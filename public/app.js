@@ -2,6 +2,10 @@ document.getElementById('consultar').addEventListener('click', consultarDNI);
 document.getElementById('dni').addEventListener('keypress', function(e) {
     if (e.key === 'Enter') consultarDNI();
 });
+document.getElementById('practica').addEventListener('change', function() {
+    const dni = document.getElementById('dni').value.trim();
+    if (dni) consultarDNI();
+});
 
 async function consultarDNI() {
     const dni = document.getElementById('dni').value.trim();
@@ -52,9 +56,72 @@ function updateProfile(data) {
     document.getElementById('welcome-message').innerHTML = 
         `¡Hola, ${nombre}! Este programa es para ayudarte y acompañarte en el cuidado de tu salud.`;
 }
-
 function showResults(data) {
     console.log('Mostrando resultados con datos:', data);
+    const practicaSelect = document.getElementById('practica');
+    const practicaSeleccionada = practicaSelect.value;
+    
+    let infoPractica = '';
+    
+    if (practicaSeleccionada) {
+        // Mapeo de campos a sus observaciones correspondientes
+        const mapaObservaciones = {
+            'Presion_Arterial': 'Observaciones_Presion_Arterial',
+            'IMC': 'Observaciones_IMC',
+            'Agudeza_visual': 'Observaciones - Agudeza visual',
+            'Control_odontologico': 'Observaciones - Control_odontologico',
+            'Valor_CPO': 'Observaciones - Control_odontologico',
+            'Alimentacion_saludable': 'Observaciones - Alimentacion_saludable',
+            'Actividad_fisica': 'Observaciones - Actividad_fisica',
+            'Seguridad_vial': 'Observaciones - Seguridad_vial',
+            'Caidas_en_adultos_mayores': 'Observaciones - Caidas_en_adultos_mayores',
+            'Acido_folico': 'Observaciones - Acido_folico',
+            'Abuso_alcohol': 'Observaciones - Abuso_alcohol',
+            'Tabaco': 'Observaciones - Tabaco',
+            'Violencia': 'Observaciones - Violencia',
+            'Depresion': 'Observaciones - Depresion',
+            'ITS': 'Observaciones - ITS',
+            'Hepatitis_B': 'Observaciones - Hepatitis_B',
+            'Hepatitis_C': 'Observaciones - Hepatitis_C',
+            'VIH': 'Observaciones - VIH',
+            'Dislipemias': 'Observaciones - Dislipemias',
+            'Diabetes': 'Observaciones - Diabetes',
+            'Cancer_cervico_uterino_HPV': 'Observaciones - HPV',
+            'Cancer_cervico_uterino_PAP': 'Observaciones - PAP',
+            'Cancer_colon_SOMF': 'Observaciones - SOMF',
+            'Cancer_colon_Colonoscopia': 'Observaciones - Colonoscopia',
+            'Cancer_mama_Mamografia': 'Observaciones - Mamografia',
+            'ERC': 'Observaciones - ERC',
+            'EPOC': 'Observaciones - EPOC',
+            'Aneurisma_aorta': 'Observaciones - Aneurisma_aorta',
+            'Osteoporosis': 'Observaciones - Osteoporosis',
+            'Estratificacion_riesgo_CV': 'Observaciones - Riesgo_CV',
+            'Aspirina': 'Observaciones - Aspirina',
+            'Inmunizaciones': 'Observaciones - Inmunizaciones',
+            'VDRL': 'Observaciones - VDRL',
+            'Prostata_PSA': 'Observaciones - PSA',
+            'Chagas': 'Observaciones - Chagas'
+            // 'Profesional' no tiene observaciones asociadas
+        };
+
+        const valor = data[practicaSeleccionada] || 'No registrado';
+        const nombrePractica = practicaSelect.options[practicaSelect.selectedIndex].text;
+        
+        // Solo buscar observaciones si no es el campo "Profesional"
+        let observaciones = '';
+        if (practicaSeleccionada !== 'Profesional' && mapaObservaciones[practicaSeleccionada]) {
+            observaciones = data[mapaObservaciones[practicaSeleccionada]] || '';
+        }
+
+        infoPractica = `
+            <div class="bg-blue-50 p-4 rounded-lg mt-4">
+                <h3 class="font-semibold text-blue-800 mb-2">${nombrePractica}</h3>
+                <p><span class="font-medium">Valor:</span> ${valor}</p>
+                ${observaciones ? `<p><span class="font-medium">Observaciones:</span> ${observaciones}</p>` : ''}
+            </div>
+        `;
+    }
+
     document.getElementById('result').innerHTML = `
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="bg-blue-50 p-4 rounded-lg">
@@ -63,11 +130,12 @@ function showResults(data) {
                 <p><span class="font-medium">Apellido:</span> ${data.Apellido || data.apellido || 'N/A'}</p>
                 <p><span class="font-medium">Edad:</span> ${data.Edad || data.edad || 'N/A'}</p>
                 <p><span class="font-medium">DNI:</span> ${data.DNI || data.dni || data.Documento || 'N/A'}</p>
+                ${data.Profesional ? `<p><span class="font-medium">Profesional:</span> ${data.Profesional}</p>` : ''}
             </div>
+            ${infoPractica}
         </div>
     `;
 }
-
 function evaluateCardiovascularRisk(data) {
     console.log('Evaluando riesgo cardiovascular con datos:', data);
     const riskAssessmentDiv = document.getElementById('risk-assessment');
