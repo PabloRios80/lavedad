@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consulta de Afiliados IAPOS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f8fafc;
+        }
+        
+        .risk-high {
+            background-color: #fee2e2;
+            border-left: 4px solid #ef4444;
+        }
+        
+        .risk-medium {
+            background-color: #fef3c7;
+            border-left: 4px solid #f59e0b;
+        }
+        
+        .risk-low {
+            background-color: #dcfce7;
+            border-left: 4px solid #22c55e;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <header class="bg-blue-600 text-white shadow-lg">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center space-x-4">
+                    <div class="bg-white rounded-full p-2">
+                        <i class="fas fa-shield-alt text-blue-600 text-2xl"></i>
+                    </div>
+                    <h1 class="text-xl font-bold">Consulta de Afiliados IAPOS</h1>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <input type="text" id="dni" placeholder="Buscar por DNI" 
+                           class="w-48 px-3 py-1 border border-blue-400 rounded-lg focus:outline-none focus:ring-1 focus:ring-white text-gray-800">
+                    <button id="consultar" class="bg-blue-700 hover:bg-blue-800 text-white px-3 py-1 rounded-lg text-sm">
+                        <i class="fas fa-search"></i>
+                    </button>
+                    <div id="loading" class="text-blue-200 hidden ml-2">
+                        <i class="fas fa-spinner fa-spin"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-6">
+        <div class="grid grid-cols-1 gap-6">
+            <!-- User Profile Card -->
+            <div class="bg-white rounded-xl shadow-md p-6">
+                <div class="flex flex-col md:flex-row items-center md:items-start space-y-4 md:space-y-0 md:space-x-6">
+                    <div class="relative">
+                        <img src="https://randomuser.me/api/portraits/women/45.jpg" alt="User" 
+                             class="w-20 h-20 rounded-full border-4 border-blue-100">
+                    </div>
+                    <div class="text-center md:text-left">
+                        <h3 class="font-bold text-lg" id="user-name">Nombre Apellido</h3>
+                        <div class="mt-2 p-4 bg-blue-50 rounded-lg text-sm text-gray-700">
+                            <p id="welcome-message">¡Hola! Este programa es para ayudarte y acompañarte en el cuidado de tu salud...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Section -->
+            <div class="bg-white rounded-xl shadow-md p-6">
+                <h2 class="text-xl font-bold mb-4">Información del Afiliado</h2>
+                <div id="result" class="text-gray-700">
+                    <p class="text-center text-gray-500 py-8">Ingrese un DNI para buscar afiliado</p>
+                </div>
+            </div>
+
+            <!-- Health Risk Assessment -->
+            <div class="bg-white rounded-xl shadow-md p-6 hidden" id="risk-assessment">
+                <h2 class="text-xl font-bold mb-4">Evaluación de Riesgo Cardiovascular</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div id="pressure-card" class="p-4 rounded-lg">
+                        <h3 class="font-semibold mb-2">Presión Arterial</h3>
+                        <p id="pressure-value">--</p>
+                        <p id="pressure-notes" class="text-sm mt-2"></p>
+                    </div>
+                    <div id="imc-card" class="p-4 rounded-lg">
+                        <h3 class="font-semibold mb-2">Índice de Masa Corporal (IMC)</h3>
+                        <p id="imc-value">--</p>
+                        <p id="imc-notes" class="text-sm mt-2"></p>
+                    </div>
+                    <div class="md:col-span-2 p-4 rounded-lg" id="risk-card">
+                        <h3 class="font-semibold mb-2">Riesgo Cardiovascular</h3>
+                        <p id="risk-level" class="text-lg font-bold">--</p>
+                        <p id="risk-description" class="text-sm mt-2"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>
