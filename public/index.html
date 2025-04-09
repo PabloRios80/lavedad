@@ -28,6 +28,52 @@
             background-color: #dcfce7;
             border-left: 4px solid #22c55e;
         }
+        /* Agregar al estilo existente */
+#risk-card {
+    transition: all 0.3s ease;
+}
+
+.risk-high #risk-level {
+    color: #dc2626;
+}
+
+.risk-medium #risk-level {
+    color: #d97706;
+}
+
+.risk-low #risk-level {
+    color: #16a34a;
+}
+
+#risk-percentage {
+    background-color: #e5e7eb;
+}
+
+.risk-high #risk-percentage {
+    background-color: #fee2e2;
+    color: #b91c1c;
+}
+
+.risk-medium #risk-percentage {
+    background-color: #fef3c7;
+    color: #92400e;
+}
+
+.risk-low #risk-percentage {
+    background-color: #dcfce7;
+    color: #166534;
+}
+
+.action-item {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem;
+    border-radius: 0.25rem;
+}
+
+.action-item i {
+    margin-right: 0.5rem;
+}
     </style>
 </head>
 <body class="bg-gray-50">
@@ -97,6 +143,7 @@
         </div>
     </div>
 </header>
+
     <!-- Main Content -->
     <main class="container mx-auto px-4 py-6">
         <div class="grid grid-cols-1 gap-6">
@@ -124,30 +171,108 @@
                 </div>
             </div>
 
-            <!-- Health Risk Assessment -->
-            <div class="bg-white rounded-xl shadow-md p-6 hidden" id="risk-assessment">
-                <h2 class="text-xl font-bold mb-4">Evaluación de Riesgo Cardiovascular</h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div id="pressure-card" class="p-4 rounded-lg">
-                        <h3 class="font-semibold mb-2">Presión Arterial</h3>
-                        <p id="pressure-value">--</p>
-                        <p id="pressure-notes" class="text-sm mt-2"></p>
-                    </div>
-                    <div id="imc-card" class="p-4 rounded-lg">
-                        <h3 class="font-semibold mb-2">Índice de Masa Corporal (IMC)</h3>
-                        <p id="imc-value">--</p>
-                        <p id="imc-notes" class="text-sm mt-2"></p>
-                    </div>
-                    <div class="md:col-span-2 p-4 rounded-lg" id="risk-card">
-                        <h3 class="font-semibold mb-2">Riesgo Cardiovascular</h3>
-                        <p id="risk-level" class="text-lg font-bold">--</p>
-                        <p id="risk-description" class="text-sm mt-2"></p>
-                    </div>
-                </div>
+<!-- Health Risk Assessment -->
+<!-- Health Risk Assessment -->
+<div class="bg-white rounded-xl shadow-md p-6 hidden" id="risk-assessment">
+    <h2 class="text-xl font-bold mb-4">Evaluación de Riesgo Cardiovascular</h2>
+    
+    <!-- Factores Principales (2 columnas) -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <!-- Presión Arterial -->
+        <div id="pressure-card" class="p-4 rounded-lg">
+            <div class="flex items-center mb-2">
+                <i class="fas fa-heartbeat mr-2"></i>
+                <h3 class="font-semibold">Presión Arterial</h3>
             </div>
+            <p id="pressure-value" class="text-2xl font-bold">--</p>
+            <p id="pressure-notes" class="text-sm mt-2 text-gray-600"></p>
         </div>
-    </main>
-
+        
+        <!-- IMC -->
+        <div id="imc-card" class="p-4 rounded-lg">
+            <div class="flex items-center mb-2">
+                <i class="fas fa-weight mr-2"></i>
+                <h3 class="font-semibold">Índice de Masa Corporal</h3>
+            </div>
+            <p id="imc-value" class="text-2xl font-bold">--</p>
+            <p id="imc-notes" class="text-sm mt-2 text-gray-600"></p>
+        </div>
+        
+        <!-- Diabetes -->
+        <div id="diabetes-card" class="p-4 rounded-lg">
+            <div class="flex items-center mb-2">
+                <i class="fas fa-vial mr-2"></i>
+                <h3 class="font-semibold">Diabetes</h3>
+            </div>
+            <p id="diabetes-value" class="text-2xl font-bold">--</p>
+            <p id="diabetes-notes" class="text-sm mt-2 text-gray-600"></p>
+        </div>
+        
+        <!-- Dislipemias -->
+        <div id="dislipemia-card" class="p-4 rounded-lg">
+            <div class="flex items-center mb-2">
+                <i class="fas fa-tint mr-2"></i>
+                <h3 class="font-semibold">Dislipemias</h3>
+            </div>
+            <p id="dislipemia-value" class="text-2xl font-bold">--</p>
+            <p id="dislipemia-notes" class="text-sm mt-2 text-gray-600"></p>
+        </div>
+    </div>
+    
+    <!-- Factores Secundarios (3 columnas) -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <!-- Tabaquismo -->
+        <div id="tabaquismo-card" class="p-4 rounded-lg">
+            <div class="flex items-center mb-2">
+                <i class="fas fa-smoking mr-2"></i>
+                <h3 class="font-semibold">Tabaquismo</h3>
+            </div>
+            <p id="tabaquismo-value" class="text-xl font-bold">--</p>
+            <p id="tabaquismo-notes" class="text-sm mt-2 text-gray-600"></p>
+        </div>
+        
+        <!-- Edad -->
+        <div id="edad-card" class="p-4 rounded-lg bg-blue-50">
+            <div class="flex items-center mb-2">
+                <i class="fas fa-birthday-cake text-blue-500 mr-2"></i>
+                <h3 class="font-semibold">Edad</h3>
+            </div>
+            <p id="edad-value" class="text-xl font-bold">--</p>
+        </div>
+        
+        <!-- Sexo -->
+        <div id="sexo-card" class="p-4 rounded-lg bg-blue-50">
+            <div class="flex items-center mb-2">
+                <i class="fas fa-venus-mars text-blue-500 mr-2"></i>
+                <h3 class="font-semibold">Sexo</h3>
+            </div>
+            <p id="sexo-value" class="text-xl font-bold">--</p>
+        </div>
+    </div>
+    
+    <!-- Resultado Final -->
+    <div id="risk-card" class="p-6 rounded-lg">
+        <h3 class="font-semibold text-lg mb-3 flex items-center">
+            <i class="fas fa-exclamation-triangle mr-2"></i> Evaluación Final de Riesgo
+        </h3>
+        <div class="flex items-center mb-3">
+            <span id="risk-level" class="text-2xl font-bold mr-3">--</span>
+            <span id="risk-percentage" class="px-3 py-1 rounded-full text-sm font-medium"></span>
+        </div>
+        <div id="risk-description" class="bg-white bg-opacity-50 p-4 rounded-lg">
+            <p id="risk-score" class="font-medium mb-2"></p>
+            <p id="risk-recommendation"></p>
+        </div>
+    </div>
+    
+    <!-- Plan de Acción -->
+    <div class="mt-6 bg-blue-50 p-4 rounded-lg">
+        <h4 class="font-semibold mb-2 text-blue-800">Plan de Acción Personalizado</h4>
+        <ul id="action-plan" class="list-disc pl-5 space-y-1">
+            <!-- Se llenará dinámicamente -->
+        </ul>
+    </div>
+</div>
     <script src="app.js"></script>
 </body>
 </html>

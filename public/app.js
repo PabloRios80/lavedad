@@ -136,56 +136,216 @@ function showResults(data) {
         </div>
     `;
 }
-function evaluateCardiovascularRisk(data) {
-    console.log('Evaluando riesgo cardiovascular con datos:', data);
-    const riskAssessmentDiv = document.getElementById('risk-assessment');
-    
-    // Obtener datos con acceso seguro a propiedades
-    const presionArterial = data['Presion Arterial'] || data['Presion_Arterial'] || 'No registrado';
-    const obsPresion = data['Observaciones_Presion Arterial'] || data['Observaciones_Presion_Arterial'] || '';
-    const imc = data['IMC'] || 'No registrado';
-    const obsIMC = data['Observaciones_IMC'] || '';
-    
-    console.log('Datos médicos:', { presionArterial, obsPresion, imc, obsIMC });
 
-    // Mostrar valores en la interfaz
-    document.getElementById('pressure-value').textContent = presionArterial;
-    document.getElementById('pressure-notes').textContent = obsPresion;
-    document.getElementById('imc-value').textContent = imc;
-    document.getElementById('imc-notes').textContent = obsIMC;
+function evaluateCardiovascularRisk(data) {
+    console.log('Datos completos recibidos:', data); // Para depuración
     
-    // Evaluar riesgo
-    let riesgo = 'NORMAL';
-    let descripcion = 'Indicadores dentro de parámetros normales.';
-    let riesgoClass = 'risk-low';
+    // 1. Obtener valores REALES del paciente (sin procesar)
+    const valoresReales = {
+        edad: parseInt(data.Edad || data.edad) || 0,
+        sexo: (data.Sexo || '').toUpperCase().startsWith('F') ? 'Femenino' : 'Masculino',
+        presion: data['Presion Arterial'] || data['Presion_Arterial'] || 'No registrado',
+        imc: data['IMC'] || 'No registrado',
+        diabetes: data['Diabetes'] || data['Diabetes'] || 'No registrado',
+        dislipemia: data['Dislipemias'] || data['Dislipemias'] || 'No registrado',
+        tabaquismo: data['Tabaquismo'] || data['Tabaco'] || 'No registrado',
+    };
+
+    // 2. Evaluar factores de riesgo (lógica que funciona bien)
+    const factoresEvaluados = {
+        presion: evaluarPresion(valoresReales.presion),
+        imc: evaluarIMC(valoresReales.imc),
+        diabetes: { valor: valoresReales.diabetes, riesgo: valoresReales.diabetes === 'Presenta' },
+        dislipemia: { valor: valoresReales.dislipemia, riesgo: valoresReales.dislipemia === 'Presenta' },
+        tabaquismo: { valor: valoresReales.tabaquismo, riesgo: valoresReales.tabaquismo === 'Fuma' },
+        edad: { valor: valoresReales.edad, riesgo: valoresReales.edad >= 40 },
+        sexo: { valor: valoresReales.sexo, riesgo: valoresReales.sexo === 'Masculino' }
+    };
+
+    // 3. Calcular puntuación (función existente que funciona)
+    const puntuacion = calcularPuntuacionRiesgo(factoresEvaluados);
     
-    // Lógica de evaluación mejorada
-    const tieneHipertension = presionArterial.includes('Hipertensión') || obsPresion.includes('Hipertensión');
-    const tieneObesidad = imc.includes('Obesidad') || obsIMC.includes('Obesidad');
-    const tieneSobrepeso = imc.includes('Sobrepeso') || obsIMC.includes('Sobrepeso');
+    // 4. Clasificar riesgo (función existente que funciona)
+    const riesgo = clasificarRiesgo(puntuacion, factoresEvaluados.diabetes.riesgo, factoresEvaluados.presion.riesgo);
+
+    // 5. Mostrar resultados CORRECTAMENTE
+    mostrarResultadosFinales({
+        valoresReales,
+        factoresEvaluados,
+        puntuacion,
+        riesgo
+    });
+}
+
+function evaluarPresion(presion) {
+    let valor = presion;
+    let riesgo = false;
     
-    if (tieneHipertension && tieneObesidad) {
-        riesgo = 'ALTO';
-        descripcion = 'Presenta Hipertensión y Obesidad. Riesgo cardiovascular elevado.';
-        riesgoClass = 'risk-high';
-    } else if (tieneHipertension || tieneObesidad || tieneSobrepeso) {
-        riesgo = 'MODERADO';
-        descripcion = 'Presenta factores de riesgo que requieren atención.';
-        riesgoClass = 'risk-medium';
+    if (presion.includes('Hipertensión')) {
+        riesgo = true;
+    } else if (presion.match(/\d+\s*\/\s*\d+/)) {
+        const [sistolica, diastolica] = presion.split('/').map(Number);
+        riesgo = sistolica >= 140 || diastolica >= 90;
+        valor = `${sistolica}/${diastolica}`;
     }
     
-    // Actualizar interfaz
-    document.getElementById('risk-level').textContent = riesgo;
-    document.getElementById('risk-description').textContent = descripcion;
+    return {valor, riesgo};
+}
+
+function evaluarIMC(imc) {
+    let valor = imc;
+    let riesgo = false;
+    const imcNum = parseFloat(imc);
     
-    // Aplicar estilos
-    document.getElementById('pressure-card').className = `p-4 rounded-lg ${riesgoClass}`;
-    document.getElementById('imc-card').className = `p-4 rounded-lg ${riesgoClass}`;
-    document.getElementById('risk-card').className = `md:col-span-2 p-4 rounded-lg ${riesgoClass}`;
+    if (!isNaN(imcNum)) {
+        riesgo = imcNum >= 25;
+        valor = imcNum.toFixed(1);
+    } else if (imc.includes('Sobrepeso') || imc.includes('Obesidad')) {
+        riesgo = true;
+    }
+    
+    return {valor, riesgo};
+}
+
+function evaluarTabaquismo(tabaco) {
+    let valor = tabaco;
+    let riesgo = false;
+    
+    if (tabaco === "Fuma") {
+        riesgo = true;
+        valor = "Fuma";
+    } else if (tabaco === "No fuma") {
+        riesgo = false;
+        valor = "No fuma";
+    } else {
+        // Para casos como "No registrado" o valores inesperados
+        riesgo = false;
+        valor = tabaco || "No registrado";
+    }
+    
+    return {valor, riesgo};
+}
+
+function calcularPuntuacionRiesgo(factores) {
+    let puntos = 0;
+
+    // Puntos por edad
+    if (factores.edad.valor >= 70) puntos += (factores.sexo.valor === 'Masculino' ? 8 : 9);
+    else if (factores.edad.valor >= 60) puntos += (factores.sexo.valor === 'Masculino' ? 6 : 7);
+    else if (factores.edad.valor >= 50) puntos += 4;
+    else if (factores.edad.valor >= 40) puntos += (factores.sexo.valor === 'Masculino' ? 3 : 2);
+
+    // Puntos por factores de riesgo
+    if (factores.presion.riesgo) puntos += 3;
+    if (factores.diabetes.riesgo) puntos += 3;
+    if (factores.tabaquismo.riesgo) puntos += 2;
+    if (factores.dislipemia.riesgo) puntos += 2;
+    if (factores.imc.riesgo) {
+        const imcNum = parseFloat(factores.imc.valor);
+        puntos += (!isNaN(imcNum) && imcNum >= 30) ? 2 : 1;
+    }
+
+    return puntos;
+}
+
+function clasificarRiesgo(puntuacion, diabetes, hipertension) {
+    if (puntuacion >= 15 || diabetes || hipertension) {
+        return {
+            nivel: "ALTO RIESGO",
+            porcentaje: "≥20% a 10 años",
+            clase: "risk-high",
+            recomendacion: "Consulta cardiológica urgente. Control estricto de factores de riesgo."
+        };
+    } else if (puntuacion >= 10) {
+        return {
+            nivel: "RIESGO MODERADO",
+            porcentaje: "10-19% a 10 años",
+            clase: "risk-medium",
+            recomendacion: "Consulta con médico clínico. Mejora de hábitos."
+        };
+    }
+    return {
+        nivel: "BAJO RIESGO",
+        porcentaje: "<10% a 10 años",
+        clase: "risk-low",
+        recomendacion: "Control médico anual. Mantener hábitos saludables."
+    };
+}
+
+function mostrarResultadosCompletos({presion, imc, diabetes, dislipemia, tabaquismo, edad, sexo, puntuacion, riesgo, datosOriginales}) {
+    const riskAssessmentDiv = document.getElementById('risk-assessment');
+    
+    // Mostrar valores REALES del paciente
+    document.getElementById('pressure-value').textContent = presion.valor;
+    document.getElementById('imc-value').textContent = imc.valor;
+    document.getElementById('diabetes-value').textContent = diabetes.valor;
+    document.getElementById('dislipemia-value').textContent = (datosOriginales.Dislipemias || '').includes('PRESENTA') ? 'PRESENTA' : 'No registrada';
+    document.getElementById('tabaquismo-value').textContent = (datosOriginales.Tabaco || '').includes('FUMA') ? 'FUMADOR' : 'No fumador';
+    document.getElementById('edad-value').textContent = `${edad.valor} años`;
+    document.getElementById('sexo-value').textContent = sexo.valor;
+
+    // Aplicar estilos según evaluación de riesgo
+    actualizarEstiloTarjeta('pressure', presion.riesgo);
+    actualizarEstiloTarjeta('imc', imc.riesgo);
+    actualizarEstiloTarjeta('diabetes', diabetes.riesgo);
+    actualizarEstiloTarjeta('dislipemia', dislipemia.riesgo);
+    actualizarEstiloTarjeta('tabaquismo', tabaquismo.riesgo);
+
+    // Mostrar resultado final
+    document.getElementById('risk-level').textContent = riesgo.nivel;
+    document.getElementById('risk-percentage').textContent = riesgo.porcentaje;
+    document.getElementById('risk-description').innerHTML = `
+        <strong>Puntuación:</strong> ${puntuacion}<br>
+        <strong>Recomendaciones:</strong> ${riesgo.recomendacion}
+    `;
+
+    document.getElementById('risk-card').className = `md:col-span-2 p-4 rounded-lg ${riesgo.clase}`;
+    riskAssessmentDiv.classList.remove('hidden');
+}
+function actualizarEstiloTarjeta(tipo, tieneRiesgo) {
+    const card = document.getElementById(`${tipo}-card`);
+    const notesElement = document.getElementById(`${tipo}-notes`);
+    
+    if (tieneRiesgo) {
+        card.className = `p-4 rounded-lg bg-red-100 border-l-4 border-red-500`;
+        if (notesElement) notesElement.innerHTML = '<span class="text-red-500"><i class="fas fa-exclamation-triangle"></i> Riesgo detectado</span>';
+    } else {
+        card.className = `p-4 rounded-lg bg-green-100 border-l-4 border-green-500`;
+        if (notesElement) notesElement.innerHTML = '<span class="text-green-500"><i class="fas fa-check-circle"></i> Normal</span>';
+    }
+}
+function mostrarResultadosFinales({valoresReales, factoresEvaluados, puntuacion, riesgo}) {
+    const riskAssessmentDiv = document.getElementById('risk-assessment');
+    
+    // 1. Mostrar valores EXACTOS del paciente
+    document.getElementById('pressure-value').textContent = valoresReales.presion;
+    document.getElementById('imc-value').textContent = valoresReales.imc;
+    document.getElementById('diabetes-value').textContent = valoresReales.diabetes;
+    document.getElementById('dislipemia-value').textContent = valoresReales.dislipemia;
+    document.getElementById('tabaquismo-value').textContent = valoresReales.tabaquismo;
+    document.getElementById('edad-value').textContent = `${valoresReales.edad} años`;
+    document.getElementById('sexo-value').textContent = valoresReales.sexo;
+
+    // 2. Aplicar estilos según evaluación (sin alterar los valores mostrados)
+    actualizarEstiloTarjeta('pressure', factoresEvaluados.presion.riesgo);
+    actualizarEstiloTarjeta('imc', factoresEvaluados.imc.riesgo);
+    actualizarEstiloTarjeta('diabetes', factoresEvaluados.diabetes.riesgo);
+    actualizarEstiloTarjeta('dislipemia', factoresEvaluados.dislipemia.riesgo);
+    actualizarEstiloTarjeta('tabaquismo', factoresEvaluados.tabaquismo.riesgo);
+
+    // 3. Mostrar evaluación de riesgo (calculada correctamente)
+    document.getElementById('risk-level').textContent = riesgo.nivel;
+    document.getElementById('risk-percentage').textContent = riesgo.porcentaje;
+    document.getElementById('risk-description').innerHTML = `
+        <strong>Puntuación:</strong> ${puntuacion}<br>
+        <strong>Recomendaciones:</strong> ${riesgo.recomendacion}
+    `;
+
+    // 4. Color del recuadro principal según riesgo
+    document.getElementById('risk-card').className = `md:col-span-2 p-4 rounded-lg ${riesgo.clase}`;
     
     riskAssessmentDiv.classList.remove('hidden');
 }
-
 function resetProfile() {
     document.getElementById('user-name').textContent = 'Nombre Apellido';
     document.getElementById('welcome-message').innerHTML = 
