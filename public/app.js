@@ -45,7 +45,11 @@ async function consultarDNI() {
             evaluateHealthyHabits(data);
             evaluateDentalHealth(data); 
             evaluateMentalHealth(data); 
-            evaluateRenalHealth(data); 
+            evaluateRenalHealth(data);
+            evaluateEPOC(data); 
+            evaluateAneurisma(data); 
+            evaluateOsteoporosis(data); 
+            evaluateAspirina(data);
         }
     } catch (error) {
         console.error('Error en la consulta:', error);
@@ -926,7 +930,237 @@ function evaluateRenalHealth(data) {
     // Mostrar sección
     renalDiv.classList.remove('hidden');
 }
+function evaluateEPOC(data) {
+    const epocDiv = document.getElementById('epoc-section');
+    const recommendationsList = document.getElementById('epoc-recommendations');
+    
+    // Limpiar recomendaciones previas
+    recommendationsList.innerHTML = '';
+    
+    // Obtener valores
+    const value = data['EPOC'] || '';
+    const notes = data['Observaciones - EPOC'] || '';
+    
+    // Mostrar valores
+    document.getElementById('epoc-value').textContent = value || 'No registrado';
+    
+    // Evaluar resultado
+    const isPositive = /^se\s*verifica$/i.test(value.trim());
+    const isNegative = /^no\s*se\s*verifica$/i.test(value.trim());
+    const isNotDone = /^no\s*se\s*realiza$/i.test(value.trim());
+    
+    // Aplicar estilos y recomendaciones
+    const cardElement = document.getElementById('epoc-card');
+    const notesElement = document.getElementById('epoc-notes');
+    
+    if (isPositive) {
+        cardElement.className = 'p-4 rounded-lg risk-high';
+        notesElement.innerHTML = '<span class="text-red-500"><i class="fas fa-exclamation-triangle"></i> Se verifica</span>';
+        recommendationsList.innerHTML = `
+            <li class="text-red-600 font-medium">EPOC detectado: Evaluación neumológica</li>
+            <li>Rehabilitación pulmonar recomendada</li>
+            <li>Evitar exposición a humos/contaminantes</li>
+        `;
+    } else if (isNegative) {
+        cardElement.className = 'p-4 rounded-lg risk-low';
+        notesElement.innerHTML = '<span class="text-green-500"><i class="fas fa-check-circle"></i> No se verifica</span>';
+        recommendationsList.innerHTML = `
+            <li class="text-green-600">Sin indicios de EPOC detectados</li>
+            <li>Continuar con prevención en fumadores</li>
+        `;
+    } else if (isNotDone) {
+        cardElement.className = 'p-4 rounded-lg bg-gray-100';
+        notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-info-circle"></i> No realizado</span>';
+        recommendationsList.innerHTML = `
+            <li>Evaluación recomendada para fumadores</li>
+            <li>Espirometría como prueba diagnóstica</li>
+        `;
+    } else {
+        cardElement.className = 'p-4 rounded-lg bg-gray-100';
+        notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-question-circle"></i> No registrado</span>';
+    }
+    
+    // Mostrar observaciones
+    if (notes) {
+        notesElement.innerHTML += `<div class="mt-1 text-gray-600">Obs: ${notes}</div>`;
+    }
+    
+    // Mostrar sección
+    epocDiv.classList.remove('hidden');
+}
 
+function evaluateAneurisma(data) {
+    const aneurismaDiv = document.getElementById('aneurisma-section');
+    const recommendationsList = document.getElementById('aneurisma-recommendations');
+    
+    // Limpiar recomendaciones previas
+    recommendationsList.innerHTML = '';
+    
+    // Obtener valores
+    const value = data['Aneurisma_aorta'] || '';
+    const notes = data['Observaciones - Aneurisma_aorta'] || '';
+    
+    // Mostrar valores
+    document.getElementById('aneurisma-value').textContent = value || 'No registrado';
+    
+    // Evaluar resultado
+    const isPositive = /^se\s*verifica$/i.test(value.trim());
+    const isNegative = /^no\s*se\s*verifica$/i.test(value.trim());
+    const isNotDone = /^no\s*se\s*realiza$/i.test(value.trim());
+    
+    // Aplicar estilos y recomendaciones
+    const cardElement = document.getElementById('aneurisma-card');
+    const notesElement = document.getElementById('aneurisma-notes');
+    
+    if (isPositive) {
+        cardElement.className = 'p-4 rounded-lg risk-high';
+        notesElement.innerHTML = '<span class="text-red-500"><i class="fas fa-exclamation-triangle"></i> Se verifica</span>';
+        recommendationsList.innerHTML = `
+            <li class="text-red-600 font-medium">Aneurisma detectado: Urgencia vascular</li>
+            <li>Evaluación por cirugía vascular</li>
+            <li>Control estricto de presión arterial</li>
+        `;
+    } else if (isNegative) {
+        cardElement.className = 'p-4 rounded-lg risk-low';
+        notesElement.innerHTML = '<span class="text-green-500"><i class="fas fa-check-circle"></i> No se verifica</span>';
+        recommendationsList.innerHTML = `
+            <li class="text-green-600">Sin evidencia de aneurisma</li>
+            <li>Control en pacientes de riesgo</li>
+        `;
+    } else if (isNotDone) {
+        cardElement.className = 'p-4 rounded-lg bg-gray-100';
+        notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-info-circle"></i> No realizado</span>';
+        recommendationsList.innerHTML = `
+            <li>Recomendado en fumadores >65 años</li>
+            <li>Ecografía abdominal de screening</li>
+        `;
+    } else {
+        cardElement.className = 'p-4 rounded-lg bg-gray-100';
+        notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-question-circle"></i> No registrado</span>';
+    }
+    
+    // Mostrar observaciones
+    if (notes) {
+        notesElement.innerHTML += `<div class="mt-1 text-gray-600">Obs: ${notes}</div>`;
+    }
+    
+    // Mostrar sección
+    aneurismaDiv.classList.remove('hidden');
+}
+
+function evaluateOsteoporosis(data) {
+    const osteoporosisDiv = document.getElementById('osteoporosis-section');
+    const recommendationsList = document.getElementById('osteoporosis-recommendations');
+    
+    // Limpiar recomendaciones previas
+    recommendationsList.innerHTML = '';
+    
+    // Obtener valores
+    const value = data['Osteoporosis'] || '';
+    const notes = data['Observaciones - Osteoporosis'] || '';
+    
+    // Mostrar valores
+    document.getElementById('osteoporosis-value').textContent = value || 'No registrado';
+    
+    // Evaluar resultado
+    const isPositive = /^se\s*verifica$/i.test(value.trim());
+    const isNegative = /^no\s*se\s*verifica$/i.test(value.trim());
+    const isNotDone = /^no\s*se\s*realiza$/i.test(value.trim());
+    
+    // Aplicar estilos y recomendaciones
+    const cardElement = document.getElementById('osteoporosis-card');
+    const notesElement = document.getElementById('osteoporosis-notes');
+    
+    if (isPositive) {
+        cardElement.className = 'p-4 rounded-lg risk-high';
+        notesElement.innerHTML = '<span class="text-red-500"><i class="fas fa-exclamation-triangle"></i> Se verifica</span>';
+        recommendationsList.innerHTML = `
+            <li class="text-red-600 font-medium">Osteoporosis confirmada</li>
+            <li>Suplementación con calcio/vitamina D</li>
+            <li>Evaluación para tratamiento específico</li>
+        `;
+    } else if (isNegative) {
+        cardElement.className = 'p-4 rounded-lg risk-low';
+        notesElement.innerHTML = '<span class="text-green-500"><i class="fas fa-check-circle"></i> No se verifica</span>';
+        recommendationsList.innerHTML = `
+            <li class="text-green-600">Densidad ósea normal</li>
+            <li>Mantener ingesta adecuada de calcio</li>
+        `;
+    } else if (isNotDone) {
+        cardElement.className = 'p-4 rounded-lg bg-gray-100';
+        notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-info-circle"></i> No realizado</span>';
+        recommendationsList.innerHTML = `
+            <li>Recomendado en mujeres >65 años</li>
+            <li>Densitometría ósea como prueba clave</li>
+        `;
+    } else {
+        cardElement.className = 'p-4 rounded-lg bg-gray-100';
+        notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-question-circle"></i> No registrado</span>';
+    }
+    
+    // Mostrar observaciones
+    if (notes) {
+        notesElement.innerHTML += `<div class="mt-1 text-gray-600">Obs: ${notes}</div>`;
+    }
+    
+    // Mostrar sección
+    osteoporosisDiv.classList.remove('hidden');
+}
+
+function evaluateAspirina(data) {
+    const aspirinaDiv = document.getElementById('aspirina-section');
+    const recommendationsList = document.getElementById('aspirina-recommendations');
+    
+    // Limpiar recomendaciones previas
+    recommendationsList.innerHTML = '';
+    
+    // Obtener valores
+    const value = data['Aspirina'] || '';
+    const notes = data['Observaciones - Aspirina'] || '';
+    
+    // Mostrar valores
+    document.getElementById('aspirina-value').textContent = value || 'No registrado';
+    
+    // Evaluar resultado
+    const isIndicated = /^indicada$/i.test(value.trim());
+    const isNotIndicated = /^no\s*indicada$/i.test(value.trim());
+    
+    // Aplicar estilos y recomendaciones
+    const cardElement = document.getElementById('aspirina-card');
+    const notesElement = document.getElementById('aspirina-notes');
+    
+    if (isIndicated) {
+        cardElement.className = 'p-4 rounded-lg risk-high';
+        notesElement.innerHTML = '<span class="text-red-500"><i class="fas fa-exclamation-triangle"></i> Indicada</span>';
+        recommendationsList.innerHTML = `
+            <li class="text-red-600 font-medium">Aspirina indicada para prevención</li>
+            <li>Dosis usual: 75-100 mg/día</li>
+            <li>Monitorizar efectos gastrointestinales</li>
+        `;
+    } else if (isNotIndicated) {
+        cardElement.className = 'p-4 rounded-lg risk-low';
+        notesElement.innerHTML = '<span class="text-green-500"><i class="fas fa-check-circle"></i> No indicada</span>';
+        recommendationsList.innerHTML = `
+            <li class="text-green-600">Sin indicación actual de aspirina</li>
+            <li>Reevaluar según factores de riesgo</li>
+        `;
+    } else {
+        cardElement.className = 'p-4 rounded-lg bg-gray-100';
+        notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-question-circle"></i> No registrado</span>';
+        recommendationsList.innerHTML = `
+            <li>Evaluar indicación según riesgo CV</li>
+            <li>Balancear riesgo/beneficio individual</li>
+        `;
+    }
+    
+    // Mostrar observaciones
+    if (notes) {
+        notesElement.innerHTML += `<div class="mt-1 text-gray-600">Obs: ${notes}</div>`;
+    }
+    
+    // Mostrar sección
+    aspirinaDiv.classList.remove('hidden');
+}
 function resetProfile() {
     document.getElementById('user-name').textContent = 'Nombre Apellido';
     document.getElementById('welcome-message').innerHTML = 
@@ -938,4 +1172,8 @@ function resetProfile() {
     document.getElementById('dental-health').classList.add('hidden');
     document.getElementById('mental-health').classList.add('hidden');
     document.getElementById('renal-health').classList.add('hidden');
+    document.getElementById('epoc-section').classList.add('hidden');
+    document.getElementById('aneurisma-section').classList.add('hidden');
+    document.getElementById('osteoporosis-section').classList.add('hidden');
+    document.getElementById('aspirina-section').classList.add('hidden');
 }
