@@ -41,6 +41,7 @@ async function consultarDNI() {
             showResults(data);
             evaluateCardiovascularRisk(data);
             evaluateCancerPrevention(data);
+            evaluateInfectiousDiseases(data);
         }
     } catch (error) {
         console.error('Error en la consulta:', error);
@@ -472,10 +473,123 @@ function evaluateCancerPrevention(data) {
     // Mostrar la sección
     cancerDiv.classList.remove('hidden');
 }
+function evaluateInfectiousDiseases(data) {
+    const infectiousDiv = document.getElementById('infectious-diseases');
+    const recommendationsList = document.getElementById('infectious-recommendations');
+    
+    // Limpiar recomendaciones previas
+    recommendationsList.innerHTML = '';
+    
+    // Mapeo de campos de enfermedades infecciosas
+    const infectiousTests = {
+        'its': {
+            field: 'ITS',
+            notesField: 'Observaciones - ITS',
+            name: 'Infecciones de Transmisión Sexual',
+            riskGroups: ['Personas sexualmente activas', 'Múltiples parejas', 'Sin protección'],
+            screening: 'Anual o según factores de riesgo'
+        },
+        'hepatitis-b': {
+            field: 'Hepatitis_B',
+            notesField: 'Observaciones - Hepatitis_B',
+            name: 'Hepatitis B',
+            riskGroups: ['Personal de salud', 'Parejas de infectados', 'Usuarios de drogas IV'],
+            screening: 'Al menos una vez en la vida'
+        },
+        'hepatitis-c': {
+            field: 'Hepatitis_C',
+            notesField: 'Observaciones - Hepatitis_C',
+            name: 'Hepatitis C',
+            riskGroups: ['Nacidos entre 1945-1965', 'Transfusiones antes de 1992', 'Usuarios de drogas IV'],
+            screening: 'Al menos una vez en la vida'
+        },
+        'vih': {
+            field: 'VIH',
+            notesField: 'Observaciones - VIH',
+            name: 'VIH',
+            riskGroups: ['Personas sexualmente activas', 'Usuarios de drogas IV', 'Parejas de positivos'],
+            screening: 'Al menos una vez en la vida, anual si factores de riesgo'
+        },
+        'vdrl': {
+            field: 'VDRL',
+            notesField: 'Observaciones - VDRL',
+            name: 'VDRL (Sífilis)',
+            riskGroups: ['Embarazadas', 'Personas sexualmente activas', 'Hombres que tienen sexo con hombres'],
+            screening: 'Anual si factores de riesgo'
+        },
+        'chagas': {
+            field: 'Chagas',
+            notesField: 'Observaciones - Chagas',
+            name: 'Chagas',
+            riskGroups: ['Zonas endémicas', 'Madres positivas', 'Transfusiones antes de 2005'],
+            screening: 'Al menos una vez en la vida si factores de riesgo'
+        }
+    };
+    
+    // Procesar cada examen
+    for (const [testId, testInfo] of Object.entries(infectiousTests)) {
+        const valueElement = document.getElementById(`${testId}-value`);
+        const notesElement = document.getElementById(`${testId}-notes`);
+        const cardElement = document.getElementById(`${testId}-card`);
+        
+        // Obtener el valor del campo, normalizando posibles variaciones
+        let value = data[testInfo.field] || 'No registrado';
+        const notes = data[testInfo.notesField] || '';
+        
+        // Normalizar valores
+        value = value.toString().trim();
+        
+        // Verificar si el valor contiene alguna de las palabras clave
+        const isPositive = /positivo|reactivo|detectado|presenta/i.test(value);
+        const isNegative = /negativo|no reactivo|no presenta/i.test(value);
+        const isNotDone = /no se realiza|no realizado|no efectuado/i.test(value);
+        
+        valueElement.textContent = value;
+        
+        // Establecer estilo según resultado
+        if (isPositive) {
+            cardElement.className = 'p-4 rounded-lg risk-high';
+            notesElement.innerHTML = '<span class="text-red-500"><i class="fas fa-exclamation-triangle"></i> Resultado positivo - Requiere atención</span>';
+            
+            // Agregar recomendación urgente
+            recommendationsList.innerHTML += `
+                <li class="text-red-600 font-medium">
+                    <strong>${testInfo.name}:</strong> Resultado positivo (${value}). Consultar con especialista urgentemente.
+                </li>
+            `;
+        } else if (isNegative) {
+            cardElement.className = 'p-4 rounded-lg risk-low';
+            notesElement.innerHTML = '<span class="text-green-500"><i class="fas fa-check-circle"></i> Resultado negativo</span>';
+        } else if (isNotDone) {
+            cardElement.className = 'p-4 rounded-lg bg-gray-100';
+            notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-info-circle"></i> No realizado</span>';
+            
+            // Recomendación de screening según factores de riesgo
+            recommendationsList.innerHTML += `
+                <li>
+                    <strong>${testInfo.name}:</strong> Prueba recomendada para ${testInfo.riskGroups.join(', ')}. 
+                    <span class="text-blue-600">Frecuencia: ${testInfo.screening}.</span>
+                </li>
+            `;
+        } else {
+            cardElement.className = 'p-4 rounded-lg bg-gray-100';
+            notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-question-circle"></i> No registrado</span>';
+        }
+        
+        // Mostrar observaciones si existen
+        if (notes) {
+            notesElement.innerHTML += `<div class="mt-1 text-gray-600">Obs: ${notes}</div>`;
+        }
+    }
+    
+    // Mostrar la sección
+    infectiousDiv.classList.remove('hidden');
+}
 function resetProfile() {
     document.getElementById('user-name').textContent = 'Nombre Apellido';
     document.getElementById('welcome-message').innerHTML = 
         '¡Hola! Este programa es para ayudarte y acompañarte en el cuidado de tu salud.';
     document.getElementById('risk-assessment').classList.add('hidden');
-    document.getElementById('cancer-prevention').classList.add('hidden'); // Nueva línea
+    document.getElementById('cancer-prevention').classList.add('hidden');
+    document.getElementById('infectious-diseases').classList.add('hidden'); // Nueva línea
 }

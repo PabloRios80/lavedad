@@ -74,6 +74,12 @@
 .action-item i {
     margin-right: 0.5rem;
 }
+/* Agrega esto en el <style> del head */
+    .fa-bacteria:before { content: "\f959"; }
+.fa-liver:before { content: "\f21e"; }
+.fa-virus:before { content: "\f974"; }
+.fa-bug:before { content: "\f188"; }
+
     </style>
 </head>
 <body class="bg-gray-50">
@@ -345,6 +351,81 @@
     <div class="mt-6 bg-blue-50 p-4 rounded-lg">
         <h4 class="font-semibold mb-2 text-blue-800">Recomendaciones</h4>
         <ul id="cancer-recommendations" class="list-disc pl-5 space-y-1">
+            <!-- Se llenará dinámicamente -->
+        </ul>
+    </div>
+</div>
+<!-- Infectious Diseases Prevention Section -->
+<div class="bg-white rounded-xl shadow-md p-6 hidden" id="infectious-diseases">
+    <h2 class="text-xl font-bold mb-4">Prevención de Enfermedades Infecciosas</h2>
+    
+    <!-- Exámenes de Prevención -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <!-- ITS -->
+        <div id="its-card" class="p-4 rounded-lg">
+            <div class="flex items-center mb-2">
+                <i class="fas fa-bacteria mr-2"></i>
+                <h3 class="font-semibold">Infecciones de Transmisión Sexual</h3>
+            </div>
+            <p id="its-value" class="text-2xl font-bold">--</p>
+            <p id="its-notes" class="text-sm mt-2 text-gray-600"></p>
+        </div>
+        
+        <!-- Hepatitis B -->
+        <div id="hepatitis-b-card" class="p-4 rounded-lg">
+            <div class="flex items-center mb-2">
+                <i class="fas fa-liver mr-2"></i>
+                <h3 class="font-semibold">Hepatitis B</h3>
+            </div>
+            <p id="hepatitis-b-value" class="text-2xl font-bold">--</p>
+            <p id="hepatitis-b-notes" class="text-sm mt-2 text-gray-600"></p>
+        </div>
+        
+        <!-- Hepatitis C -->
+        <div id="hepatitis-c-card" class="p-4 rounded-lg">
+            <div class="flex items-center mb-2">
+                <i class="fas fa-liver mr-2"></i>
+                <h3 class="font-semibold">Hepatitis C</h3>
+            </div>
+            <p id="hepatitis-c-value" class="text-2xl font-bold">--</p>
+            <p id="hepatitis-c-notes" class="text-sm mt-2 text-gray-600"></p>
+        </div>
+        
+        <!-- VIH -->
+        <div id="vih-card" class="p-4 rounded-lg">
+            <div class="flex items-center mb-2">
+                <i class="fas fa-virus mr-2"></i>
+                <h3 class="font-semibold">VIH</h3>
+            </div>
+            <p id="vih-value" class="text-2xl font-bold">--</p>
+            <p id="vih-notes" class="text-sm mt-2 text-gray-600"></p>
+        </div>
+        
+        <!-- VDRL -->
+        <div id="vdrl-card" class="p-4 rounded-lg">
+            <div class="flex items-center mb-2">
+                <i class="fas fa-microscope mr-2"></i>
+                <h3 class="font-semibold">VDRL (Sífilis)</h3>
+            </div>
+            <p id="vdrl-value" class="text-2xl font-bold">--</p>
+            <p id="vdrl-notes" class="text-sm mt-2 text-gray-600"></p>
+        </div>
+        
+        <!-- Chagas -->
+        <div id="chagas-card" class="p-4 rounded-lg">
+            <div class="flex items-center mb-2">
+                <i class="fas fa-bug mr-2"></i>
+                <h3 class="font-semibold">Chagas</h3>
+            </div>
+            <p id="chagas-value" class="text-2xl font-bold">--</p>
+            <p id="chagas-notes" class="text-sm mt-2 text-gray-600"></p>
+        </div>
+    </div>
+    
+    <!-- Recomendaciones -->
+    <div class="mt-6 bg-blue-50 p-4 rounded-lg">
+        <h4 class="font-semibold mb-2 text-blue-800">Recomendaciones</h4>
+        <ul id="infectious-recommendations" class="list-disc pl-5 space-y-1">
             <!-- Se llenará dinámicamente -->
         </ul>
     </div>
