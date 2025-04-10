@@ -40,6 +40,7 @@ async function consultarDNI() {
             updateProfile(data);
             showResults(data);
             evaluateCardiovascularRisk(data);
+            evaluateCancerPrevention(data);
         }
     } catch (error) {
         console.error('Error en la consulta:', error);
@@ -346,9 +347,135 @@ function mostrarResultadosFinales({valoresReales, factoresEvaluados, puntuacion,
     
     riskAssessmentDiv.classList.remove('hidden');
 }
+
+function evaluateCancerPrevention(data) {
+    const cancerDiv = document.getElementById('cancer-prevention');
+    const recommendationsList = document.getElementById('cancer-recommendations');
+    
+    // Limpiar recomendaciones previas
+    recommendationsList.innerHTML = '';
+    
+    // Mapeo de campos de cáncer con nombres normalizados
+    const cancerTests = {
+        'hpv': {
+            field: 'Cancer_cervico_uterino_HPV',
+            notesField: 'Observaciones - HPV',
+            name: 'Test de HPV',
+            gender: 'Femenino',
+            ageRange: '30-65 años',
+            frequency: 'Cada 5 años'
+        },
+        'pap': {
+            field: 'Cancer_cervico_uterino_PAP',
+            notesField: 'Observaciones - PAP',
+            name: 'Papanicolaou',
+            gender: 'Femenino',
+            ageRange: '25-65 años',
+            frequency: 'Cada 3 años'
+        },
+        'somf': {
+            field: 'Cancer_colon_SOMF',
+            notesField: 'Observaciones - SOMF',
+            name: 'SOMF (Sangre Oculta en Materia Fecal)',
+            gender: 'Ambos',
+            ageRange: '50-75 años',
+            frequency: 'Anual'
+        },
+        'colonoscopia': {
+            field: 'Cancer_colon_Colonoscopia',
+            notesField: 'Observaciones - Colonoscopia',
+            name: 'Colonoscopia',
+            gender: 'Ambos',
+            ageRange: '50-75 años',
+            frequency: 'Cada 10 años'
+        },
+        'mamografia': {
+            field: 'Cancer_mama_Mamografia',
+            notesField: 'Observaciones - Mamografia',
+            name: 'Mamografía',
+            gender: 'Femenino',
+            ageRange: '50-69 años',
+            frequency: 'Cada 2 años'
+        },
+        'psa': {
+            field: 'Prostata_PSA',
+            notesField: 'Observaciones - PSA',
+            name: 'PSA (Antígeno Prostático Específico)',
+            gender: 'Masculino',
+            ageRange: '50-70 años',
+            frequency: 'Según criterio médico'
+        }
+    };
+    
+    // Procesar cada examen
+    for (const [testId, testInfo] of Object.entries(cancerTests)) {
+        const valueElement = document.getElementById(`${testId}-value`);
+        const notesElement = document.getElementById(`${testId}-notes`);
+        const cardElement = document.getElementById(`${testId}-card`);
+        
+        // Obtener el valor del campo, normalizando posibles variaciones
+        let value = data[testInfo.field] || 'No registrado';
+        const notes = data[testInfo.notesField] || '';
+        
+        // Normalizar valores (por si hay diferencias en mayúsculas/minúsculas o espacios)
+        value = value.toString().trim();
+        
+        // Verificar si el valor contiene alguna de las palabras clave (insensible a mayúsculas)
+        const isPatologico = /patológico|patologica|alterado|positivo/i.test(value);
+        const isNormal = /normal|negativo/i.test(value);
+        const isNoRealizado = /no se realiza|no realizado|no efectuado/i.test(value);
+        
+        valueElement.textContent = value;
+        
+        // Establecer estilo según resultado
+        if (isPatologico) {
+            cardElement.className = 'p-4 rounded-lg risk-high';
+            notesElement.innerHTML = '<span class="text-red-500"><i class="fas fa-exclamation-triangle"></i> Resultado patológico - Requiere atención</span>';
+            
+            // Agregar recomendación urgente
+            recommendationsList.innerHTML += `
+                <li class="text-red-600 font-medium">
+                    <strong>${testInfo.name}:</strong> Resultado patológico (${value}). Consultar con especialista urgentemente.
+                </li>
+            `;
+        } else if (isNormal) {
+            cardElement.className = 'p-4 rounded-lg risk-low';
+            notesElement.innerHTML = '<span class="text-green-500"><i class="fas fa-check-circle"></i> Resultado normal</span>';
+        } else if (isNoRealizado) {
+            cardElement.className = 'p-4 rounded-lg bg-gray-100';
+            notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-info-circle"></i> No realizado</span>';
+            
+            // Verificar si debería recomendarse según edad y sexo
+            const edad = parseInt(data.Edad || data.edad) || 0;
+            const sexo = (data.Sexo || '').toUpperCase().startsWith('F') ? 'Femenino' : 'Masculino';
+            
+            if ((testInfo.gender === 'Ambos' || testInfo.gender === sexo) && 
+                edad >= parseInt(testInfo.ageRange.split('-')[0])) {
+                recommendationsList.innerHTML += `
+                    <li>
+                        <strong>${testInfo.name}:</strong> Recomendado para ${sexo} ${testInfo.ageRange} (${testInfo.frequency}). 
+                        <span class="text-blue-600">Considerar realizar.</span>
+                    </li>
+                `;
+            }
+        } else {
+            cardElement.className = 'p-4 rounded-lg bg-gray-100';
+            notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-question-circle"></i> No registrado</span>';
+        }
+        
+        // Mostrar observaciones si existen
+        if (notes) {
+            notesElement.innerHTML += `<div class="mt-1 text-gray-600">Obs: ${notes}</div>`;
+        }
+    }
+    
+    // Mostrar la sección
+    cancerDiv.classList.remove('hidden');
+}
 function resetProfile() {
     document.getElementById('user-name').textContent = 'Nombre Apellido';
     document.getElementById('welcome-message').innerHTML = 
         '¡Hola! Este programa es para ayudarte y acompañarte en el cuidado de tu salud.';
     document.getElementById('risk-assessment').classList.add('hidden');
+    document.getElementById('cancer-prevention').classList.add('hidden'); // Nueva línea
 }

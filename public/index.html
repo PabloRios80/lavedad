@@ -172,7 +172,6 @@
             </div>
 
 <!-- Health Risk Assessment -->
-<!-- Health Risk Assessment -->
 <div class="bg-white rounded-xl shadow-md p-6 hidden" id="risk-assessment">
     <h2 class="text-xl font-bold mb-4">Evaluación de Riesgo Cardiovascular</h2>
     
@@ -273,6 +272,84 @@
         </ul>
     </div>
 </div>
+<!-- Cancer Prevention Section -->
+<div class="bg-white rounded-xl shadow-md p-6 hidden" id="cancer-prevention">
+    <h2 class="text-xl font-bold mb-4">Prevención del Cáncer</h2>
+    
+    <!-- Exámenes de Prevención -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <!-- Cáncer Cérvico-uterino (HPV) -->
+        <div id="hpv-card" class="p-4 rounded-lg">
+            <div class="flex items-center mb-2">
+                <i class="fas fa-female mr-2"></i>
+                <h3 class="font-semibold">HPV (VPH)</h3>
+            </div>
+            <p id="hpv-value" class="text-2xl font-bold">--</p>
+            <p id="hpv-notes" class="text-sm mt-2 text-gray-600"></p>
+        </div>
+        
+        <!-- Cáncer Cérvico-uterino (PAP) -->
+        <div id="pap-card" class="p-4 rounded-lg">
+            <div class="flex items-center mb-2">
+                <i class="fas fa-microscope mr-2"></i>
+                <h3 class="font-semibold">PAP</h3>
+            </div>
+            <p id="pap-value" class="text-2xl font-bold">--</p>
+            <p id="pap-notes" class="text-sm mt-2 text-gray-600"></p>
+        </div>
+        
+        <!-- Cáncer de Colon (SOMF) -->
+        <div id="somf-card" class="p-4 rounded-lg">
+            <div class="flex items-center mb-2">
+                <i class="fas fa-poop mr-2"></i>
+                <h3 class="font-semibold">SOMF</h3>
+            </div>
+            <p id="somf-value" class="text-2xl font-bold">--</p>
+            <p id="somf-notes" class="text-sm mt-2 text-gray-600"></p>
+        </div>
+        
+        <!-- Cáncer de Colon (Colonoscopia) -->
+        <div id="colonoscopia-card" class="p-4 rounded-lg">
+            <div class="flex items-center mb-2">
+                <i class="fas fa-procedures mr-2"></i>
+                <h3 class="font-semibold">Colonoscopia</h3>
+            </div>
+            <p id="colonoscopia-value" class="text-2xl font-bold">--</p>
+            <p id="colonoscopia-notes" class="text-sm mt-2 text-gray-600"></p>
+        </div>
+    </div>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <!-- Cáncer de Mama (Mamografía) -->
+        <div id="mamografia-card" class="p-4 rounded-lg">
+            <div class="flex items-center mb-2">
+                <i class="fas fa-breastfeeding mr-2"></i>
+                <h3 class="font-semibold">Mamografía</h3>
+            </div>
+            <p id="mamografia-value" class="text-2xl font-bold">--</p>
+            <p id="mamografia-notes" class="text-sm mt-2 text-gray-600"></p>
+        </div>
+        
+        <!-- Próstata (PSA) -->
+        <div id="psa-card" class="p-4 rounded-lg">
+            <div class="flex items-center mb-2">
+                <i class="fas fa-male mr-2"></i>
+                <h3 class="font-semibold">PSA (Próstata)</h3>
+            </div>
+            <p id="psa-value" class="text-2xl font-bold">--</p>
+            <p id="psa-notes" class="text-sm mt-2 text-gray-600"></p>
+        </div>
+    </div>
+    
+    <!-- Recomendaciones -->
+    <div class="mt-6 bg-blue-50 p-4 rounded-lg">
+        <h4 class="font-semibold mb-2 text-blue-800">Recomendaciones</h4>
+        <ul id="cancer-recommendations" class="list-disc pl-5 space-y-1">
+            <!-- Se llenará dinámicamente -->
+        </ul>
+    </div>
+</div>
+
     <script src="app.js"></script>
 </body>
 </html>
