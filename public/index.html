@@ -79,7 +79,6 @@
 .fa-liver:before { content: "\f21e"; }
 .fa-virus:before { content: "\f974"; }
 .fa-bug:before { content: "\f188"; }
-
     </style>
 </head>
 <body class="bg-gray-50">
@@ -428,6 +427,174 @@
         <ul id="infectious-recommendations" class="list-disc pl-5 space-y-1">
             <!-- Se llenará dinámicamente -->
         </ul>
+    </div>
+</div>
+
+<!-- Healthy Habits Section -->
+<div class="bg-white rounded-xl shadow-md p-6 hidden" id="healthy-habits">
+    <h2 class="text-xl font-bold mb-4">Hábitos Saludables</h2>
+    
+    <!-- Hábitos -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <!-- Alimentación saludable -->
+        <div id="alimentacion-card" class="p-4 rounded-lg">
+            <div class="flex items-center mb-2">
+                <i class="fas fa-apple-alt mr-2"></i>
+                <h3 class="font-semibold">Alimentación Saludable</h3>
+            </div>
+            <p id="alimentacion-value" class="text-2xl font-bold">--</p>
+            <p id="alimentacion-notes" class="text-sm mt-2 text-gray-600"></p>
+        </div>
+        
+        <!-- Actividad física -->
+        <div id="actividad-card" class="p-4 rounded-lg">
+            <div class="flex items-center mb-2">
+                <i class="fas fa-running mr-2"></i>
+                <h3 class="font-semibold">Actividad Física</h3>
+            </div>
+            <p id="actividad-value" class="text-2xl font-bold">--</p>
+            <p id="actividad-notes" class="text-sm mt-2 text-gray-600"></p>
+        </div>
+        
+        <!-- Seguridad vial -->
+        <div id="seguridad-card" class="p-4 rounded-lg">
+            <div class="flex items-center mb-2">
+                <i class="fas fa-car mr-2"></i>
+                <h3 class="font-semibold">Seguridad Vial</h3>
+            </div>
+            <p id="seguridad-value" class="text-2xl font-bold">--</p>
+            <p id="seguridad-notes" class="text-sm mt-2 text-gray-600"></p>
+        </div>
+        
+        <!-- Caídas en adultos mayores -->
+        <div id="caidas-card" class="p-4 rounded-lg">
+            <div class="flex items-center mb-2">
+                <i class="fas fa-wheelchair mr-2"></i>
+                <h3 class="font-semibold">Prevención de Caídas</h3>
+            </div>
+            <p id="caidas-value" class="text-2xl font-bold">--</p>
+            <p id="caidas-notes" class="text-sm mt-2 text-gray-600"></p>
+        </div>
+        
+        <!-- Abuso de alcohol -->
+        <div id="alcohol-card" class="p-4 rounded-lg">
+            <div class="flex items-center mb-2">
+                <i class="fas fa-wine-glass-alt mr-2"></i>
+                <h3 class="font-semibold">Consumo de Alcohol</h3>
+            </div>
+            <p id="alcohol-value" class="text-2xl font-bold">--</p>
+            <p id="alcohol-notes" class="text-sm mt-2 text-gray-600"></p>
+        </div>
+        
+        <!-- Tabaco -->
+        <div id="tabaco-card" class="p-4 rounded-lg">
+            <div class="flex items-center mb-2">
+                <i class="fas fa-smoking mr-2"></i>
+                <h3 class="font-semibold">Consumo de Tabaco</h3>
+            </div>
+            <p id="tabaco-value" class="text-2xl font-bold">--</p>
+            <p id="tabaco-notes" class="text-sm mt-2 text-gray-600"></p>
+        </div>
+        
+        <!-- Ácido fólico -->
+        <div id="acido-card" class="p-4 rounded-lg">
+            <div class="flex items-center mb-2">
+                <i class="fas fa-pills mr-2"></i>
+                <h3 class="font-semibold">Ácido Fólico</h3>
+            </div>
+            <p id="acido-value" class="text-2xl font-bold">--</p>
+            <p id="acido-notes" class="text-sm mt-2 text-gray-600"></p>
+        </div>
+    </div>
+    
+    <!-- Recomendaciones -->
+    <div class="mt-6 bg-blue-50 p-4 rounded-lg">
+        <h4 class="font-semibold mb-2 text-blue-800">Recomendaciones Personalizadas</h4>
+        <ul id="habits-recommendations" class="list-disc pl-5 space-y-1">
+            <!-- Se llenará dinámicamente -->
+        </ul>
+    </div>
+</div>
+
+<!-- Sección de Módulos Especializados -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+    <!-- Salud Bucal -->
+    <div class="bg-white rounded-xl shadow-md p-6 hidden" id="dental-health">
+        <h2 class="text-xl font-bold mb-4">Salud Bucal</h2>
+        
+        <!-- Control Odontológico -->
+        <div id="odontologico-card" class="p-4 rounded-lg mb-4">
+            <div class="flex items-center mb-2">
+                <i class="fas fa-tooth mr-2"></i>
+                <h3 class="font-semibold">Control Odontológico</h3>
+            </div>
+            <p id="odontologico-value" class="text-2xl font-bold">--</p>
+            <p id="odontologico-notes" class="text-sm mt-2 text-gray-600"></p>
+        </div>
+        
+        <!-- Recomendaciones -->
+        <div class="mt-4 bg-blue-50 p-4 rounded-lg">
+            <h4 class="font-semibold mb-2 text-blue-800">Recomendaciones</h4>
+            <ul id="dental-recommendations" class="list-disc pl-5 space-y-1">
+                <!-- Se llenará dinámicamente -->
+            </ul>
+        </div>
+    </div>
+    
+    <!-- Salud Mental -->
+    <div class="bg-white rounded-xl shadow-md p-6 hidden" id="mental-health">
+        <h2 class="text-xl font-bold mb-4">Salud Mental</h2>
+        
+        <!-- Depresión -->
+        <div id="depresion-card" class="p-4 rounded-lg mb-4">
+            <div class="flex items-center mb-2">
+                <i class="fas fa-brain mr-2"></i>
+                <h3 class="font-semibold">Depresión</h3>
+            </div>
+            <p id="depresion-value" class="text-2xl font-bold">--</p>
+            <p id="depresion-notes" class="text-sm mt-2 text-gray-600"></p>
+        </div>
+        
+        <!-- Violencia -->
+        <div id="violencia-card" class="p-4 rounded-lg mb-4">
+            <div class="flex items-center mb-2">
+                <i class="fas fa-hand-paper mr-2"></i>
+                <h3 class="font-semibold">Violencia</h3>
+            </div>
+            <p id="violencia-value" class="text-2xl font-bold">--</p>
+            <p id="violencia-notes" class="text-sm mt-2 text-gray-600"></p>
+        </div>
+        
+        <!-- Recomendaciones -->
+        <div class="mt-4 bg-blue-50 p-4 rounded-lg">
+            <h4 class="font-semibold mb-2 text-blue-800">Recomendaciones</h4>
+            <ul id="mental-recommendations" class="list-disc pl-5 space-y-1">
+                <!-- Se llenará dinámicamente -->
+            </ul>
+        </div>
+    </div>
+    
+    <!-- Salud Renal -->
+    <div class="bg-white rounded-xl shadow-md p-6 hidden" id="renal-health">
+        <h2 class="text-xl font-bold mb-4">Salud Renal</h2>
+        
+        <!-- ERC -->
+        <div id="erc-card" class="p-4 rounded-lg mb-4">
+            <div class="flex items-center mb-2">
+                <i class="fas fa-kidneys mr-2"></i>
+                <h3 class="font-semibold">Enfermedad Renal Crónica</h3>
+            </div>
+            <p id="erc-value" class="text-2xl font-bold">--</p>
+            <p id="erc-notes" class="text-sm mt-2 text-gray-600"></p>
+        </div>
+        
+        <!-- Recomendaciones -->
+        <div class="mt-4 bg-blue-50 p-4 rounded-lg">
+            <h4 class="font-semibold mb-2 text-blue-800">Recomendaciones</h4>
+            <ul id="renal-recommendations" class="list-disc pl-5 space-y-1">
+                <!-- Se llenará dinámicamente -->
+            </ul>
+        </div>
     </div>
 </div>
 

@@ -42,6 +42,10 @@ async function consultarDNI() {
             evaluateCardiovascularRisk(data);
             evaluateCancerPrevention(data);
             evaluateInfectiousDiseases(data);
+            evaluateHealthyHabits(data);
+            evaluateDentalHealth(data); 
+            evaluateMentalHealth(data); 
+            evaluateRenalHealth(data); 
         }
     } catch (error) {
         console.error('Error en la consulta:', error);
@@ -424,7 +428,7 @@ function evaluateCancerPrevention(data) {
         // Verificar si el valor contiene alguna de las palabras clave (insensible a mayúsculas)
         const isPatologico = /patológico|patologica|alterado|positivo/i.test(value);
         const isNormal = /normal|negativo/i.test(value);
-        const isNoRealizado = /no se realiza|no realizado|no efectuado/i.test(value);
+        const isNoRealizado = /no se realiza|no realizado|No aplica/i.test(value);
         
         valueElement.textContent = value;
         
@@ -585,11 +589,353 @@ function evaluateInfectiousDiseases(data) {
     // Mostrar la sección
     infectiousDiv.classList.remove('hidden');
 }
+function evaluateHealthyHabits(data) {
+    const habitsDiv = document.getElementById('healthy-habits');
+    const recommendationsList = document.getElementById('habits-recommendations');
+    
+    // Limpiar recomendaciones previas
+    recommendationsList.innerHTML = '';
+    
+    // Mapeo de hábitos saludables con patrones de detección mejorados
+    const healthyHabits = {
+        'alimentacion': {
+            field: 'Alimentacion_saludable',
+            notesField: 'Observaciones - Alimentacion_saludable',
+            name: 'Alimentación Saludable',
+            recommendationPositive: 'Excelentes hábitos alimenticios, continúa así',
+            recommendationNegative: 'Considera mejorar tu dieta con más frutas, verduras y alimentos integrales',
+            recommendationNotDone: 'Recomendación: Evaluación nutricional anual'
+        },
+        'actividad': {
+            field: 'Actividad_fisica',
+            notesField: 'Observaciones - Actividad_fisica',
+            name: 'Actividad Física',
+            recommendationPositive: 'Buen nivel de actividad física, mantén la rutina',
+            recommendationNegative: 'Intenta realizar al menos 150 minutos de actividad moderada por semana',
+            recommendationNotDone: 'Recomendación: Evaluación de actividad física anual'
+        },
+        'seguridad': {
+            field: 'Seguridad_vial',
+            notesField: 'Observaciones - Seguridad_vial',
+            name: 'Seguridad Vial',
+            recommendationPositive: 'Buenas prácticas de seguridad vial',
+            recommendationNegative: 'Recuerda usar siempre cinturón de seguridad y casco en motocicletas',
+            recommendationNotDone: 'Recomendación: Revisión de hábitos de seguridad vial'
+        },
+        'caidas': {
+            field: 'Caidas_en_adultos_mayores',
+            notesField: 'Observaciones - Caidas_en_adultos_mayores',
+            name: 'Prevención de Caídas',
+            recommendationPositive: 'Buenas medidas de prevención de caídas',
+            recommendationNegative: 'Evalúa la seguridad en tu hogar y usa calzado adecuado',
+            recommendationNotDone: 'Recomendación: Evaluación de riesgo de caídas'
+        },
+        'alcohol': {
+            field: 'Abuso_alcohol',
+            notesField: 'Observaciones - Abuso_alcohol',
+            name: 'Consumo de Alcohol',
+            recommendationPositive: 'Consumo responsable o nulo de alcohol',
+            recommendationNegative: 'Considera reducir el consumo de alcohol',
+            recommendationNotDone: 'Recomendación: Evaluación de consumo de alcohol anual'
+        },
+        'tabaco': {
+            field: 'Tabaco',
+            notesField: 'Observaciones - Tabaco',
+            name: 'Consumo de Tabaco',
+            recommendationPositive: 'No fumas o has dejado de fumar, excelente decisión',
+            recommendationNegative: 'Dejar de fumar es lo mejor para tu salud',
+            recommendationNotDone: 'Recomendación: Evaluación de hábito tabáquico'
+        },
+        'acido': {
+            field: 'Acido_folico',
+            notesField: 'Observaciones - Acido_folico',
+            name: 'Ácido Fólico',
+            recommendationPositive: 'Niveles adecuados de ácido fólico',
+            recommendationNegative: 'Considera suplementación si estás en edad fértil',
+            recommendationNotDone: 'Recomendación: Evaluación de niveles de ácido fólico'
+        }
+    };
+    
+    // Procesar cada hábito
+    for (const [habitId, habitInfo] of Object.entries(healthyHabits)) {
+        const valueElement = document.getElementById(`${habitId}-value`);
+        const notesElement = document.getElementById(`${habitId}-notes`);
+        const cardElement = document.getElementById(`${habitId}-card`);
+        
+        // Obtener el valor del campo
+        let value = data[habitInfo.field] || 'No registrado';
+        const notes = data[habitInfo.notesField] || '';
+        
+        // Normalizar valores
+        value = value.toString().trim();
+        
+        // Verificar patrones (similar al módulo de infecciosas)
+        const isPositive = /adecuad[ao]|buen[ao]|No se verifica|si|Cumple|no abusa|No fuma|nunca|Indicado/i.test(value);
+        const isNegative = /No Cumple|Se verifica|no|No cumple|abusa|excesiv[ao]|Fuma|sedentario|poc[ao]/i.test(value);
+        const isNotDone = /No se Realiza|no realizado|No indicado|pendiente/i.test(value);
+        
+        valueElement.textContent = value;
+        
+        // Establecer estilo según resultado
+        if (isPositive) {
+            cardElement.className = 'p-4 rounded-lg risk-low';
+            notesElement.innerHTML = '<span class="text-green-500"><i class="fas fa-check-circle"></i> Adecuado</span>';
+            
+            // Agregar recomendación positiva
+            recommendationsList.innerHTML += `
+                <li class="text-green-600">
+                    <strong>${habitInfo.name}:</strong> ${habitInfo.recommendationPositive}
+                </li>
+            `;
+        } else if (isNegative) {
+            cardElement.className = 'p-4 rounded-lg risk-high';
+            notesElement.innerHTML = '<span class="text-red-500"><i class="fas fa-exclamation-triangle"></i> Requiere mejora</span>';
+            
+            // Agregar recomendación
+            recommendationsList.innerHTML += `
+                <li class="text-red-600 font-medium">
+                    <strong>${habitInfo.name}:</strong> ${habitInfo.recommendationNegative}
+                </li>
+            `;
+        } else if (isNotDone) {
+            cardElement.className = 'p-4 rounded-lg bg-gray-100';
+            notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-info-circle"></i> No realizado</span>';
+            
+            // Agregar recomendación
+            recommendationsList.innerHTML += `
+                <li>
+                    <strong>${habitInfo.name}:</strong> ${habitInfo.recommendationNotDone}
+                </li>
+            `;
+        } else {
+            cardElement.className = 'p-4 rounded-lg bg-gray-100';
+            notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-question-circle"></i> No registrado</span>';
+        }
+        
+        // Mostrar observaciones si existen
+        if (notes) {
+            notesElement.innerHTML += `<div class="mt-1 text-gray-600">Obs: ${notes}</div>`;
+        }
+    }
+    
+    // Mostrar la sección
+    habitsDiv.classList.remove('hidden');
+}
+function evaluateDentalHealth(data) {
+    const dentalDiv = document.getElementById('dental-health');
+    const recommendationsList = document.getElementById('dental-recommendations');
+    
+    // Limpiar recomendaciones previas
+    recommendationsList.innerHTML = '';
+    
+    // Obtener valores
+    const value = data['Control_odontologico'] || 'No registrado';
+    const notes = data['Observaciones - Control_odontologico'] || '';
+    
+    // Mostrar valores
+    document.getElementById('odontologico-value').textContent = value;
+    
+    // Evaluar resultado
+    const isHighRisk = /riesgo alto/i.test(value);
+    const isModerateRisk = /riesgo moderado/i.test(value);
+    const isLowRisk = /riesgo bajo/i.test(value);
+    const isNotDone = /no se realiza/i.test(value);
+    
+    // Aplicar estilos y recomendaciones
+    const cardElement = document.getElementById('odontologico-card');
+    const notesElement = document.getElementById('odontologico-notes');
+    
+    if (isHighRisk) {
+        cardElement.className = 'p-4 rounded-lg risk-high';
+        notesElement.innerHTML = '<span class="text-red-500"><i class="fas fa-exclamation-triangle"></i> Riesgo Alto</span>';
+        recommendationsList.innerHTML = `
+            <li class="text-red-600 font-medium">Consulta odontológica urgente requerida</li>
+            <li>Evaluación cada 3 meses</li>
+            <li>Reforzar higiene bucal</li>
+        `;
+    } else if (isModerateRisk) {
+        cardElement.className = 'p-4 rounded-lg risk-medium';
+        notesElement.innerHTML = '<span class="text-yellow-500"><i class="fas fa-exclamation-circle"></i> Riesgo Moderado</span>';
+        recommendationsList.innerHTML = `
+            <li class="text-yellow-600 font-medium">Consulta odontológica recomendada</li>
+            <li>Evaluación cada 6 meses</li>
+            <li>Mejorar técnicas de cepillado</li>
+        `;
+    } else if (isLowRisk) {
+        cardElement.className = 'p-4 rounded-lg risk-low';
+        notesElement.innerHTML = '<span class="text-green-500"><i class="fas fa-check-circle"></i> Riesgo Bajo</span>';
+        recommendationsList.innerHTML = `
+            <li class="text-green-600">Control anual odontológico</li>
+            <li>Mantener buenos hábitos de higiene</li>
+        `;
+    } else if (isNotDone) {
+        cardElement.className = 'p-4 rounded-lg bg-gray-100';
+        notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-info-circle"></i> No realizado</span>';
+        recommendationsList.innerHTML = `
+            <li>Recomendado: Control odontológico anual</li>
+            <li>Importante para salud general</li>
+        `;
+    } else {
+        cardElement.className = 'p-4 rounded-lg bg-gray-100';
+        notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-question-circle"></i> No registrado</span>';
+    }
+    
+    // Mostrar observaciones
+    if (notes) {
+        notesElement.innerHTML += `<div class="mt-1 text-gray-600">Obs: ${notes}</div>`;
+    }
+    
+    // Mostrar sección
+    dentalDiv.classList.remove('hidden');
+}
+function evaluateMentalHealth(data) {
+    const mentalDiv = document.getElementById('mental-health');
+    const recommendationsList = document.getElementById('mental-recommendations');
+    
+    // Limpiar recomendaciones previas
+    recommendationsList.innerHTML = '';
+    
+    // Evaluar Depresión
+    const depresionValue = data['Depresion'] || '';
+    const depresionNotes = data['Observaciones - Depresion'] || '';
+    
+    document.getElementById('depresion-value').textContent = depresionValue || 'No registrado';
+    
+    // Detección corregida (insensible a mayúsculas/minúsculas y espacios)
+    const isDepresion = /^se\s*verifica$/i.test(depresionValue.trim());
+    const isNotDepresion = /^no\s*se\s*verifica$/i.test(depresionValue.trim());
+    
+    const depresionCard = document.getElementById('depresion-card');
+    const depresionNotesElement = document.getElementById('depresion-notes');
+    
+    if (isDepresion) {
+        depresionCard.className = 'p-4 rounded-lg risk-high';
+        depresionNotesElement.innerHTML = '<span class="text-red-500"><i class="fas fa-exclamation-triangle"></i> Se verifica</span>';
+        recommendationsList.innerHTML += `
+            <li class="text-red-600 font-medium">Depresión detectada: Evaluación por especialista requerida</li>
+            <li>Considerar intervención psicológica/psiquiátrica</li>
+        `;
+    } else if (isNotDepresion) {
+        depresionCard.className = 'p-4 rounded-lg risk-low';
+        depresionNotesElement.innerHTML = '<span class="text-green-500"><i class="fas fa-check-circle"></i> No se verifica</span>';
+        recommendationsList.innerHTML += `
+            <li class="text-green-600">Sin indicios de depresión detectados</li>
+        `;
+    } else {
+        depresionCard.className = 'p-4 rounded-lg bg-gray-100';
+        depresionNotesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-question-circle"></i> No registrado</span>';
+    }
+    
+    // Evaluar Violencia (misma lógica corregida)
+    const violenciaValue = data['Violencia'] || '';
+    const violenciaNotes = data['Observaciones - Violencia'] || '';
+    
+    document.getElementById('violencia-value').textContent = violenciaValue || 'No registrado';
+    
+    const isViolencia = /^se\s*verifica$/i.test(violenciaValue.trim());
+    const isNotViolencia = /^no\s*se\s*verifica$/i.test(violenciaValue.trim());
+    
+    const violenciaCard = document.getElementById('violencia-card');
+    const violenciaNotesElement = document.getElementById('violencia-notes');
+    
+    if (isViolencia) {
+        violenciaCard.className = 'p-4 rounded-lg risk-high';
+        violenciaNotesElement.innerHTML = '<span class="text-red-500"><i class="fas fa-exclamation-triangle"></i> Se verifica</span>';
+        recommendationsList.innerHTML += `
+            <li class="text-red-600 font-medium">Violencia detectada: Intervención urgente necesaria</li>
+            <li>Contactar con servicios de protección</li>
+            <li>Protocolo de actuación frente a violencia</li>
+        `;
+    } else if (isNotViolencia) {
+        violenciaCard.className = 'p-4 rounded-lg risk-low';
+        violenciaNotesElement.innerHTML = '<span class="text-green-500"><i class="fas fa-check-circle"></i> No se verifica</span>';
+        recommendationsList.innerHTML += `
+            <li class="text-green-600">Sin indicios de violencia detectados</li>
+        `;
+    } else {
+        violenciaCard.className = 'p-4 rounded-lg bg-gray-100';
+        violenciaNotesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-question-circle"></i> No registrado</span>';
+    }
+    
+    // Mostrar observaciones si existen
+    if (depresionNotes) {
+        depresionNotesElement.innerHTML += `<div class="mt-1 text-gray-600">Obs: ${depresionNotes}</div>`;
+    }
+    if (violenciaNotes) {
+        violenciaNotesElement.innerHTML += `<div class="mt-1 text-gray-600">Obs: ${violenciaNotes}</div>`;
+    }
+    
+    // Mostrar sección
+    mentalDiv.classList.remove('hidden');
+}
+function evaluateRenalHealth(data) {
+    const renalDiv = document.getElementById('renal-health');
+    const recommendationsList = document.getElementById('renal-recommendations');
+    
+    // Limpiar recomendaciones previas
+    recommendationsList.innerHTML = '';
+    
+    // Obtener valores
+    const value = data['ERC'] || 'No registrado';
+    const notes = data['Observaciones - ERC'] || '';
+    
+    // Mostrar valores
+    document.getElementById('erc-value').textContent = value;
+    
+    // Evaluar resultado
+    const isNormal = /normal/i.test(value);
+    const isPathological = /patol[oó]gico/i.test(value);
+    const isNotDone = /no se realiza/i.test(value);
+    
+    // Aplicar estilos y recomendaciones
+    const cardElement = document.getElementById('erc-card');
+    const notesElement = document.getElementById('erc-notes');
+    
+    if (isPathological) {
+        cardElement.className = 'p-4 rounded-lg risk-high';
+        notesElement.innerHTML = '<span class="text-red-500"><i class="fas fa-exclamation-triangle"></i> Resultado Patológico</span>';
+        recommendationsList.innerHTML = `
+            <li class="text-red-600 font-medium">Evaluación nefrológica urgente requerida</li>
+            <li>Control estricto de función renal</li>
+            <li>Monitorizar presión arterial</li>
+        `;
+    } else if (isNormal) {
+        cardElement.className = 'p-4 rounded-lg risk-low';
+        notesElement.innerHTML = '<span class="text-green-500"><i class="fas fa-check-circle"></i> Normal</span>';
+        recommendationsList.innerHTML = `
+            <li class="text-green-600">Control anual de función renal</li>
+            <li>Mantener buena hidratación</li>
+        `;
+    } else if (isNotDone) {
+        cardElement.className = 'p-4 rounded-lg bg-gray-100';
+        notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-info-circle"></i> No realizado</span>';
+        recommendationsList.innerHTML = `
+            <li>Recomendado: Evaluación de función renal</li>
+            <li>Especialmente si hay factores de riesgo</li>
+        `;
+    } else {
+        cardElement.className = 'p-4 rounded-lg bg-gray-100';
+        notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-question-circle"></i> No registrado</span>';
+    }
+    
+    // Mostrar observaciones
+    if (notes) {
+        notesElement.innerHTML += `<div class="mt-1 text-gray-600">Obs: ${notes}</div>`;
+    }
+    
+    // Mostrar sección
+    renalDiv.classList.remove('hidden');
+}
+
 function resetProfile() {
     document.getElementById('user-name').textContent = 'Nombre Apellido';
     document.getElementById('welcome-message').innerHTML = 
         '¡Hola! Este programa es para ayudarte y acompañarte en el cuidado de tu salud.';
     document.getElementById('risk-assessment').classList.add('hidden');
     document.getElementById('cancer-prevention').classList.add('hidden');
-    document.getElementById('infectious-diseases').classList.add('hidden'); // Nueva línea
+    document.getElementById('infectious-diseases').classList.add('hidden');
+    document.getElementById('healthy-habits').classList.add('hidden');
+    document.getElementById('dental-health').classList.add('hidden');
+    document.getElementById('mental-health').classList.add('hidden');
+    document.getElementById('renal-health').classList.add('hidden');
 }
