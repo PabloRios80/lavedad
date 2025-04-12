@@ -50,6 +50,7 @@ async function consultarDNI() {
             evaluateAneurisma(data); 
             evaluateOsteoporosis(data); 
             evaluateAspirina(data);
+            evaluateVisualHealth(data);
         }
     } catch (error) {
         console.error('Error en la consulta:', error);
@@ -1161,6 +1162,66 @@ function evaluateAspirina(data) {
     // Mostrar sección
     aspirinaDiv.classList.remove('hidden');
 }
+function evaluateVisualHealth(data) {
+    const visualDiv = document.getElementById('visual-health');
+    const recommendationsList = document.getElementById('visual-recommendations');
+    
+    // Limpiar recomendaciones previas
+    recommendationsList.innerHTML = '';
+    
+    // Obtener valores
+    const value = data['Agudeza_visual'] || '';
+    const notes = data['Observaciones - Agudeza visual'] || '';
+    
+    // Mostrar valores
+    document.getElementById('agudeza-value').textContent = value || 'No registrado';
+    
+    // Evaluar resultado
+    const isAlterada = /Alterada/i.test(value);
+    const isNormal = /Normal/i.test(value);
+    const isControlNormal = /Control Normal/i.test(value);
+    const isNotDone = /No se Realiza|no realizado/i.test(value);
+    
+    // Aplicar estilos y recomendaciones
+    const cardElement = document.getElementById('agudeza-card');
+    const notesElement = document.getElementById('agudeza-notes');
+    
+    if (isAlterada) {
+        cardElement.className = 'p-4 rounded-lg risk-high';
+        notesElement.innerHTML = '<span class="text-red-500"><i class="fas fa-exclamation-triangle"></i> Alterada</span>';
+        recommendationsList.innerHTML = `
+            <li class="text-red-600 font-medium">Agudeza visual alterada detectada</li>
+            <li>Evaluación oftalmológica urgente recomendada</li>
+            <li>Considerar corrección visual</li>
+        `;
+    } else if (isNormal || isControlNormal) {
+        cardElement.className = 'p-4 rounded-lg risk-low';
+        notesElement.innerHTML = '<span class="text-green-500"><i class="fas fa-check-circle"></i> Normal</span>';
+        recommendationsList.innerHTML = `
+            <li class="text-green-600">Agudeza visual dentro de parámetros normales</li>
+            <li>Control anual recomendado</li>
+        `;
+    } else if (isNotDone) {
+        cardElement.className = 'p-4 rounded-lg bg-gray-100';
+        notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-info-circle"></i> No realizado</span>';
+        recommendationsList.innerHTML = `
+            <li>Evaluación de agudeza visual recomendada</li>
+            <li>Realizar en próximo control de salud</li>
+            <li>Importante para detección temprana de problemas visuales</li>
+        `;
+    } else {
+        cardElement.className = 'p-4 rounded-lg bg-gray-100';
+        notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-question-circle"></i> No registrado</span>';
+    }
+    
+    // Mostrar observaciones
+    if (notes) {
+        notesElement.innerHTML += `<div class="mt-1 text-gray-600">Obs: ${notes}</div>`;
+    }
+    
+    // Mostrar sección
+    visualDiv.classList.remove('hidden');
+}
 function resetProfile() {
     document.getElementById('user-name').textContent = 'Nombre Apellido';
     document.getElementById('welcome-message').innerHTML = 
@@ -1176,4 +1237,5 @@ function resetProfile() {
     document.getElementById('aneurisma-section').classList.add('hidden');
     document.getElementById('osteoporosis-section').classList.add('hidden');
     document.getElementById('aspirina-section').classList.add('hidden');
+    document.getElementById('visual-health').classList.add('hidden');
 }
