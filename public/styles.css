@@ -1,0 +1,88 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+body {
+    font-family: 'Poppins', sans-serif;
+    background-color: #f8fafc;
+}
+
+.risk-high {
+    background-color: #fee2e2;
+    border-left: 4px solid #ef4444;
+}
+
+.risk-medium {
+    background-color: #fef3c7;
+    border-left: 4px solid #f59e0b;
+}
+
+.risk-low {
+    background-color: #dcfce7;
+    border-left: 4px solid #22c55e;
+}
+/* Agregar al estilo existente */
+#risk-card {
+    transition: all 0.3s ease;
+}
+
+.risk-high #risk-level {
+    color: #dc2626;
+}
+
+.risk-medium #risk-level {
+    color: #d97706;
+}
+
+.risk-low #risk-level {
+    color: #16a34a;
+}
+
+#risk-percentage {
+    background-color: #e5e7eb;
+}
+
+.risk-high #risk-percentage {
+    background-color: #fee2e2;
+    color: #b91c1c;
+}
+
+.risk-medium #risk-percentage {
+    background-color: #fef3c7;
+    color: #92400e;
+}
+
+.risk-low #risk-percentage {
+    background-color: #dcfce7;
+    color: #166534;
+}
+
+.action-item {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem;
+    border-radius: 0.25rem;
+}
+
+.action-item i {
+    margin-right: 0.5rem;
+}
+/* Agrega esto en el <style> del head */
+.fa-bacteria:before { content: "\f959"; }
+.fa-liver:before { content: "\f21e"; }
+.fa-virus:before { content: "\f974"; }
+.fa-bug:before { content: "\f188"; }
+/* Asegura que todos los módulos tengan la misma altura */
+.bg-white.rounded-xl {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+/* Hace que la sección de recomendaciones se pegue al fondo */
+.bg-blue-50.rounded-lg {
+    margin-top: auto;
+}
+
+/* Ajusta el espaciado interno para consistencia */
+.p-6 {
+    padding: 1.5rem;
+}

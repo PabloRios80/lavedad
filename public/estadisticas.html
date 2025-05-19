@@ -4,11 +4,29 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Estadísticas PPDT</title>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#003366', /* Azul oscuro de IAPOS */
+                        secondary: '#ADD8E6', /* Azul claro de IAPOS */
+                        accent: '#D53F8C',
+                        warning: '#DD6B20',
+                        info: '#4299E1',
+                        'iapos-bg-light': '#f8f9fa', /* Un gris claro para el fondo */
+                    }
+                }
+            }
+        }
+    </script>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQmXVf9GOvfG+nCtUWQV7l+MGpRJcIxzcwyhMNfmReeHeho++LoK0GvLk91cuySNC9ytw4+m6KgmPgw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
-    <link rel="stylesheet" href="style.css">
-</head>
-<body class="bg-gray-100">
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    </head>
+<body class="bg-gray-100"></body>
     <div class="container mx-auto p-8">
         <h1 class="text-3xl font-bold text-green-700 mb-6">Programa Seguimiento Crónicos PPDT</h1>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">

@@ -1292,17 +1292,23 @@ if (window.location.pathname === '/estadisticas.html') {
                 console.error('Error al cargar los campos:', error);
             }
         }
-
-        function agregarNuevoFiltro() {
-            const camposSeleccionados = Array.from(selectorCampos.selectedOptions).map(option => option.value);
-            console.log('Campos seleccionados para filtrar:', camposSeleccionados);
-            camposSeleccionados.forEach(campo => {
-                if (!document.getElementById(`filtro-${campo}`)) {
-                    crearInterfazFiltro(campo);
-                }
-            });
+function agregarNuevoFiltro() {
+    const camposSeleccionados = Array.from(selectorCampos.selectedOptions).map(option => option.value);
+    console.log('Campos seleccionados para filtrar:', camposSeleccionados);
+    camposSeleccionados.forEach(campo => {
+        // Verificamos SI NO existe ya un filtro para este campo
+        if (!document.getElementById(`filtro-${campo}`)) {
+            crearInterfazFiltro(campo);
         }
-        async function crearInterfazFiltro(campo) {
+    });
+}
+async function crearInterfazFiltro(campo) {
+    const filtroExistente = document.getElementById(`filtro-${campo}`);
+    if (filtroExistente) {
+        console.log(`Ya existe un filtro para el campo: ${campo}`);
+        return; // Si ya existe, no creamos uno nuevo
+    }
+
     const filtroDiv = document.createElement('div');
     filtroDiv.id = `filtro-${campo}`;
     filtroDiv.classList.add('filtro', 'mb-4', 'p-3', 'bg-gray-200', 'rounded-md');
@@ -1313,6 +1319,7 @@ if (window.location.pathname === '/estadisticas.html') {
     filtroDiv.appendChild(labelCampo);
 
     if (campo === 'Edad') {
+        // ... (tu código para crear el filtro de rango de edad) ...
         const divRango = document.createElement('div');
         divRango.classList.add('flex', 'space-x-2', 'mb-2');
 
@@ -1391,38 +1398,62 @@ if (window.location.pathname === '/estadisticas.html') {
         }
     }
 }
-        async function realizarConsultaGrupal() {
-            const filtros = obtenerCriteriosDeFiltro();
-            const combinacion = combinacionFiltrosSelect.value;
-            const dataToSend = { conditions: filtros, combinator: combinacion };
+async function realizarConsultaGrupal() {
+    const filtros = obtenerCriteriosDeFiltro();
+    const combinacion = combinacionFiltrosSelect.value;
+    const dataToSend = { conditions: filtros, combinator: combinacion };
 
-            try {
-                const response = await fetch('/consultar-grupo', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(dataToSend)
-                });
-                const resultados = await response.json();
-                console.log('Resultados de la consulta grupal:', resultados);
-                mostrarResultadosResumen(resultados);
-            } catch (error) {
-                console.error('Error al realizar la consulta grupal:', error);
-            }
+    try {
+        const response = await fetch('/consultar-grupo', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(dataToSend)
+        });
+        const resultados = await response.json();
+        console.log('Resultados de la consulta grupal:', resultados);
+
+        // Asumimos que 'resultados.data' ahora contiene el array de objetos con los datos completos
+        if (resultados && Array.isArray(resultados.data)) {
+            // Almacenamos los datos en un atributo data del botón de exportar para accederlos fácilmente
+            exportarExcelBtn.data = resultados.data;
+            mostrarResultadosResumen({
+                total_registros: resultados.total_registros,
+                conteo_cruce: resultados.conteo_cruce,
+                criterios_cruce: resultados.criterios_cruce
+            });
+        } else {
+            resultadosResumenDiv.textContent = 'Error: No se recibieron datos detallados para la exportación.';
+            console.error('Error: No se recibieron datos detallados para la exportación:', resultados);
         }
+
+    } catch (error) {
+        console.error('Error al realizar la consulta grupal:', error);
+    }
+}
+
 function obtenerCriteriosDeFiltro() {
     const filtros = [];
     const filtrosDivs = document.querySelectorAll('#filtros-aplicados > .filtro');
     filtrosDivs.forEach(filtroDiv => {
         const campo = filtroDiv.id.replace('filtro-', '');
         if (campo === 'Edad') {
-            // ... (tu lógica para el rango de edad) ...
+            const desde = filtroDiv.dataset.edadDesde;
+            const hasta = filtroDiv.dataset.edadHasta;
+            if (desde && hasta) {
+                if (desde === hasta) {
+                    filtros.push({ field: campo, operator: 'equals', value: desde });
+                } else {
+                    filtros.push({ field: campo, operator: 'greaterThanOrEqual', value: desde });
+                    filtros.push({ field: campo, operator: 'lessThanOrEqual', value: hasta });
+                }
+            }
         } else {
             const checkboxes = filtroDiv.querySelectorAll('input[type="checkbox"]:checked');
             const textoInput = filtroDiv.querySelector('input[type="text"]');
 
             if (checkboxes.length > 0) {
                 const valores = Array.from(checkboxes).map(cb => cb.value);
-                filtros.push({ field: campo, operator: 'in', value: valores }); // Usar operador 'in' con array de valores
+                filtros.push({ field: campo, operator: 'in', value: valores });
             } else if (textoInput && textoInput.value.trim() !== '') {
                 filtros.push({ field: campo, operator: 'includes', value: textoInput.value.trim() });
             }
@@ -1476,9 +1507,26 @@ function mostrarResultadosResumen(resultados) {
 
     resultadosResumenDiv.appendChild(tabla);
 }
-        function exportarResultados() {
-            // TODO: Implementar la lógica de exportación a Excel
-            alert('Funcionalidad de exportar a Excel aún no implementada.');
-        }
+function exportarResultados() {
+    const dataParaExportar = exportarExcelBtn.data;
+
+    if (!dataParaExportar || dataParaExportar.length === 0) {
+        alert('No hay datos para exportar.');
+        return;
+    }
+
+    // Crear una nueva hoja de cálculo
+    const wb = XLSX.utils.book_new();
+    const ws_data = [Object.keys(dataParaExportar[0])]; // Encabezados de las columnas
+    dataParaExportar.forEach(obj => ws_data.push(Object.values(obj)));
+    const ws = XLSX.utils.aoa_to_sheet(ws_data);
+
+    // Añadir la hoja de cálculo al libro
+    XLSX.utils.book_append_sheet(wb, ws, "Datos Filtrados");
+
+    // Generar el archivo Excel y forzar la descarga
+    XLSX.writeFile(wb, "datos_filtrados.xlsx");
+}
     }
     });
+

@@ -105,7 +105,7 @@ app.post('/buscar', async (req, res) => {
 });
 app.post('/consultar-grupo', async (req, res) => {
     try {
-        const { conditions, combinator = 'AND', fieldsToRetrieve = ['DNI', 'Nombre', 'Apellido'] } = req.body;
+        const { conditions, combinator = 'AND', fieldsToRetrieve = [] } = req.body; // Dejamos fieldsToRetrieve pero usaremos todos los campos para exportar
 
         const allData = await getAllDataFromSheet();
         const totalRegistros = allData.length;
@@ -189,7 +189,8 @@ app.post('/consultar-grupo', async (req, res) => {
             total_registros: totalRegistros,
             conteo_cruce: conteoCruce,
             criterios_cruce: criteriosCruce,
-            results: filteredResults.slice(0, 5)
+            // Incluimos el array completo de filteredResults
+            data: filteredResults
         });
 
     } catch (error) {
