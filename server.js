@@ -1,113 +1,142 @@
 const express = require('express');
 const { GoogleSpreadsheet } = require('google-spreadsheet');
-const creds = require('./credentials.json');
+const creds = require('./credentials.json'); // Asegúrate de que este archivo exista y esté bien configurado
 
 const app = express();
 const PORT = 3000;
-const SHEET_ID = '15YPfBG9PBfN3nBW5xXJYjIXEgYIS9z71pI0VpeCtAAU';
+const SPREADSHEET_ID = '15YPfBG9PBfN3nBW5xXJYjIXEgYIS9z71pI0VpeCtAAU'; // Tu ID de la hoja de cálculo de Google
 
 app.use(express.json());
-app.use(express.static('public'));
+app.use(express.static('public')); // Sirve archivos estáticos desde la carpeta 'public'
 
-// Función para obtener todos los datos de la hoja de Google Sheets (reutilizada)
-async function getAllDataFromSheet() {
-  try {
-    const doc = new GoogleSpreadsheet(SHEET_ID);
-    await doc.useServiceAccountAuth({
-      client_email: creds.client_email,
-      private_key: creds.private_key.replace(/\\n/g, '\n'),
-    });
-    await doc.loadInfo();
-    const sheet = doc.sheetsByIndex[0];
-    await sheet.loadHeaderRow();
-    const rows = await sheet.getRows();
+// Variable global para el objeto del documento de Google Spreadsheet
+// Se inicializará una vez al inicio del servidor para evitar re-autenticaciones
+let doc;
 
-    const allData = rows.map(row => {
-      const rowData = {};
-      sheet.headerValues.forEach(header => {
-        rowData[header] = row[header] || '';
-      });
-      return rowData;
-    });
-
-    return allData;
-  } catch (error) {
-    console.error('Error al leer la hoja de cálculo:', error);
-    return [];
-  }
+// Función para inicializar el documento de Google Sheet y cargar su información
+async function initializeGoogleSheet() {
+    try {
+        doc = new GoogleSpreadsheet(SPREADSHEET_ID);
+        await doc.useServiceAccountAuth({
+            client_email: creds.client_email,
+            private_key: creds.private_key.replace(/\\n/g, '\n'), // Reemplaza saltos de línea para la clave privada
+        });
+        await doc.loadInfo(); // Carga la información de todas las hojas (pestañas)
+        console.log('✅ Google Sheet document loaded successfully.');
+    } catch (error) {
+        console.error('❌ Error initializing Google Sheet document:', error);
+        // Es crítico que esto funcione. Si falla, el servidor no podrá acceder a las hojas.
+        process.exit(1); // Sale del proceso si la inicialización falla
+    }
 }
+
+// Función para obtener todos los datos de una hoja específica (por nombre o índice)
+// Usaremos esta función para ambas: la hoja principal y las hojas de estudios.
+async function getDataFromSpecificSheet(sheetIdentifier) { // sheetIdentifier puede ser el nombre o el índice
+    if (!doc) {
+        throw new Error('Google Sheet document not initialized. Call initializeGoogleSheet() first.');
+    }
+    try {
+        let sheet;
+        if (typeof sheetIdentifier === 'string') {
+            sheet = doc.sheetsByTitle[sheetIdentifier]; // Busca por nombre
+        } else if (typeof sheetIdentifier === 'number') {
+            sheet = doc.sheetsByIndex[sheetIdentifier]; // Busca por índice
+        }
+
+        if (!sheet) {
+            console.warn(`Hoja "${sheetIdentifier}" no encontrada en el documento.`);
+            return [];
+        }
+
+        await sheet.loadHeaderRow(); // Carga la fila de encabezados de esta hoja
+        const rows = await sheet.getRows(); // Obtiene todas las filas de datos
+
+        const allData = rows.map(row => {
+            const rowData = {};
+            sheet.headerValues.forEach(header => {
+                // Maneja valores nulos o indefinidos, devolviendo una cadena vacía
+                rowData[header] = row[header] || '';
+            });
+            return rowData;
+        });
+        return allData;
+    } catch (error) {
+        console.error(`Error al leer la hoja de cálculo "${sheetIdentifier}":`, error);
+        throw error; // Re-lanza el error para que sea manejado por la ruta que la llamó
+    }
+}
+
+// ====================================================================
+// RUTAS EXISTENTES - ADAPTADAS PARA USAR EL OBJETO 'doc' GLOBAL
+// Y la nueva función 'getDataFromSpecificSheet'
+// ====================================================================
 
 // Ruta para obtener todos los campos (para el selector), excluyendo los de observaciones
 app.get('/obtener-campos', async (req, res) => {
-  try {
-    const data = await getAllDataFromSheet();
-    if (data && data.length > 0) {
-      const headers = Object.keys(data[0]).filter(header => !header.startsWith('Observaciones'));
-      res.json(headers);
-    } else {
-      res.status(404).send('No se encontraron datos en la hoja.');
+    try {
+        // Asumimos que los campos a filtrar están en la primera hoja (índice 0)
+        const data = await getDataFromSpecificSheet(0);
+        if (data && data.length > 0) {
+            const headers = Object.keys(data[0]).filter(header => !header.startsWith('Observaciones'));
+            res.json(headers);
+        } else {
+            res.status(404).send('No se encontraron datos en la hoja principal.');
+        }
+    } catch (error) {
+        console.error('Error al obtener los campos:', error);
+        res.status(500).send('Error al obtener los campos.');
     }
-  } catch (error) {
-    console.error('Error al obtener los campos:', error);
-    res.status(500).send('Error al obtener los campos.');
-  }
 });
 
 // Nueva ruta para obtener todas las opciones únicas de un campo específico
 app.get('/obtener-opciones-campo/:campo', async (req, res) => {
-  const campo = req.params.campo;
-  try {
-    const allData = await getAllDataFromSheet();
-    const opcionesUnicas = [...new Set(allData.map(item => item[campo]).filter(Boolean))]; // Obtiene valores únicos y elimina los vacíos
-    res.json(opcionesUnicas);
-  } catch (error) {
-    console.error(`Error al obtener las opciones para el campo ${campo}:`, error);
-    res.status(500).json({ error: `Error al obtener las opciones para el campo ${campo}`, details: error.message });
-  }
-});
-
-app.post('/buscar', async (req, res) => {
-  // (Tu código existente para la búsqueda por DNI - SIN MODIFICACIONES)
-  try {
-    const doc = new GoogleSpreadsheet(SHEET_ID);
-    await doc.useServiceAccountAuth({
-      client_email: creds.client_email,
-      private_key: creds.private_key.replace(/\\n/g, '\n'),
-    });
-    await doc.loadInfo();
-    const sheet = doc.sheetsByIndex[0];
-    await sheet.loadHeaderRow();
-    const rows = await sheet.getRows();
-
-    const resultado = rows.find(row =>
-      String(row['DNI'] || row['Documento'] || '').trim() === String(req.body.dni).trim()
-    );
-
-    if (!resultado) {
-      return res.json({ error: 'No encontrado' });
+    const campo = req.params.campo;
+    try {
+        // Asumimos que las opciones están en la primera hoja (índice 0)
+        const allData = await getDataFromSpecificSheet(0);
+        // Obtiene valores únicos y elimina los vacíos o nulos (filter(Boolean))
+        const opcionesUnicas = [...new Set(allData.map(item => item[campo]).filter(Boolean))];
+        res.json(opcionesUnicas);
+    } catch (error) {
+        console.error(`Error al obtener las opciones para el campo ${campo}:`, error);
+        res.status(500).json({ error: `Error al obtener las opciones para el campo ${campo}`, details: error.message });
     }
-
-    const responseData = {};
-    sheet.headerValues.forEach(header => {
-      responseData[header] = resultado[header] || '';
-    });
-
-    console.log('Datos enviados al frontend:', responseData);
-    res.json(responseData);
-
-  } catch (error) {
-    console.error('Error en servidor:', error);
-    res.status(500).json({
-      error: 'Error en el servidor',
-      details: error.message
-    });
-  }
 });
+
+// Ruta para buscar un paciente por DNI (usada en index.html)
+app.post('/buscar', async (req, res) => {
+    try {
+        // Obtener datos de la hoja principal (índice 0)
+        const allData = await getDataFromSpecificSheet(0);
+
+        const resultado = allData.find(patient =>
+            // Asegura que 'DNI' o 'Documento' se manejen como cadenas y se limpien espacios
+            String(patient['DNI'] || patient['Documento'] || '').trim() === String(req.body.dni).trim()
+        );
+
+        if (!resultado) {
+            return res.json({ error: 'No encontrado' });
+        }
+
+        // Devolver todos los datos de la fila del paciente encontrado
+        res.json(resultado); // 'resultado' ya es un objeto con todos los datos
+    } catch (error) {
+        console.error('Error en servidor al buscar paciente por DNI:', error);
+        res.status(500).json({
+            error: 'Error en el servidor',
+            details: error.message
+        });
+    }
+});
+
+// Ruta para consultas grupales (usada en estadisticas.html)
 app.post('/consultar-grupo', async (req, res) => {
     try {
-        const { conditions, combinator = 'AND', fieldsToRetrieve = [] } = req.body; // Dejamos fieldsToRetrieve pero usaremos todos los campos para exportar
+        const { conditions, combinator = 'AND', fieldsToRetrieve = [] } = req.body;
 
-        const allData = await getAllDataFromSheet();
+        // Obtener todos los datos de la hoja principal (índice 0)
+        const allData = await getDataFromSpecificSheet(0);
         const totalRegistros = allData.length;
         let filteredResults;
 
@@ -120,9 +149,9 @@ app.post('/consultar-grupo', async (req, res) => {
 
                     switch (operator) {
                         case 'equals':
-                            return String(patientValue).trim() === String(conditionValue).trim();
+                            return String(patientValue || '').trim() === String(conditionValue || '').trim();
                         case 'notEquals':
-                            return String(patientValue).trim() !== String(conditionValue).trim();
+                            return String(patientValue || '').trim() !== String(conditionValue || '').trim();
                         case 'greaterThan':
                             return Number(patientValue) > Number(conditionValue);
                         case 'greaterThanOrEqual':
@@ -132,10 +161,10 @@ app.post('/consultar-grupo', async (req, res) => {
                         case 'lessThanOrEqual':
                             return Number(patientValue) <= Number(conditionValue);
                         case 'includes':
-                            return String(patientValue).toLowerCase().includes(String(conditionValue).toLowerCase());
+                            return String(patientValue || '').toLowerCase().includes(String(conditionValue || '').toLowerCase());
                         case 'in':
                             if (Array.isArray(conditionValue)) {
-                                return conditionValue.some(val => String(patientValue).trim() === String(val).trim());
+                                return conditionValue.some(val => String(patientValue || '').trim() === String(val || '').trim());
                             }
                             return false;
                         default:
@@ -152,9 +181,9 @@ app.post('/consultar-grupo', async (req, res) => {
 
                     switch (operator) {
                         case 'equals':
-                            return String(patientValue).trim() === String(conditionValue).trim();
+                            return String(patientValue || '').trim() === String(conditionValue || '').trim();
                         case 'notEquals':
-                            return String(patientValue).trim() !== String(conditionValue).trim();
+                            return String(patientValue || '').trim() !== String(conditionValue || '').trim();
                         case 'greaterThan':
                             return Number(patientValue) > Number(conditionValue);
                         case 'greaterThanOrEqual':
@@ -164,10 +193,10 @@ app.post('/consultar-grupo', async (req, res) => {
                         case 'lessThanOrEqual':
                             return Number(patientValue) <= Number(conditionValue);
                         case 'includes':
-                            return String(patientValue).toLowerCase().includes(String(conditionValue).toLowerCase());
+                            return String(patientValue || '').toLowerCase().includes(String(conditionValue || '').toLowerCase());
                         case 'in':
                             if (Array.isArray(conditionValue)) {
-                                return conditionValue.some(val => String(patientValue).trim() === String(val).trim());
+                                return conditionValue.some(val => String(patientValue || '').trim() === String(val || '').trim());
                             }
                             return false;
                         default:
@@ -189,8 +218,7 @@ app.post('/consultar-grupo', async (req, res) => {
             total_registros: totalRegistros,
             conteo_cruce: conteoCruce,
             criterios_cruce: criteriosCruce,
-            // Incluimos el array completo de filteredResults
-            data: filteredResults
+            data: filteredResults // Incluimos el array completo de filteredResults para la exportación
         });
 
     } catch (error) {
@@ -202,7 +230,8 @@ app.post('/consultar-grupo', async (req, res) => {
 app.get('/obtener-resultados-variable/:variable', async (req, res) => {
     const variable = req.params.variable;
     try {
-        const data = await getAllDataFromSheet();
+        // Obtener datos de la hoja principal (índice 0)
+        const data = await getDataFromSpecificSheet(0);
         if (data && data.length > 0 && data[0].hasOwnProperty(variable)) {
             const resultadosUnicos = [...new Set(data.map(row => row[variable]).filter(value => value !== ''))];
             res.json(resultadosUnicos);
@@ -215,6 +244,100 @@ app.get('/obtener-resultados-variable/:variable', async (req, res) => {
     }
 });
 
-app.listen(PORT, () => {
-  console.log(`✅ Servidor funcionando en http://localhost:${PORT}`);
+
+// ====================================================================
+// NUEVA RUTA - OBTENER ESTUDIOS COMPLEMENTARIOS POR DNI
+// ====================================================================
+
+app.post('/obtener-estudios-paciente', async (req, res) => {
+    try {
+        const { dni } = req.body;
+        if (!dni) {
+            return res.status(400).json({ error: 'DNI del paciente es requerido.' });
+        }
+
+        const estudiosEncontrados = [];
+        // >>>>>>>> ATENCIÓN <<<<<<<<
+        // MUY IMPORTANTE: Asegúrate que estos nombres de hojas coincidan EXACTAMENTE
+        // con los nombres de las pestañas (hojas) en tu archivo de Google Sheets
+        const hojasDeEstudios = [
+            'Mamografia',
+            'Laboratorio',
+            'Ecografia',
+            'Espirometria',
+            'Densitometria',
+            'VCC',
+            'Biopsia',
+            // Agrega aquí todos los nombres de tus hojas de estudios complementarios
+            // Ejemplo: 'Radiografia', 'Cardiologia', etc.
+        ];
+
+        // Itera sobre cada hoja de estudio definida
+        for (const sheetName of hojasDeEstudios) {
+            try {
+                // Obtiene los datos de la hoja de estudio actual
+                const sheetData = await getDataFromSpecificSheet(sheetName);
+
+                // Filtra los estudios de esa hoja para encontrar los que coincidan con el DNI
+                const estudiosPacienteEnHoja = sheetData.filter(row => {
+                    // >>>>>>>> ATENCIÓN <<<<<<<<
+                    // Asumimos que la columna del DNI en TODAS TUS HOJAS DE ESTUDIOS se llama 'DNI'.
+                    // Si en alguna hoja se llama diferente (ej: 'Documento'), ajusta esto.
+                    return String(row['DNI'] || '').trim() === String(dni).trim();
+                });
+
+                // Añade los estudios encontrados de esta hoja a la lista global
+                estudiosPacienteEnHoja.forEach(estudio => {
+                    estudiosEncontrados.push({
+                        TipoEstudio: sheetName, // Indica de qué tipo de estudio es (nombre de la hoja)
+                        DNI: estudio['DNI'] || 'N/A',
+                        Nombre: estudio['Nombre'] || 'N/A',
+                        Apellido: estudio['Apellido'] || 'N/A',
+                        Fecha: estudio['Fecha'] || 'N/A', // Columna 'Fecha' en la hoja de estudio
+                        Prestador: estudio['Prestador'] || 'N/A', // Columna 'Prestador' en la hoja de estudio
+                        // >>>>>>>> ATENCIÓN <<<<<<<<
+                        // Si la columna de resultado puede llamarse 'Resultado' o 'Normal/Patologica', verifica cuál usas.
+                        // O añade más opciones si hay otras variantes.
+                        Resultado: estudio['Resultado'] || estudio['Normal/Patologica'] || 'N/A',
+                        // >>>>>>>> ATENCIÓN <<<<<<<<
+                        // Si la columna del link puede llamarse 'Link al PDF' o 'URL PDF', etc.
+                        LinkPDF: estudio['LinkPDF'] || estudio['LinkPDF'] || '' // Vacío si no hay link
+                    });
+                });
+
+            } catch (sheetError) {
+                // Esto capturará errores al intentar leer una hoja específica (ej: si no existe, o problema de API)
+                console.warn(`⚠️ Error al procesar la hoja "${sheetName}" para DNI ${dni}: ${sheetError.message}`);
+                // Continuamos con la siguiente hoja, no detenemos toda la búsqueda
+            }
+        }
+
+        // Responde al frontend con la lista de estudios encontrados o un mensaje de no encontrados
+        if (estudiosEncontrados.length > 0) {
+            res.json({ success: true, estudios: estudiosEncontrados });
+        } else {
+            res.json({ success: true, message: 'No se encontraron estudios complementarios para este DNI.', estudios: [] });
+        }
+
+    } catch (error) {
+        // Esto capturará errores fatales fuera del bucle de hojas
+        console.error('❌ Error fatal al obtener estudios del paciente:', error);
+        res.status(500).json({ error: 'Error interno del servidor al obtener estudios.' });
+    }
+});
+
+
+// ====================================================================
+// INICIO DEL SERVIDOR
+// ====================================================================
+
+// Llama a la función de inicialización de Google Sheet una vez que el servidor arranca.
+// El servidor no empezará a escuchar peticiones hasta que la conexión con la hoja esté lista.
+initializeGoogleSheet().then(() => {
+    app.listen(PORT, () => {
+        console.log(`✅ Servidor funcionando en http://localhost:${PORT}`);
+    });
+}).catch(err => {
+    console.error('❌ Fallo al iniciar el servidor debido a un error de inicialización de Google Sheet:', err);
+    process.exit(1); // Sale si no se puede iniciar el servidor
 });

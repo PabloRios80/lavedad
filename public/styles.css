@@ -86,3 +86,32 @@ body {
 .p-6 {
     padding: 1.5rem;
 }
+/* Estilos para la tabla de resultados */
+.resultados-table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid #003366; /* Color primario para el borde de la tabla */
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    margin-bottom: 1rem;
+}
+
+.resultados-table thead {
+    background-color: #003366; /* Color primario para el fondo del encabezado */
+    color: white;
+}
+
+.resultados-table th,
+.resultados-table td {
+    padding: 0.75rem;
+    border: 1px solid #003366; /* Color primario para los bordes de las celdas */
+    text-align: center;
+}
+
+.resultados-table th {
+    font-weight: bold;
+}
+
+.resultados-table tbody td:nth-child(2) {
+    text-align: left; /* Alinear los criterios del cruce a la izquierda para mejor legibilidad */
+}

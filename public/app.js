@@ -23,7 +23,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadingDiv = document.getElementById('loading');
     const resultDiv = document.getElementById('result');
     const riskAssessmentDiv = document.getElementById('risk-assessment');
-    // ... (posiblemente más variables para otros divs de resultados) ...
+     // >>>>>>>> ATENCIÓN <<<<<<<<
+    // Nuevos elementos del DOM para la sección de estudios complementarios
+    const estudiosComplementariosSeccion = document.getElementById('estudios-complementarios-seccion');
+    const verEstudiosBtn = document.getElementById('ver-estudios-btn');
+    const resultadosEstudiosPacienteDiv = document.getElementById('resultados-estudios-paciente');
+
+    // Variable global para almacenar el DNI del paciente actualmente mostrado
+    let currentPatientDNI = null;
+
+    // >>>>>>>> ATENCIÓN <<<<<<<<
+    // Asegúrate de que estas referencias existan en tu index.html.
+    // Si no, la inicialización de estos elementos será null.
+    if (!estudiosComplementariosSeccion || !verEstudiosBtn || !resultadosEstudiosPacienteDiv) {
+        console.warn('Algunos elementos DOM para estudios complementarios no se encontraron. Asegúrate de que index.html los tenga.');
+        // Puedes optar por salir de la función o simplemente continuar sin esa funcionalidad.
+        // Por ahora, continuaremos pero la funcionalidad de estudios no estará disponible.
+    }
 
     if (consultarBtn && dniInput && practicaSelect) {
         consultarBtn.addEventListener('click', consultarDNI);
@@ -35,68 +51,191 @@ document.addEventListener('DOMContentLoaded', () => {
             if (dni) consultarDNI();
         });
 
-document.getElementById('consultar').addEventListener('click', consultarDNI);
-document.getElementById('dni').addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') consultarDNI();
-});
-document.getElementById('practica').addEventListener('change', function() {
-    const dni = document.getElementById('dni').value.trim();
-    if (dni) consultarDNI();
-});
-
 async function consultarDNI() {
-    const dni = document.getElementById('dni').value.trim();
-    const resultDiv = document.getElementById('result');
-    const loadingDiv = document.getElementById('loading');
-    const riskAssessmentDiv = document.getElementById('risk-assessment');
-    
-    if (!dni) {
-        alert('Por favor ingrese un DNI');
-        return;
-    }
-    
-    loadingDiv.classList.remove('hidden');
-    resultDiv.innerHTML = '<p class="text-center text-gray-500 py-8"><i class="fas fa-spinner fa-spin"></i> Buscando información...</p>';
-    riskAssessmentDiv.classList.add('hidden');
-    
-    try {
-        console.log('Iniciando búsqueda para DNI:', dni);
-        const response = await fetch('/buscar', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ dni })
-        });
-        
-        const data = await response.json();
-        console.log('Datos recibidos del servidor:', data);
-        
-        if (data.error) {
-            resultDiv.innerHTML = `<p class="text-center text-red-500 py-8">${data.error}</p>`;
-            resetProfile();
-        } else {
-            updateProfile(data);
-            showResults(data);
-            evaluateCardiovascularRisk(data);
-            evaluateCancerPrevention(data);
-            evaluateInfectiousDiseases(data);
-            evaluateHealthyHabits(data);
-            evaluateDentalHealth(data); 
-            evaluateMentalHealth(data); 
-            evaluateRenalHealth(data);
-            evaluateEPOC(data); 
-            evaluateAneurisma(data); 
-            evaluateOsteoporosis(data); 
-            evaluateAspirina(data);
-            evaluateVisualHealth(data);
+        const dni = dniInput.value.trim(); // Usar la variable dniInput ya declarada
+
+        if (!dni) {
+            alert('Por favor ingrese un DNI');
+            return;
         }
-    } catch (error) {
-        console.error('Error en la consulta:', error);
-        resultDiv.innerHTML = '<p class="text-center text-red-500 py-8">Error al conectar con el servidor</p>';
-        resetProfile();
-    } finally {
-        loadingDiv.classList.add('hidden');
+
+        loadingDiv.classList.remove('hidden');
+        resultDiv.innerHTML = '<p class="text-center text-gray-500 py-8"><i class="fas fa-spinner fa-spin"></i> Buscando información...</p>';
+        riskAssessmentDiv.classList.add('hidden');
+
+        // >>>>>>>> MODIFICACIÓN CLAVE: Ocultar la sección de estudios al inicio de cada nueva búsqueda <<<<<<<<
+        if (estudiosComplementariosSeccion) {
+            estudiosComplementariosSeccion.classList.add('hidden'); // Ocultar la sección
+            resultadosEstudiosPacienteDiv.innerHTML = ''; // Limpiar cualquier estudio previamente mostrado
+            currentPatientDNI = null; // Resetear el DNI actual
+        }    
+    try {
+            console.log('Iniciando búsqueda para DNI:', dni);
+            const response = await fetch('/buscar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ dni })
+            });
+
+            const data = await response.json();
+            console.log('Datos recibidos del servidor:', data);
+
+            if (data.error) {
+                resultDiv.innerHTML = `<p class="text-center text-red-500 py-8">${data.error}</p>`;
+                // >>>>>>>> MODIFICACIÓN: Llamar a resetProfile y asegurar que la sección de estudios se oculte <<<<<<<<
+                resetProfile(); // Llama a tu función para limpiar el perfil
+            } else {
+                // Si la búsqueda fue exitosa, almacenamos el DNI del paciente actual
+                currentPatientDNI = data.DNI || data.Documento; // Asume que el DNI puede venir en 'DNI' o 'Documento'
+
+                // >>>>>>>> MODIFICACIÓN: Mostrar la sección de estudios si hay un paciente válido <<<<<<<<
+                if (currentPatientDNI && estudiosComplementariosSeccion) {
+                    estudiosComplementariosSeccion.classList.remove('hidden'); // Mostrar la sección
+                    // Limpiar el contenido anterior de estudios si hubiera, antes de que el usuario haga click
+                    resultadosEstudiosPacienteDiv.innerHTML = '<p class="text-gray-600">Haz clic en "Ver Estudios" para cargar los informes complementarios.</p>';
+                    verEstudiosBtn.disabled = false; // Asegurarse de que el botón esté habilitado
+                } else if (estudiosComplementariosSeccion) {
+                     // Si no se encontró un DNI válido en los datos del paciente, ocultar por las dudas.
+                    estudiosComplementariosSeccion.classList.add('hidden');
+                }
+
+                updateProfile(data);
+                showResults(data); // Asegúrate de que esta función (y otras) utilicen los IDs correctos para mostrar el perfil
+                evaluateCardiovascularRisk(data);
+                evaluateCancerPrevention(data);
+                evaluateInfectiousDiseases(data);
+                evaluateHealthyHabits(data);
+                evaluateDentalHealth(data);
+                evaluateMentalHealth(data);
+                evaluateRenalHealth(data);
+                evaluateEPOC(data);
+                evaluateAneurisma(data);
+                evaluateOsteoporosis(data);
+                evaluateAspirina(data);
+                evaluateVisualHealth(data);
+            }
+        } catch (error) {
+            console.error('Error en la consulta:', error);
+            resultDiv.innerHTML = '<p class="text-center text-red-500 py-8">Error al conectar con el servidor</p>';
+            // >>>>>>>> MODIFICACIÓN: Llamar a resetProfile y asegurar que la sección de estudios se oculte en caso de error <<<<<<<<
+            resetProfile();
+            if (estudiosComplementariosSeccion) {
+                estudiosComplementariosSeccion.classList.add('hidden');
+                currentPatientDNI = null;
+            }
+        } finally {
+            loadingDiv.classList.add('hidden');
+        }
     }
-}
+    
+    // >>>>>>>> NUEVO: Listener para el botón "Ver Estudios" <<<<<<<<
+    // Este bloque de código debe ir DENTRO del `DOMContentLoaded` listener,
+    // pero FUERA de la función `consultarDNI`.
+    if (verEstudiosBtn) {
+        verEstudiosBtn.addEventListener('click', async () => {
+            if (!currentPatientDNI) {
+                alert('No hay un DNI de paciente cargado para buscar estudios.');
+                return;
+            }
+
+            resultadosEstudiosPacienteDiv.innerHTML = '<p class="text-gray-600"><i class="fas fa-spinner fa-spin"></i> Cargando informes complementarios...</p>';
+            verEstudiosBtn.disabled = true; // Deshabilitar el botón durante la búsqueda
+
+            try {
+                const response = await fetch('/obtener-estudios-paciente', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ dni: currentPatientDNI })
+                });
+                const result = await response.json();
+
+                if (result.success && result.estudios && result.estudios.length > 0) {
+                    let estudiosHtml = `<h4 class="text-lg font-semibold text-gray-700 mb-4">Estudios Encontrados para DNI: ${currentPatientDNI}</h4>`;
+                    estudiosHtml += `<table class="resultados-table w-full border-collapse">`; // Añadimos border-collapse para mejor visualización
+                    estudiosHtml += `
+                        <thead>
+                            <tr class="bg-blue-200">
+                                <th class="px-4 py-2 border border-blue-300 text-left">Tipo de Estudio</th>
+                                <th class="px-4 py-2 border border-blue-300 text-left">Fecha</th>
+                                <th class="px-4 py-2 border border-blue-300 text-left">Prestador</th>
+                                <th class="px-4 py-2 border border-blue-300 text-left">Resultado</th>
+                                <th class="px-4 py-2 border border-blue-300 text-center">Informe PDF</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                    `;
+                    result.estudios.forEach(estudio => {
+                        // Manejo de campos vacíos/N/A para visualización
+                        const tipoEstudio = estudio.TipoEstudio || 'Desconocido';
+                        const fechaEstudio = estudio.Fecha || 'N/A';
+                        const prestadorEstudio = estudio.Prestador || 'N/A';
+                        const resultadoEstudio = estudio.Resultado || 'N/A';
+                        const linkPdf = estudio.LinkPDF && estudio.LinkPDF.trim() !== '' && estudio.LinkPDF.trim().toLowerCase() !== 'n/a' ? estudio.LinkPDF : null;
+
+                        const linkPdfHtml = linkPdf ?
+                            `<a href="${linkPdf}" target="_blank" class="text-blue-500 hover:underline">Ver PDF <i class="fas fa-external-link-alt ml-1"></i></a>` :
+                            '<span class="text-gray-500">No disponible</span>'; // Muestra 'No disponible' si el link no existe o está vacío
+
+                        estudiosHtml += `
+                            <tr class="hover:bg-blue-100">
+                                <td class="px-4 py-2 border border-blue-200">${tipoEstudio}</td>
+                                <td class="px-4 py-2 border border-blue-200">${fechaEstudio}</td>
+                                <td class="px-4 py-2 border border-blue-200">${prestadorEstudio}</td>
+                                <td class="px-4 py-2 border border-blue-200">${resultadoEstudio}</td>
+                                <td class="px-4 py-2 border border-blue-200 text-center">${linkPdfHtml}</td>
+                            </tr>
+                        `;
+                    });
+                    estudiosHtml += `</tbody></table>`;
+                    resultadosEstudiosPacienteDiv.innerHTML = estudiosHtml;
+                } else {
+                    resultadosEstudiosPacienteDiv.innerHTML = `<p class="text-gray-600">No se encontraron estudios complementarios para este paciente.</p>`;
+                }
+
+            } catch (error) {
+                console.error('Error al buscar estudios por DNI:', error);
+                resultadosEstudiosPacienteDiv.innerHTML = '<p class="text-red-500">Error al buscar estudios. Intente de nuevo.</p>';
+            } finally {
+                verEstudiosBtn.disabled = false; // Volver a habilitar el botón
+            }
+        });
+    }
+    
+    // >>>>>>>> ATENCIÓN <<<<<<<<
+    // Asegúrate de que tus funciones `resetProfile()` y `updateProfile(data)` (y las demás `evaluate...`)
+    // estén definidas en este archivo o sean accesibles globalmente.
+    // Aquí asumo que `resetProfile` también oculta `riskAssessmentDiv`.
+
+    function resetProfile() {
+        // Limpiar los divs de resultados
+        resultDiv.innerHTML = '';
+        riskAssessmentDiv.innerHTML = '';
+        riskAssessmentDiv.classList.add('hidden'); // Asegura que el div de riesgo esté oculto
+
+        // Ocultar la sección de estudios complementarios
+        if (estudiosComplementariosSeccion) {
+            estudiosComplementariosSeccion.classList.add('hidden');
+            resultadosEstudiosPacienteDiv.innerHTML = '';
+            currentPatientDNI = null;
+        }
+        // ... Cualquier otra lógica para limpiar el perfil del paciente
+    }
+
+    // Ejemplo de cómo `updateProfile` podría mostrar datos (ADAPTA ESTO A TU CÓDIGO REAL)
+    // Probablemente ya tienes algo similar en tu 'showResults' u otra función.
+    // Esta función se llama cuando `data` (del paciente) es exitosa.
+    function updateProfile(data) {
+        // Asume que tienes divs con IDs como 'patient-name', 'patient-dni', etc.
+        // O que tu función showResults ya se encarga de esto.
+        // Si no, aquí podrías actualizar elementos como:
+        // document.getElementById('patient-name').textContent = `${data.Nombre} ${data.Apellido}`;
+        // document.getElementById('patient-dni').textContent = data.DNI;
+        // etc.
+    }
+
+    // Las demás funciones como showResults, evaluateCardiovascularRisk, etc.,
+    // deben estar definidas y ser llamadas como las tienes.
+
 
 function updateProfile(data) {
     const nombre = data.Nombre || data.nombre || 'Afiliado';
@@ -1477,7 +1616,7 @@ function mostrarResultadosResumen(resultados) {
     const criteriosCruce = resultados.criterios_cruce || {};
 
     const tabla = document.createElement('table');
-    tabla.classList.add('table', 'table-bordered', 'table-striped');
+    tabla.classList.add('resultados-table'); // Añadimos la clase principal
 
     // Crear encabezado de la tabla
     const thead = document.createElement('thead');
@@ -1497,8 +1636,8 @@ function mostrarResultadosResumen(resultados) {
     dataRow.innerHTML = `
         <td>${totalRegistros}</td>
         <td>${Object.entries(criteriosCruce)
-                    .map(([variable, valor]) => `${variable} = ${valor}`)
-                    .join('<br>')}</td>
+                        .map(([variable, valor]) => `${variable} = ${valor}`)
+                        .join('<br>')}</td>
         <td>${conteoCruce}</td>
         <td>${porcentajeCruce}%</td>
     `;
