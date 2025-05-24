@@ -24,14 +24,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const resultDiv = document.getElementById('result');
     const riskAssessmentDiv = document.getElementById('risk-assessment');
      // >>>>>>>> ATENCIÓN <<<<<<<<
-    // Nuevos elementos del DOM para la sección de estudios complementarios
     const estudiosComplementariosSeccion = document.getElementById('estudios-complementarios-seccion');
     const verEstudiosBtn = document.getElementById('ver-estudios-btn');
     const resultadosEstudiosPacienteDiv = document.getElementById('resultados-estudios-paciente');
+    
+      // >>> NUEVOS ELEMENTOS PARA EL MODAL DE LABORATORIO <<<
+    const labResultsModal = document.getElementById('lab-results-modal');
+    const labResultsModalContent = document.getElementById('lab-results-modal-content');
+    const closeLabResultsModal = document.getElementById('close-lab-results-modal');
 
-    // Variable global para almacenar el DNI del paciente actualmente mostrado
-    let currentPatientDNI = null;
-
+    let currentPatientDNI = null; // Asumiendo que esta variable ya existe y se actualiza en la función consultarDNI
+    // >>> NUEVA VARIABLE PARA ALMACENAR TODOS LOS ESTUDIOS RECIBIDOS <<<
+    let allFetchedStudies = []; // Almacenará todos los estudios para poder accederlos por ID
     // >>>>>>>> ATENCIÓN <<<<<<<<
     // Asegúrate de que estas referencias existan en tu index.html.
     // Si no, la inicialización de estos elementos será null.
@@ -127,10 +131,61 @@ async function consultarDNI() {
             loadingDiv.classList.add('hidden');
         }
     }
-    
-    // >>>>>>>> NUEVO: Listener para el botón "Ver Estudios" <<<<<<<<
-    // Este bloque de código debe ir DENTRO del `DOMContentLoaded` listener,
-    // pero FUERA de la función `consultarDNI`.
+    // >>> NUEVA FUNCIÓN PARA ABRIR EL MODAL DE LABORATORIO <<<
+    function openLabResultsModal(results) {
+        currentLabResults = results; // Guarda los resultados para que el modal pueda usarlos
+        let tableHtml = `<h3 class="text-lg font-semibold mb-4 text-gray-800">Resultados de Laboratorio</h3>`;
+        tableHtml += `<table class="min-w-full bg-white border border-gray-300">
+                        <thead>
+                            <tr class="bg-gray-100">
+                                <th class="py-2 px-4 border-b">Campo</th>
+                                <th class="py-2 px-4 border-b">Resultado</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+
+        let hasResults = false;
+        for (const campo in currentLabResults) {
+            // Excluimos campos básicos si aparecen para no duplicar en el modal
+            if (campo === 'DNI' || campo === 'Nombre' || campo === 'Apellido' || campo === 'Fecha' || campo === 'Prestador' || campo === 'TipoEstudio') {
+                continue; 
+            }
+            const valor = currentLabResults[campo];
+            if (valor && String(valor).trim() !== '' && String(valor).trim().toLowerCase() !== 'n/a') {
+                const formattedCampoName = campo.replace(/([A-Z])/g, ' $1').trim();
+                tableHtml += `<tr>
+                                <td class="py-2 px-4 border-b text-gray-700">${formattedCampoName}</td>
+                                <td class="py-2 px-4 border-b text-gray-900 font-medium">${valor}</td>
+                            </tr>`;
+                hasResults = true;
+            }
+        }
+
+        if (!hasResults) {
+            tableHtml += `<tr><td colspan="2" class="py-4 px-4 text-center text-gray-500">No hay resultados detallados de laboratorio para mostrar.</td></tr>`;
+        }
+
+        tableHtml += `</tbody></table>`;
+        labResultsModalContent.innerHTML = tableHtml;
+        labResultsModal.classList.remove('hidden'); // Muestra el modal
+    }
+
+    // >>> FUNCIÓN PARA CERRAR EL MODAL <<<
+    if (closeLabResultsModal) {
+        closeLabResultsModal.addEventListener('click', () => {
+            labResultsModal.classList.add('hidden'); // Oculta el modal
+        });
+    }
+    // Cierra el modal si se hace clic fuera del contenido
+    if (labResultsModal) {
+        labResultsModal.addEventListener('click', (e) => {
+            if (e.target === labResultsModal) {
+                labResultsModal.classList.add('hidden');
+            }
+        });
+    }
+
+
     if (verEstudiosBtn) {
         verEstudiosBtn.addEventListener('click', async () => {
             if (!currentPatientDNI) {
@@ -139,7 +194,7 @@ async function consultarDNI() {
             }
 
             resultadosEstudiosPacienteDiv.innerHTML = '<p class="text-gray-600"><i class="fas fa-spinner fa-spin"></i> Cargando informes complementarios...</p>';
-            verEstudiosBtn.disabled = true; // Deshabilitar el botón durante la búsqueda
+            verEstudiosBtn.disabled = true;
 
             try {
                 const response = await fetch('/obtener-estudios-paciente', {
@@ -149,57 +204,104 @@ async function consultarDNI() {
                 });
                 const result = await response.json();
 
+                console.log('DEBUG (app.js - /obtener-estudios-paciente): Datos recibidos del Backend:', result);
+
                 if (result.success && result.estudios && result.estudios.length > 0) {
+                    allFetchedStudies = result.estudios; 
+
                     let estudiosHtml = `<h4 class="text-lg font-semibold text-gray-700 mb-4">Estudios Encontrados para DNI: ${currentPatientDNI}</h4>`;
-                    estudiosHtml += `<table class="resultados-table w-full border-collapse">`; // Añadimos border-collapse para mejor visualización
+                    estudiosHtml += `<table class="resultados-table w-full border-collapse">`;
                     estudiosHtml += `
                         <thead>
-                            <tr class="bg-blue-200">
-                                <th class="px-4 py-2 border border-blue-300 text-left">Tipo de Estudio</th>
-                                <th class="px-4 py-2 border border-blue-300 text-left">Fecha</th>
-                                <th class="px-4 py-2 border border-blue-300 text-left">Prestador</th>
-                                <th class="px-4 py-2 border border-blue-300 text-left">Resultado</th>
-                                <th class="px-4 py-2 border border-blue-300 text-center">Informe PDF</th>
+                            <tr class="bg-gray-200">
+                                <th class="px-4 py-2 border text-left">Tipo de Estudio</th>
+                                <th class="px-4 py-2 border text-left">Fecha</th>
+                                <th class="px-4 py-2 border text-left">Prestador</th>
+                                <th class="px-4 py-2 border text-left">Resultado/Detalle</th>
+                                <th class="px-4 py-2 border text-center">Informe/PDF</th>
                             </tr>
                         </thead>
                         <tbody>
                     `;
-                    result.estudios.forEach(estudio => {
-                        // Manejo de campos vacíos/N/A para visualización
+                    result.estudios.forEach((estudio, index) => { 
+                        console.log(`DEBUG (app.js - Procesando estudio ${index}):`, estudio);
+
                         const tipoEstudio = estudio.TipoEstudio || 'Desconocido';
                         const fechaEstudio = estudio.Fecha || 'N/A';
                         const prestadorEstudio = estudio.Prestador || 'N/A';
-                        const resultadoEstudio = estudio.Resultado || 'N/A';
-                        const linkPdf = estudio.LinkPDF && estudio.LinkPDF.trim() !== '' && estudio.LinkPDF.trim().toLowerCase() !== 'n/a' ? estudio.LinkPDF : null;
 
-                        const linkPdfHtml = linkPdf ?
-                            `<a href="${linkPdf}" target="_blank" class="text-blue-500 hover:underline">Ver PDF <i class="fas fa-external-link-alt ml-1"></i></a>` :
-                            '<span class="text-gray-500">No disponible</span>'; // Muestra 'No disponible' si el link no existe o está vacío
+                        let resultadoCeldaContent = '';
+                        let informeCeldaContent = '';
+
+                        if (tipoEstudio === 'Laboratorio' && estudio.ResultadosLaboratorio && typeof estudio.ResultadosLaboratorio === 'object' && Object.keys(estudio.ResultadosLaboratorio).length > 0) {
+                            resultadoCeldaContent = '<p class="text-gray-600 text-sm">Ver detalles en tabla.</p>';
+                            
+                            // Aseguramos que data-index se imprime correctamente
+                            informeCeldaContent = `<button type="button" class="ver-lab-results-btn bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded text-sm" 
+                                data-index="${index}">Ver Tabla Resultados</button>`; // Usamos index directamente aquí
+
+                        } else {
+                            // >>>>>>> CORRECCIÓN CRÍTICA AQUÍ: LinkPDF en lugar de LinkPdf <<<<<<<
+                            const linkPdf = estudio.LinkPDF && String(estudio.LinkPDF).trim() !== '' && String(estudio.LinkPDF).trim().toLowerCase() !== 'n/a' ? estudio.LinkPDF : null;
+                            informeCeldaContent = linkPdf ?
+                                `<a href="${linkPdf}" target="_blank" class="text-blue-500 hover:underline">Ver PDF <i class="fas fa-external-link-alt ml-1"></i></a>` :
+                                '<span class="text-gray-500">No disponible</span>';
+                        }
 
                         estudiosHtml += `
-                            <tr class="hover:bg-blue-100">
-                                <td class="px-4 py-2 border border-blue-200">${tipoEstudio}</td>
-                                <td class="px-4 py-2 border border-blue-200">${fechaEstudio}</td>
-                                <td class="px-4 py-2 border border-blue-200">${prestadorEstudio}</td>
-                                <td class="px-4 py-2 border border-blue-200">${resultadoEstudio}</td>
-                                <td class="px-4 py-2 border border-blue-200 text-center">${linkPdfHtml}</td>
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-2 border">${tipoEstudio}</td>
+                                <td class="px-4 py-2 border">${fechaEstudio}</td>
+                                <td class="px-4 py-2 border">${prestadorEstudio}</td>
+                                <td class="px-4 py-2 border">${resultadoCeldaContent}</td>
+                                <td class="px-4 py-2 border text-center">${informeCeldaContent}</td>
                             </tr>
                         `;
                     });
                     estudiosHtml += `</tbody></table>`;
                     resultadosEstudiosPacienteDiv.innerHTML = estudiosHtml;
+
+                    // >>> DELEGACIÓN DE EVENTOS PARA BOTONES DE LABORATORIO <<<
+                    // Adjuntamos un solo listener al contenedor principal de resultados
+                    resultadosEstudiosPacienteDiv.addEventListener('click', (event) => {
+                        // Verificamos si el clic fue en un botón con la clase 'ver-lab-results-btn'
+                        if (event.target.classList.contains('ver-lab-results-btn')) {
+                            const button = event.target;
+                            const index = parseInt(button.dataset.index, 10); 
+                            
+                            console.log('DEBUG (app.js): Botón de Laboratorio clicado, index:', index);
+
+                            if (!isNaN(index) && allFetchedStudies[index]) {
+                                const labStudy = allFetchedStudies[index]; 
+                                console.log('DEBUG (app.js): Estudio de laboratorio encontrado por índice:', labStudy);
+
+                                if (labStudy.ResultadosLaboratorio) {
+                                    openLabResultsModal(labStudy.ResultadosLaboratorio);
+                                } else {
+                                    alert('El estudio de laboratorio encontrado no contiene la propiedad "ResultadosLaboratorio".');
+                                    console.error('ERROR: El estudio de laboratorio en el índice', index, 'no tiene ResultadosLaboratorio:', labStudy);
+                                }
+                            } else {
+                                alert('Error al identificar el estudio de laboratorio. Intente de nuevo.');
+                                console.error('ERROR: No se pudo obtener un índice válido para el estudio de laboratorio clicado. Index:', index);
+                            }
+                        }
+                    });
+
                 } else {
                     resultadosEstudiosPacienteDiv.innerHTML = `<p class="text-gray-600">No se encontraron estudios complementarios para este paciente.</p>`;
                 }
 
             } catch (error) {
-                console.error('Error al buscar estudios por DNI:', error);
+                console.error('ERROR en frontend al buscar estudios (verEstudiosBtn):', error);
                 resultadosEstudiosPacienteDiv.innerHTML = '<p class="text-red-500">Error al buscar estudios. Intente de nuevo.</p>';
             } finally {
-                verEstudiosBtn.disabled = false; // Volver a habilitar el botón
+                verEstudiosBtn.disabled = false;
             }
         });
     }
+
+
     
     // >>>>>>>> ATENCIÓN <<<<<<<<
     // Asegúrate de que tus funciones `resetProfile()` y `updateProfile(data)` (y las demás `evaluate...`)

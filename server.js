@@ -248,7 +248,6 @@ app.get('/obtener-resultados-variable/:variable', async (req, res) => {
 // ====================================================================
 // NUEVA RUTA - OBTENER ESTUDIOS COMPLEMENTARIOS POR DNI
 // ====================================================================
-
 app.post('/obtener-estudios-paciente', async (req, res) => {
     try {
         const { dni } = req.body;
@@ -262,14 +261,34 @@ app.post('/obtener-estudios-paciente', async (req, res) => {
         // con los nombres de las pestañas (hojas) en tu archivo de Google Sheets
         const hojasDeEstudios = [
             'Mamografia',
-            'Laboratorio',
+            'Laboratorio', // ¡Aquí está tu hoja de laboratorio!
             'Ecografia',
             'Espirometria',
             'Densitometria',
             'VCC',
             'Biopsia',
-            // Agrega aquí todos los nombres de tus hojas de estudios complementarios
-            // Ejemplo: 'Radiografia', 'Cardiologia', etc.
+            // Si tenías 'Laboratorio' dos veces, lo dejé una sola vez aquí por claridad.
+            // Si tienes otras hojas, agrégalas.
+        ];
+
+        // >>>>>>>> NUEVO: Definición de campos específicos para la hoja de Laboratorio <<<<<<<<
+        // ESTOS DEBEN COINCIDIR EXACTAMENTE CON LOS ENCABEZADOS DE LAS COLUMNAS EN TU HOJA 'Laboratorio'
+        const camposLaboratorio = [
+            'Glucemia',
+            'Creatinina',
+            'Indice de Filtracion Glomerular', // Asegúrate de que el espacio y tildes sean exactos
+            'Colesterol Total',
+            'Colesterol HDL',
+            'Colesterol LDL',
+            'Trigliceridos',
+            'HIV',
+            'SOMF',
+            'Hepatitis B antigeno de superficie',
+            'Hepatitis C Ac. Totales',
+            'Hepatitis B AC anti core total',
+            'HPV OTROS GENOTIPOS DE ALTO RIESGO',
+            'HPV GENOTIPO 18',
+            'HPV GENOTIPO 16'
         ];
 
         // Itera sobre cada hoja de estudio definida
@@ -280,35 +299,54 @@ app.post('/obtener-estudios-paciente', async (req, res) => {
 
                 // Filtra los estudios de esa hoja para encontrar los que coincidan con el DNI
                 const estudiosPacienteEnHoja = sheetData.filter(row => {
-                    // >>>>>>>> ATENCIÓN <<<<<<<<
                     // Asumimos que la columna del DNI en TODAS TUS HOJAS DE ESTUDIOS se llama 'DNI'.
-                    // Si en alguna hoja se llama diferente (ej: 'Documento'), ajusta esto.
+                    // Si en alguna hoja se llama diferente (ej: 'Documento'), ajústalo aquí.
                     return String(row['DNI'] || '').trim() === String(dni).trim();
                 });
 
                 // Añade los estudios encontrados de esta hoja a la lista global
                 estudiosPacienteEnHoja.forEach(estudio => {
-                    estudiosEncontrados.push({
-                        TipoEstudio: sheetName, // Indica de qué tipo de estudio es (nombre de la hoja)
-                        DNI: estudio['DNI'] || 'N/A',
-                        Nombre: estudio['Nombre'] || 'N/A',
-                        Apellido: estudio['Apellido'] || 'N/A',
-                        Fecha: estudio['Fecha'] || 'N/A', // Columna 'Fecha' en la hoja de estudio
-                        Prestador: estudio['Prestador'] || 'N/A', // Columna 'Prestador' en la hoja de estudio
-                        // >>>>>>>> ATENCIÓN <<<<<<<<
-                        // Si la columna de resultado puede llamarse 'Resultado' o 'Normal/Patologica', verifica cuál usas.
-                        // O añade más opciones si hay otras variantes.
-                        Resultado: estudio['Resultado'] || estudio['Normal/Patologica'] || 'N/A',
-                        // >>>>>>>> ATENCIÓN <<<<<<<<
-                        // Si la columna del link puede llamarse 'Link al PDF' o 'URL PDF', etc.
-                        LinkPDF: estudio['LinkPDF'] || estudio['LinkPDF'] || '' // Vacío si no hay link
-                    });
+                    // >>>>>>>> LÓGICA CONDICIONAL: DIFERENCIAR LABORATORY DE OTROS ESTUDIOS <<<<<<<<
+                    if (sheetName === 'Laboratorio') {
+                        const labResultados = {};
+                        camposLaboratorio.forEach(campo => {
+                            // Si el campo existe en la fila de Google Sheets, úsalo; de lo contrario, 'N/A'
+                            labResultados[campo] = estudio[campo] !== undefined ? estudio[campo] : 'N/A';
+                        });
+
+                        estudiosEncontrados.push({
+                            TipoEstudio: sheetName, // Será 'Laboratorio'
+                            DNI: estudio['DNI'] || 'N/A',
+                            Nombre: estudio['Nombre'] || 'N/A',
+                            Apellido: estudio['Apellido'] || 'N/A',
+                            Fecha: estudio['Fecha'] || 'N/A',
+                            Prestador: estudio['Prestador'] || 'N/A',
+                            // >>>>>>>> IMPORTANTE: Para Laboratorio, enviamos los resultados específicos <<<<<<<<
+                            ResultadosLaboratorio: labResultados // Objeto con todos los resultados de laboratorio
+                        });
+
+                    } else {
+                        // Lógica para Mamografia, Ecografia, etc. (los que tienen Resultado y/o LinkPDF)
+                        estudiosEncontrados.push({
+                            TipoEstudio: sheetName,
+                            DNI: estudio['DNI'] || 'N/A',
+                            Nombre: estudio['Nombre'] || 'N/A',
+                            Apellido: estudio['Apellido'] || 'N/A',
+                            Fecha: estudio['Fecha'] || 'N/A',
+                            Prestador: estudio['Prestador'] || 'N/A',
+                            // Puedes añadir más opciones si la columna de resultado tiene variantes
+                            Resultado: estudio['Resultado'] || estudio['Normal/Patologica'] || 'N/A',
+                            // Aquí usamos el nombre de columna del link PDF que ya te funcionaba
+                            LinkPDF: estudio['LinkPDF'] || '' // Vacío si no hay link
+                            // Si tu LinkPDF venía de 'Link al PDF' o 'URL PDF', asegúrate de usar ese nombre aquí:
+                            // LinkPDF: estudio['Link al PDF'] || estudio['URL PDF'] || estudio['LinkPDF'] || ''
+                        });
+                    }
                 });
 
             } catch (sheetError) {
-                // Esto capturará errores al intentar leer una hoja específica (ej: si no existe, o problema de API)
                 console.warn(`⚠️ Error al procesar la hoja "${sheetName}" para DNI ${dni}: ${sheetError.message}`);
-                // Continuamos con la siguiente hoja, no detenemos toda la búsqueda
+                // console.error(`Detalles del error para hoja ${sheetName}:`, sheetError); // Descomentar para depuración profunda
             }
         }
 
