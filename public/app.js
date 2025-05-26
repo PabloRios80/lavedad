@@ -54,84 +54,142 @@ document.addEventListener('DOMContentLoaded', () => {
             const dni = dniInput.value.trim();
             if (dni) consultarDNI();
         });
-
+        // --- Función consultarDNI CON TODOS LOS CAMBIOS ---
 async function consultarDNI() {
-        const dni = dniInput.value.trim(); // Usar la variable dniInput ya declarada
+    const dni = dniInput.value.trim();
 
-        if (!dni) {
-            alert('Por favor ingrese un DNI');
-            return;
-        }
-
-        loadingDiv.classList.remove('hidden');
-        resultDiv.innerHTML = '<p class="text-center text-gray-500 py-8"><i class="fas fa-spinner fa-spin"></i> Buscando información...</p>';
-        riskAssessmentDiv.classList.add('hidden');
-
-        // >>>>>>>> MODIFICACIÓN CLAVE: Ocultar la sección de estudios al inicio de cada nueva búsqueda <<<<<<<<
-        if (estudiosComplementariosSeccion) {
-            estudiosComplementariosSeccion.classList.add('hidden'); // Ocultar la sección
-            resultadosEstudiosPacienteDiv.innerHTML = ''; // Limpiar cualquier estudio previamente mostrado
-            currentPatientDNI = null; // Resetear el DNI actual
-        }    
-    try {
-            console.log('Iniciando búsqueda para DNI:', dni);
-            const response = await fetch('/buscar', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ dni })
-            });
-
-            const data = await response.json();
-            console.log('Datos recibidos del servidor:', data);
-
-            if (data.error) {
-                resultDiv.innerHTML = `<p class="text-center text-red-500 py-8">${data.error}</p>`;
-                // >>>>>>>> MODIFICACIÓN: Llamar a resetProfile y asegurar que la sección de estudios se oculte <<<<<<<<
-                resetProfile(); // Llama a tu función para limpiar el perfil
-            } else {
-                // Si la búsqueda fue exitosa, almacenamos el DNI del paciente actual
-                currentPatientDNI = data.DNI || data.Documento; // Asume que el DNI puede venir en 'DNI' o 'Documento'
-
-                // >>>>>>>> MODIFICACIÓN: Mostrar la sección de estudios si hay un paciente válido <<<<<<<<
-                if (currentPatientDNI && estudiosComplementariosSeccion) {
-                    estudiosComplementariosSeccion.classList.remove('hidden'); // Mostrar la sección
-                    // Limpiar el contenido anterior de estudios si hubiera, antes de que el usuario haga click
-                    resultadosEstudiosPacienteDiv.innerHTML = '<p class="text-gray-600">Haz clic en "Ver Estudios" para cargar los informes complementarios.</p>';
-                    verEstudiosBtn.disabled = false; // Asegurarse de que el botón esté habilitado
-                } else if (estudiosComplementariosSeccion) {
-                     // Si no se encontró un DNI válido en los datos del paciente, ocultar por las dudas.
-                    estudiosComplementariosSeccion.classList.add('hidden');
-                }
-
-                updateProfile(data);
-                showResults(data); // Asegúrate de que esta función (y otras) utilicen los IDs correctos para mostrar el perfil
-                evaluateCardiovascularRisk(data);
-                evaluateCancerPrevention(data);
-                evaluateInfectiousDiseases(data);
-                evaluateHealthyHabits(data);
-                evaluateDentalHealth(data);
-                evaluateMentalHealth(data);
-                evaluateRenalHealth(data);
-                evaluateEPOC(data);
-                evaluateAneurisma(data);
-                evaluateOsteoporosis(data);
-                evaluateAspirina(data);
-                evaluateVisualHealth(data);
-            }
-        } catch (error) {
-            console.error('Error en la consulta:', error);
-            resultDiv.innerHTML = '<p class="text-center text-red-500 py-8">Error al conectar con el servidor</p>';
-            // >>>>>>>> MODIFICACIÓN: Llamar a resetProfile y asegurar que la sección de estudios se oculte en caso de error <<<<<<<<
-            resetProfile();
-            if (estudiosComplementariosSeccion) {
-                estudiosComplementariosSeccion.classList.add('hidden');
-                currentPatientDNI = null;
-            }
-        } finally {
-            loadingDiv.classList.add('hidden');
-        }
+    if (!dni) {
+        alert('Por favor ingrese un DNI');
+        return;
     }
-    // >>> NUEVA FUNCIÓN PARA ABRIR EL MODAL DE LABORATORIO <<<
+
+    loadingDiv.classList.remove('hidden');
+    resultDiv.innerHTML = '<p class="text-center text-gray-500 py-8"><i class="fas fa-spinner fa-spin"></i> Buscando información...</p>';
+    resultDiv.classList.remove('hidden');
+    resultDiv.style.display = 'block';
+
+    // --- OCULTAR SECCIONES AL INICIO DE CADA BÚSQUEDA ---
+    // La función resetProfile ya se encarga de riskAssessmentDiv.
+    // Si quieres ocultar el cartel de estudios previos, puedes hacerlo aquí
+    // o asegurarte de que resetProfile también lo haga.
+    const previousStudiesMessageDiv = document.getElementById('previous-studies-message');
+    if (previousStudiesMessageDiv) {
+        previousStudiesMessageDiv.classList.add('hidden');
+        previousStudiesMessageDiv.innerHTML = '';
+    }
+
+    // Asegurarse de limpiar el perfil de paciente antes de una nueva búsqueda
+    // Esta llamada ya oculta riskAssessmentDiv y limpia otras secciones.
+    resetProfile();
+
+    try {
+        console.log('Iniciando búsqueda para DNI:', dni);
+        const response = await fetch('/buscar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dni })
+        });
+
+        const data = await response.json();
+        console.log('DEBUG APP.JS: Datos recibidos del servidor:', data);
+
+        if (data.error) {
+            console.log('DEBUG APP.JS: Servidor reporta error:', data.error);
+            resultDiv.innerHTML = `<p class="text-center text-red-500 py-8">${data.error}</p>`;
+            resultDiv.classList.remove('hidden');
+            resultDiv.style.display = 'block';
+
+            // resetProfile ya se encarga de ocultar riskAssessmentDiv y limpiar otras cosas.
+            resetProfile(); // Aseguramos que todo esté oculto si hay un error.
+
+        } else if (data.pacientePrincipal && (data.pacientePrincipal.DNI || data.pacientePrincipal.Documento)) {
+            console.log('DEBUG APP.JS: Servidor devolvió datos de paciente principal.');
+            const pacientePrincipal = data.pacientePrincipal;
+            currentPatientDNI = pacientePrincipal.DNI || pacientePrincipal.Documento;
+
+            if (resultDiv) {
+                resultDiv.classList.add('hidden');
+            }
+
+            // --- MOSTRAR SECCIONES DESPUÉS DE RECIBIR DATOS VÁLIDOS ---
+            // Solo muestra riskAssessmentDiv aquí, ya que resetProfile la ocultó.
+            if (riskAssessmentDiv) {
+                riskAssessmentDiv.style.display = 'block'; // ¡Muestra la sección de evaluación de riesgo AHORA!
+            }
+
+            if (estudiosComplementariosSeccion) {
+                estudiosComplementariosSeccion.classList.remove('hidden');
+                resultadosEstudiosPacienteDiv.innerHTML = '<p class="text-gray-600">Haz clic en "Ver Estudios" para cargar los informes complementarios.</p>';
+                verEstudiosBtn.disabled = false;
+            }
+
+            // APLICAMOS UN PEQUEÑO RETARDO ANTES DE LLENAR LOS DATOS
+            // Esto permite que el DOM se "asiente" después de hacer visible la sección de riesgo.
+            setTimeout(() => {
+                updateProfile(pacientePrincipal);
+                showResults(pacientePrincipal);
+                evaluateCardiovascularRisk(pacientePrincipal);
+                evaluateCancerPrevention(pacientePrincipal);
+                evaluateInfectiousDiseases(pacientePrincipal);
+                evaluateHealthyHabits(pacientePrincipal);
+                evaluateDentalHealth(pacientePrincipal);
+                evaluateMentalHealth(pacientePrincipal);
+                evaluateRenalHealth(pacientePrincipal);
+                evaluateEPOC(pacientePrincipal);
+                evaluateAneurisma(pacientePrincipal);
+                evaluateOsteoporosis(pacientePrincipal);
+                evaluateAspirina(pacientePrincipal);
+                evaluateVisualHealth(pacientePrincipal);
+            }, 50); // 50 milisegundos de retardo
+
+            // Lógica para mostrar el cartel de estudios previos
+            const estudiosPrevios = data.estudiosPrevios;
+            if (estudiosPrevios && estudiosPrevios.length > 0) {
+                console.log('DEBUG APP.JS: ¡Paciente con estudios previos encontrados!', estudiosPrevios);
+                if (previousStudiesMessageDiv) {
+                    previousStudiesMessageDiv.classList.remove('hidden');
+                    previousStudiesMessageDiv.innerHTML = `
+                        <p class="text-yellow-700 font-semibold mb-2">
+                            <i class="fas fa-exclamation-triangle mr-2"></i>Existen otros Día Preventivos registrados:
+                        </p>
+                        <ul class="list-disc list-inside ml-4">
+                            ${estudiosPrevios.map(estudio =>
+                                `<li>${estudio.fecha}</li>`
+                            ).join('')}
+                        </ul>
+                        <p class="text-sm text-gray-500 mt-2">
+                            El estudio mostrado actualmente corresponde a la fecha más reciente.
+                        </p>
+                    `;
+                } else {
+                    console.error("DEBUG APP.JS: Div 'previous-studies-message' no encontrado en el HTML.");
+                }
+            } else {
+                if (previousStudiesMessageDiv) {
+                    previousStudiesMessageDiv.classList.add('hidden');
+                    previousStudiesMessageDiv.innerHTML = '';
+                }
+            }
+        } else {
+            console.error('DEBUG APP.JS: Respuesta inesperada del servidor (no es error ni datos de paciente válidos):', data);
+            resultDiv.innerHTML = '<p class="text-center text-red-500 py-8">Error: Formato de datos inesperado del servidor.</p>';
+            resultDiv.classList.remove('hidden');
+            resultDiv.style.display = 'block';
+
+            resetProfile(); // Aseguramos que todo esté oculto si hay un error de formato.
+        }
+    } catch (error) {
+        console.error('Error en la consulta:', error);
+        resultDiv.innerHTML = '<p class="text-center text-red-500 py-8">Error al conectar con el servidor</p>';
+        resultDiv.classList.remove('hidden');
+        resultDiv.style.display = 'block';
+
+        resetProfile(); // Aseguramos que todo esté oculto si hay un error de conexión.
+    } finally {
+        loadingDiv.classList.add('hidden');
+    }
+}
+        // >>> NUEVA FUNCIÓN PARA ABRIR EL MODAL DE LABORATORIO <<<
     function openLabResultsModal(results) {
         currentLabResults = results; // Guarda los resultados para que el modal pueda usarlos
         let tableHtml = `<h3 class="text-lg font-semibold mb-4 text-gray-800">Resultados de Laboratorio</h3>`;
@@ -307,37 +365,25 @@ async function consultarDNI() {
     // Asegúrate de que tus funciones `resetProfile()` y `updateProfile(data)` (y las demás `evaluate...`)
     // estén definidas en este archivo o sean accesibles globalmente.
     // Aquí asumo que `resetProfile` también oculta `riskAssessmentDiv`.
+// --- FUNCIÓN resetProfile CORREGIDA ---
+function resetProfile() {
+    // Limpiar los divs de resultados
+    resultDiv.innerHTML = '';
 
-    function resetProfile() {
-        // Limpiar los divs de resultados
-        resultDiv.innerHTML = '';
-        riskAssessmentDiv.innerHTML = '';
-        riskAssessmentDiv.classList.add('hidden'); // Asegura que el div de riesgo esté oculto
-
-        // Ocultar la sección de estudios complementarios
-        if (estudiosComplementariosSeccion) {
-            estudiosComplementariosSeccion.classList.add('hidden');
-            resultadosEstudiosPacienteDiv.innerHTML = '';
-            currentPatientDNI = null;
-        }
-        // ... Cualquier otra lógica para limpiar el perfil del paciente
+    // ¡IMPORTANTE! NO vaciar innerHTML de riskAssessmentDiv aquí.
+    // Solo ocúltala. Sus elementos internos (como pressure-value) deben permanecer.
+    if (riskAssessmentDiv) {
+        riskAssessmentDiv.style.display = 'none'; // Usa display: none para ocultar
     }
 
-    // Ejemplo de cómo `updateProfile` podría mostrar datos (ADAPTA ESTO A TU CÓDIGO REAL)
-    // Probablemente ya tienes algo similar en tu 'showResults' u otra función.
-    // Esta función se llama cuando `data` (del paciente) es exitosa.
-    function updateProfile(data) {
-        // Asume que tienes divs con IDs como 'patient-name', 'patient-dni', etc.
-        // O que tu función showResults ya se encarga de esto.
-        // Si no, aquí podrías actualizar elementos como:
-        // document.getElementById('patient-name').textContent = `${data.Nombre} ${data.Apellido}`;
-        // document.getElementById('patient-dni').textContent = data.DNI;
-        // etc.
+    // Ocultar la sección de estudios complementarios
+    if (estudiosComplementariosSeccion) {
+        estudiosComplementariosSeccion.classList.add('hidden');
+        resultadosEstudiosPacienteDiv.innerHTML = '';
+        currentPatientDNI = null;
     }
-
-    // Las demás funciones como showResults, evaluateCardiovascularRisk, etc.,
-    // deben estar definidas y ser llamadas como las tienes.
-
+    // ... Cualquier otra lógica para limpiar el perfil del paciente
+}
 
 function updateProfile(data) {
     const nombre = data.Nombre || data.nombre || 'Afiliado';
@@ -1770,4 +1816,3 @@ function exportarResultados() {
 }
     }
     });
-

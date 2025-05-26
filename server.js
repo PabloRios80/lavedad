@@ -104,27 +104,72 @@ app.get('/obtener-opciones-campo/:campo', async (req, res) => {
     }
 });
 
-// Ruta para buscar un paciente por DNI (usada en index.html)
+// --- RUTA PRINCIPAL DE BÚSQUEDA - /buscar ---
 app.post('/buscar', async (req, res) => {
     try {
-        // Obtener datos de la hoja principal (índice 0)
-        const allData = await getDataFromSpecificSheet(0);
+        const allData = await getDataFromSpecificSheet(0); // Suponiendo que los datos del Día Preventivo están en la hoja 0
+        const dniABuscar = String(req.body.dni).trim();
 
-        const resultado = allData.find(patient =>
-            // Asegura que 'DNI' o 'Documento' se manejen como cadenas y se limpien espacios
-            String(patient['DNI'] || patient['Documento'] || '').trim() === String(req.body.dni).trim()
+        const NOMBRE_COLUMNA_FECHA = 'Fecha_cierre_DP'; // Asegúrate de que este es el nombre exacto de la columna de fecha
+
+        const parseDateDDMMYYYY = (dateString) => {
+            if (!dateString) return new Date(NaN);
+            const parts = dateString.split('/');
+            if (parts.length === 3) {
+                const day = parseInt(parts[0], 10);
+                const month = parseInt(parts[1], 10) - 1; 
+                const year = parseInt(parts[2], 10);
+                if (isNaN(day) || isNaN(month) || isNaN(year)) return new Date(NaN);
+                return new Date(year, month, day);
+            }
+            return new Date(NaN);
+        };
+
+        // 1. Filtrar TODOS los registros para el DNI
+        const resultadosParaDNI = allData.filter(patient =>
+            String(patient['DNI'] || patient['Documento'] || '').trim() === dniABuscar
         );
 
-        if (!resultado) {
-            return res.json({ error: 'No encontrado' });
+        if (resultadosParaDNI.length === 0) {
+            console.log(`SERVER: DNI ${dniABuscar} no encontrado.`);
+            // Cuando no se encuentra, devolvemos un objeto con 'error'
+            return res.json({ error: 'DNI no encontrado.' }); 
         }
 
-        // Devolver todos los datos de la fila del paciente encontrado
-        res.json(resultado); // 'resultado' ya es un objeto con todos los datos
+        // 2. Ordenar los resultados por fecha (más reciente primero)
+        resultadosParaDNI.sort((a, b) => {
+            const dateA = parseDateDDMMYYYY(a[NOMBRE_COLUMNA_FECHA]);
+            const dateB = parseDateDDMMYYYY(b[NOMBRE_COLUMNA_FECHA]);
+
+            if (isNaN(dateA.getTime()) && isNaN(dateB.getTime())) return 0;
+            if (isNaN(dateA.getTime())) return 1;
+            if (isNaN(dateB.getTime())) return -1;
+
+            return dateB.getTime() - dateA.getTime(); 
+        });
+
+        // El primer elemento es el más reciente (el que se mostrará como principal)
+        const pacientePrincipal = resultadosParaDNI[0];
+        
+        // Los estudios previos son todos los demás, si existen.
+        // Mapeamos solo la fecha para el cartel informativo.
+        const estudiosPrevios = resultadosParaDNI.slice(1).map(estudio => ({
+            fecha: estudio[NOMBRE_COLUMNA_FECHA] || 'Fecha desconocida'
+        }));
+
+        console.log(`SERVER: DNI ${dniABuscar} encontrado. Enviando el más reciente y ${estudiosPrevios.length} estudios previos.`);
+
+        // 3. ¡LA CLAVE! Enviamos un objeto con dos propiedades claras.
+        // Esto evita que tu frontend se confunda sobre dónde están los datos principales.
+        res.json({
+            pacientePrincipal: pacientePrincipal,
+            estudiosPrevios: estudiosPrevios
+        });
+
     } catch (error) {
         console.error('Error en servidor al buscar paciente por DNI:', error);
         res.status(500).json({
-            error: 'Error en el servidor',
+            error: 'Error interno del servidor',
             details: error.message
         });
     }
