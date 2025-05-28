@@ -23,6 +23,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadingDiv = document.getElementById('loading');
     const resultDiv = document.getElementById('result');
     const riskAssessmentDiv = document.getElementById('risk-assessment');
+    const afiliadoDetailsDiv = document.getElementById('afiliado-details');
+    const cancerPreventionDiv = document.getElementById('cancer-prevention'); 
+    const infectiousDiseasesDiv = document.getElementById('infectious-diseases'); 
+    const healthyHabitsDiv = document.getElementById('healthy-habits'); 
+    const dentalHealthDiv = document.getElementById('dental-health');
+    const mentalHealthDiv = document.getElementById('mental-health');
+    const renalHealthDiv = document.getElementById('renal-health');
+    const visualHealthDiv = document.getElementById('visual-health');
+    const epocSectionDiv = document.getElementById('epoc-section');
+    const aneurismaSectionDiv = document.getElementById('aneurisma-section');
+    const osteoporosisSectionDiv = document.getElementById('osteoporosis-section');
+    const aspirinaSectionDiv = document.getElementById('aspirina-section');
      // >>>>>>>> ATENCIÓN <<<<<<<<
     const estudiosComplementariosSeccion = document.getElementById('estudios-complementarios-seccion');
     const verEstudiosBtn = document.getElementById('ver-estudios-btn');
@@ -69,9 +81,6 @@ async function consultarDNI() {
     resultDiv.style.display = 'block';
 
     // --- OCULTAR SECCIONES AL INICIO DE CADA BÚSQUEDA ---
-    // La función resetProfile ya se encarga de riskAssessmentDiv.
-    // Si quieres ocultar el cartel de estudios previos, puedes hacerlo aquí
-    // o asegurarte de que resetProfile también lo haga.
     const previousStudiesMessageDiv = document.getElementById('previous-studies-message');
     if (previousStudiesMessageDiv) {
         previousStudiesMessageDiv.classList.add('hidden');
@@ -102,7 +111,8 @@ async function consultarDNI() {
             // resetProfile ya se encarga de ocultar riskAssessmentDiv y limpiar otras cosas.
             resetProfile(); // Aseguramos que todo esté oculto si hay un error.
 
-        } else if (data.pacientePrincipal && (data.pacientePrincipal.DNI || data.pacientePrincipal.Documento)) {
+        } 
+        else if (data.pacientePrincipal && (data.pacientePrincipal.DNI || data.pacientePrincipal.Documento)) {
             console.log('DEBUG APP.JS: Servidor devolvió datos de paciente principal.');
             const pacientePrincipal = data.pacientePrincipal;
             currentPatientDNI = pacientePrincipal.DNI || pacientePrincipal.Documento;
@@ -110,12 +120,28 @@ async function consultarDNI() {
             if (resultDiv) {
                 resultDiv.classList.add('hidden');
             }
-
             // --- MOSTRAR SECCIONES DESPUÉS DE RECIBIR DATOS VÁLIDOS ---
             // Solo muestra riskAssessmentDiv aquí, ya que resetProfile la ocultó.
             if (riskAssessmentDiv) {
                 riskAssessmentDiv.style.display = 'block'; // ¡Muestra la sección de evaluación de riesgo AHORA!
             }
+            if (cancerPreventionDiv) {
+                cancerPreventionDiv.style.display = 'block';
+            }
+            if (infectiousDiseasesDiv) {
+                infectiousDiseasesDiv.style.display = 'block';
+            }
+            if (healthyHabitsDiv) {
+                healthyHabitsDiv.style.display = 'block';
+            }
+            if (dentalHealthDiv) {dentalHealthDiv.style.display = 'block'; }
+            if (mentalHealthDiv) { mentalHealthDiv.style.display = 'block'; }
+            if (renalHealthDiv) { renalHealthDiv.style.display = 'block'; }
+            if (visualHealthDiv) { visualHealthDiv.style.display = 'block'; }
+            if (epocSectionDiv) { epocSectionDiv.style.display = 'block'; }
+            if (aneurismaSectionDiv) { aneurismaSectionDiv.style.display = 'block'; }
+            if (osteoporosisSectionDiv) { osteoporosisSectionDiv.style.display = 'block'; }
+            if (aspirinaSectionDiv) { aspirinaSectionDiv.style.display = 'block'; }
 
             if (estudiosComplementariosSeccion) {
                 estudiosComplementariosSeccion.classList.remove('hidden');
@@ -375,6 +401,43 @@ function resetProfile() {
     if (riskAssessmentDiv) {
         riskAssessmentDiv.style.display = 'none'; // Usa display: none para ocultar
     }
+    if (cancerPreventionDiv) {
+        cancerPreventionDiv.style.display = 'none';
+    }
+    if (infectiousDiseasesDiv) {
+        infectiousDiseasesDiv.style.display = 'none';
+    }
+    if (healthyHabitsDiv) {
+        healthyHabitsDiv.style.display = 'none';
+    }
+
+    if (dentalHealthDiv) {
+        dentalHealthDiv.style.display = 'none';
+    }
+
+    if (mentalHealthDiv) {
+        mentalHealthDiv.style.display = 'none';
+    }
+    
+    if (renalHealthDiv) { 
+        renalHealthDiv.style.display = 'none';
+    }
+    if (visualHealthDiv) {
+        visualHealthDiv.style.display = 'none';
+    }
+    if (epocSectionDiv) {
+        epocSectionDiv.style.display = 'none';
+    }
+    if (aneurismaSectionDiv) {
+        aneurismaSectionDiv.style.display = 'none';
+    }
+    if (osteoporosisSectionDiv) {
+        osteoporosisSectionDiv.style.display = 'none';
+    }
+    if (aspirinaSectionDiv) {
+        aspirinaSectionDiv.style.display = 'none';
+    }
+
 
     // Ocultar la sección de estudios complementarios
     if (estudiosComplementariosSeccion) {

@@ -198,7 +198,45 @@ body {
     font-style: italic;
     font-size: 0.85rem;
 }
-/* Oculta la sección de riesgo por defecto, controlada por JS */
+
+/* Oculta la sección de información del afiliado por defecto */
+#afiliado-details {
+    display: none;
+}
+
+/* Esta ya la tenías, la mantenemos */
 #risk-assessment {
+    display: none;
+}
+
+/* Oculta las secciones de detalles de cada prevención por defecto */
+#cancer-prevention {
+    display: none;
+}
+
+#infectious-diseases{
+    display: none;
+}
+
+#healthy-habits {
+    display: none;
+}
+
+#dental-health { display: none; } 
+
+#mental-health { display: none; } 
+#renal-health { display: none; } 
+#epoc-section { display: none; } 
+#aneurisma-section { display: none; }
+#osteoporosis-section { display: none; } 
+#aspirina-section { display: none; } 
+#visual-health { display: none; }
+
+/* Asegúrate de que estas también estén ocultas por defecto si no quieres que se vean */
+#estudios-complementarios-section {
+    display: none;
+}
+
+#previous-studies-message {
     display: none;
 }
