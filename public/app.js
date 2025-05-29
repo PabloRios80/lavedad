@@ -168,34 +168,50 @@ async function consultarDNI() {
                 evaluateVisualHealth(pacientePrincipal);
             }, 50); // 50 milisegundos de retardo
 
-            // Lógica para mostrar el cartel de estudios previos
-            const estudiosPrevios = data.estudiosPrevios;
-            if (estudiosPrevios && estudiosPrevios.length > 0) {
-                console.log('DEBUG APP.JS: ¡Paciente con estudios previos encontrados!', estudiosPrevios);
-                if (previousStudiesMessageDiv) {
-                    previousStudiesMessageDiv.classList.remove('hidden');
-                    previousStudiesMessageDiv.innerHTML = `
-                        <p class="text-yellow-700 font-semibold mb-2">
-                            <i class="fas fa-exclamation-triangle mr-2"></i>Existen otros Día Preventivos registrados:
-                        </p>
-                        <ul class="list-disc list-inside ml-4">
-                            ${estudiosPrevios.map(estudio =>
-                                `<li>${estudio.fecha}</li>`
-                            ).join('')}
-                        </ul>
-                        <p class="text-sm text-gray-500 mt-2">
-                            El estudio mostrado actualmente corresponde a la fecha más reciente.
-                        </p>
-                    `;
-                } else {
-                    console.error("DEBUG APP.JS: Div 'previous-studies-message' no encontrado en el HTML.");
-                }
-            } else {
-                if (previousStudiesMessageDiv) {
-                    previousStudiesMessageDiv.classList.add('hidden');
-                    previousStudiesMessageDiv.innerHTML = '';
-                }
-            }
+            
+// Lógica para mostrar el cartel de estudios previos
+const estudiosPrevios = data.estudiosPrevios; 
+if (estudiosPrevios && estudiosPrevios.length > 0) {
+    console.log('DEBUG APP.JS: ¡Paciente con estudios previos encontrados!', estudiosPrevios);
+    
+    if (previousStudiesMessageDiv) {
+        // --- LA CORRECCIÓN CLAVE ESTÁ AQUÍ ---
+        // Antes usabas classList.remove('hidden');
+        // Ahora, como probablemente tienes display: none; en styles.css,
+        // necesitas usar style.display = 'block'; para mostrarlo.
+        previousStudiesMessageDiv.style.display = 'block'; // O 'flex' si tu HTML lo requiere para el layout
+
+        // Este es el HTML para la lista simple, si quieres mantenerla así por ahora.
+        // Si quieres la tabla con botones, deberías haber usado el HTML de la tabla
+        // que te di en una respuesta anterior. Para que vuelva a funcionar, usaremos
+        // la estructura de lista que tenías.
+        previousStudiesMessageDiv.innerHTML = `
+            <p class="text-yellow-700 font-semibold mb-2">
+                <i class="fas fa-exclamation-triangle mr-2"></i>Existen otros Día Preventivos registrados:
+            </p>
+            <ul class="list-disc list-inside ml-4">
+                ${estudiosPrevios.map(estudio => 
+                    `<li>${estudio.fecha}</li>`
+                ).join('')}
+            </ul>
+            <p class="text-sm text-gray-500 mt-2">
+                El estudio mostrado actualmente corresponde a la fecha más reciente.
+            </p>
+        `;
+    } else {
+        console.error("DEBUG APP.JS: Div 'previous-studies-message' no encontrado en el HTML.");
+    }
+} else {
+    // Si NO hay estudios previos, asegurar que el cartel esté OCULTO
+    if (previousStudiesMessageDiv) {
+        // --- LA CORRECCIÓN CLAVE ESTÁ AQUÍ ---
+        // Antes usabas classList.add('hidden');
+        // Ahora necesitas usar style.display = 'none'; para ocultarlo.
+        previousStudiesMessageDiv.style.display = 'none'; 
+        previousStudiesMessageDiv.innerHTML = ''; // Limpia el contenido
+    }
+}
+
         } else {
             console.error('DEBUG APP.JS: Respuesta inesperada del servidor (no es error ni datos de paciente válidos):', data);
             resultDiv.innerHTML = '<p class="text-center text-red-500 py-8">Error: Formato de datos inesperado del servidor.</p>';
