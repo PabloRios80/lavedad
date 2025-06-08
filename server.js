@@ -408,7 +408,70 @@ app.post('/obtener-estudios-paciente', async (req, res) => {
         res.status(500).json({ error: 'Error interno del servidor al obtener estudios.' });
     }
 });
+    app.post('/api/seguimiento/guardar', async (req, res) => {
+    const { fecha, profesional, paciente, evaluaciones, observacionProfesional, pdfLinks } = req.body;
+    console.log(`SERVER: Recibido informe de seguimiento para DNI: ${paciente.dni} en fecha: ${fecha}`);
 
+    if (!doc) {
+        console.error('SERVER ERROR: Google Sheet document not initialized.');
+        return res.status(500).json({ error: 'Error interno del servidor: Base de datos no disponible.' });
+    }
+
+    try {
+        await doc.loadInfo();
+        let sheetSeguimiento = doc.sheetsByTitle['Seguimiento'];
+        if (!sheetSeguimiento) {
+            console.log('SERVER: Creando nueva hoja "Seguimiento" en Google Sheet. (NOTA: Esto se ejecuta si la hoja no existe. SI YA LA CREASTE, NO SE EJECUTA ESTO)');
+            // Si la hoja ya existe, esta parte no se ejecuta. Asegúrate de que los encabezados estén en la hoja manual.
+            sheetSeguimiento = await doc.addSheet({
+                title: 'Seguimiento',
+                headerValues: [
+                    'Fecha_Seguimiento', 'DNI_Paciente', 'Nombre_Paciente',
+                    'Profesional_Apellido_Nombre', 'Profesional_Matricula',
+                    'Diabetes_Calificacion', 'Diabetes_Observaciones', // Solo para la prueba
+                    'Observacion_Profesional', 'Links_PDFs'
+                ]
+            });
+        }
+
+        // --- INICIO DE LA MODIFICACIÓN TEMPORAL ---
+        let diabetesCalificacion = '';
+        let diabetesObservaciones = '';
+
+        // Buscar específicamente la evaluación de "Diabetes" si existe
+        const diabetesEval = evaluaciones.find(eval => eval.motivo === 'Diabetes');
+        if (diabetesEval) {
+            diabetesCalificacion = diabetesEval.calificacion;
+            diabetesObservaciones = diabetesEval.observaciones;
+        }
+        // --- FIN DE LA MODIFICACIÓN TEMPORAL ---
+
+
+        // Crear la nueva fila
+        await sheetSeguimiento.addRow({
+            Fecha_Seguimiento: fecha,
+            DNI_Paciente: paciente.dni,
+            Nombre_Paciente: paciente.nombre,
+            Profesional_Apellido_Nombre: profesional.nombre,
+            Profesional_Matricula: profesional.matricula,
+            
+            // --- CAMPOS TEMPORALES PARA DIABETES ---
+            Diabetes_Calificacion: diabetesCalificacion,
+            Diabetes_Observaciones: diabetesObservaciones,
+            // --- FIN CAMPOS TEMPORALES ---
+
+            Observacion_Profesional: observacionProfesional,
+            Links_PDFs: JSON.stringify(pdfLinks) 
+        });
+
+        console.log('SERVER: Informe de seguimiento guardado con éxito.');
+        res.json({ success: true, message: 'Informe de seguimiento guardado.' });
+
+    } catch (error) {
+        console.error('SERVER ERROR: Fallo al guardar informe de seguimiento:', error);
+        res.status(500).json({ error: 'Error interno del servidor al guardar el informe de seguimiento.', details: error.message }); // Añade details: error.message para ver más en consola
+    }
+});
 
 // ====================================================================
 // INICIO DEL SERVIDOR

@@ -44,17 +44,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const labResultsModal = document.getElementById('lab-results-modal');
     const labResultsModalContent = document.getElementById('lab-results-modal-content');
     const closeLabResultsModal = document.getElementById('close-lab-results-modal');
+    const generarInformeBtn = document.getElementById('generar-informe-btn');
+
+    let currentPatientData = null; // Para guardar todos los datos del paciente actual
+    let currentRedFlags = new Set(); // <-- NUEVO: Usa un Set para evitar duplicados de motivos
 
     let currentPatientDNI = null; // Asumiendo que esta variable ya existe y se actualiza en la función consultarDNI
-    // >>> NUEVA VARIABLE PARA ALMACENAR TODOS LOS ESTUDIOS RECIBIDOS <<<
+    
     let allFetchedStudies = []; // Almacenará todos los estudios para poder accederlos por ID
-    // >>>>>>>> ATENCIÓN <<<<<<<<
-    // Asegúrate de que estas referencias existan en tu index.html.
-    // Si no, la inicialización de estos elementos será null.
+    
     if (!estudiosComplementariosSeccion || !verEstudiosBtn || !resultadosEstudiosPacienteDiv) {
         console.warn('Algunos elementos DOM para estudios complementarios no se encontraron. Asegúrate de que index.html los tenga.');
-        // Puedes optar por salir de la función o simplemente continuar sin esa funcionalidad.
-        // Por ahora, continuaremos pero la funcionalidad de estudios no estará disponible.
     }
 
     if (consultarBtn && dniInput && practicaSelect) {
@@ -66,6 +66,42 @@ document.addEventListener('DOMContentLoaded', () => {
             const dni = dniInput.value.trim();
             if (dni) consultarDNI();
         });
+
+        if (generarInformeBtn) {
+            generarInformeBtn.addEventListener('click', () => {
+                console.log('DEBUG: Botón Generar Informe clicado.');
+                if (currentPatientData) {
+                    console.log('DEBUG: currentPatientData NO es nulo.', currentPatientData);
+                    console.log('DEBUG: currentRedFlags antes de pasar:', [...currentRedFlags]);
+                        openSeguimientoForm(currentPatientData, [...currentRedFlags]);
+                } else {
+                    console.log('DEBUG: currentPatientData ES nulo. Alerta mostrada.');
+                    alert('Por favor, busca un paciente primero para generar un informe de seguimiento.');
+                }
+            });
+        }
+    } 
+    
+    // >>> FUNCIÓN PARA CERRAR EL MODAL <<<
+    if (closeLabResultsModal) {
+        closeLabResultsModal.addEventListener('click', () => {
+            labResultsModal.classList.add('hidden'); // Oculta el modal
+        });
+    }
+    // Cierra el modal si se hace clic fuera del contenido
+    if (labResultsModal) {
+        labResultsModal.addEventListener('click', (e) => {
+            if (e.target === labResultsModal) {
+                labResultsModal.classList.add('hidden');
+            }
+        });
+    }
+
+function openSeguimientoForm(patientData, redFlags) { // redFlags ahora viene de la variable global
+    sessionStorage.setItem('currentPatientForSeguimiento', JSON.stringify(patientData));
+    sessionStorage.setItem('redFlagsForSeguimiento', JSON.stringify(redFlags)); // Pasa la lista global
+    window.open('/seguimiento-formulario.html', '_blank');
+}
         // --- Función consultarDNI CON TODOS LOS CAMBIOS ---
 async function consultarDNI() {
     const dni = dniInput.value.trim();
@@ -116,6 +152,8 @@ async function consultarDNI() {
             console.log('DEBUG APP.JS: Servidor devolvió datos de paciente principal.');
             const pacientePrincipal = data.pacientePrincipal;
             currentPatientDNI = pacientePrincipal.DNI || pacientePrincipal.Documento;
+            currentPatientData = data.pacientePrincipal; // Guarda los datos completos del paciente
+            currentRedFlags.clear(); // <-- MUY IMPORTANTE: Limpiar el Set al inicio de cada nueva consulta
 
             if (resultDiv) {
                 resultDiv.classList.add('hidden');
@@ -148,7 +186,6 @@ async function consultarDNI() {
                 resultadosEstudiosPacienteDiv.innerHTML = '<p class="text-gray-600">Haz clic en "Ver Estudios" para cargar los informes complementarios.</p>';
                 verEstudiosBtn.disabled = false;
             }
-
             // APLICAMOS UN PEQUEÑO RETARDO ANTES DE LLENAR LOS DATOS
             // Esto permite que el DOM se "asiente" después de hacer visible la sección de riesgo.
             setTimeout(() => {
@@ -217,6 +254,8 @@ if (estudiosPrevios && estudiosPrevios.length > 0) {
             resultDiv.innerHTML = '<p class="text-center text-red-500 py-8">Error: Formato de datos inesperado del servidor.</p>';
             resultDiv.classList.remove('hidden');
             resultDiv.style.display = 'block';
+            currentPatientData = null;
+            currentRedFlags.clear(); // <-- MUY IMPORTANTE: También limpiar en caso de error o no encontrado
 
             resetProfile(); // Aseguramos que todo esté oculto si hay un error de formato.
         }
@@ -269,22 +308,6 @@ if (estudiosPrevios && estudiosPrevios.length > 0) {
         labResultsModalContent.innerHTML = tableHtml;
         labResultsModal.classList.remove('hidden'); // Muestra el modal
     }
-
-    // >>> FUNCIÓN PARA CERRAR EL MODAL <<<
-    if (closeLabResultsModal) {
-        closeLabResultsModal.addEventListener('click', () => {
-            labResultsModal.classList.add('hidden'); // Oculta el modal
-        });
-    }
-    // Cierra el modal si se hace clic fuera del contenido
-    if (labResultsModal) {
-        labResultsModal.addEventListener('click', (e) => {
-            if (e.target === labResultsModal) {
-                labResultsModal.classList.add('hidden');
-            }
-        });
-    }
-
 
     if (verEstudiosBtn) {
         verEstudiosBtn.addEventListener('click', async () => {
@@ -401,13 +424,6 @@ if (estudiosPrevios && estudiosPrevios.length > 0) {
         });
     }
 
-
-    
-    // >>>>>>>> ATENCIÓN <<<<<<<<
-    // Asegúrate de que tus funciones `resetProfile()` y `updateProfile(data)` (y las demás `evaluate...`)
-    // estén definidas en este archivo o sean accesibles globalmente.
-    // Aquí asumo que `resetProfile` también oculta `riskAssessmentDiv`.
-// --- FUNCIÓN resetProfile CORREGIDA ---
 function resetProfile() {
     // Limpiar los divs de resultados
     resultDiv.innerHTML = '';
@@ -553,25 +569,26 @@ function showResults(data) {
 
 function evaluateCardiovascularRisk(data) {
     console.log('Datos completos recibidos:', data); // Para depuración
-    
+
     // 1. Obtener valores REALES del paciente (sin procesar)
     const valoresReales = {
         edad: parseInt(data.Edad || data.edad) || 0,
         sexo: (data.Sexo || '').toUpperCase().startsWith('F') ? 'Femenino' : 'Masculino',
         presion: data['Presion Arterial'] || data['Presion_Arterial'] || 'No registrado',
         imc: data['IMC'] || 'No registrado',
-        diabetes: data['Diabetes'] || data['Diabetes'] || 'No registrado',
-        dislipemia: data['Dislipemias'] || data['Dislipemias'] || 'No registrado',
-        tabaquismo: data['Tabaquismo'] || data['Tabaco'] || 'No registrado',
+        // Asegúrate de que los nombres de las columnas sean EXACTOS como están en tu Google Sheet
+        diabetes: data['Diabetes'] || 'No registrado', // Asumo 'Diabetes' como nombre de columna
+        dislipemia: data['Dislipemias'] || 'No registrado', // Asumo 'Dislipemias' como nombre de columna
+        tabaquismo: data['Tabaquismo'] || data['Tabaco'] || 'No registrado', // Asumo 'Tabaquismo' o 'Tabaco'
     };
 
     // 2. Evaluar factores de riesgo (lógica que funciona bien)
     const factoresEvaluados = {
         presion: evaluarPresion(valoresReales.presion),
         imc: evaluarIMC(valoresReales.imc),
-        diabetes: { valor: valoresReales.diabetes, riesgo: valoresReales.diabetes === 'Presenta' },
-        dislipemia: { valor: valoresReales.dislipemia, riesgo: valoresReales.dislipemia === 'Presenta' },
-        tabaquismo: { valor: valoresReales.tabaquismo, riesgo: valoresReales.tabaquismo === 'Fuma' },
+        diabetes: { valor: valoresReales.diabetes, riesgo: valoresReales.diabetes.toLowerCase() === 'presenta' }, // Convertir a minúsculas
+        dislipemia: { valor: valoresReales.dislipemia, riesgo: valoresReales.dislipemia.toLowerCase() === 'presenta' }, // Convertir a minúsculas
+        tabaquismo: evaluarTabaquismo(valoresReales.tabaquismo), // Usa la función evaluarTabaquismo
         edad: { valor: valoresReales.edad, riesgo: valoresReales.edad >= 40 },
         sexo: { valor: valoresReales.sexo, riesgo: valoresReales.sexo === 'Masculino' }
     };
@@ -582,7 +599,56 @@ function evaluateCardiovascularRisk(data) {
     // 4. Clasificar riesgo (función existente que funciona)
     const riesgo = clasificarRiesgo(puntuacion, factoresEvaluados.diabetes.riesgo, factoresEvaluados.presion.riesgo);
 
-    // 5. Mostrar resultados CORRECTAMENTE
+    // 5. Mostrar resultados y AÑADIR RED FLAGS
+    
+    // Hipertensión
+    if (factoresEvaluados.presion.riesgo) {
+        currentRedFlags.add('Hipertensión');
+    } else if (valoresReales.presion.toLowerCase().includes('no se realiza') || valoresReales.presion.toLowerCase().includes('no aplica')) {
+        currentRedFlags.add('Control Presión Arterial (Pendiente)');
+    }
+
+    // Dislipemia
+    if (factoresEvaluados.dislipemia.riesgo) {
+        currentRedFlags.add('Dislipemia');
+    } else if (valoresReales.dislipemia.toLowerCase().includes('no se realiza') || valoresReales.dislipemia.toLowerCase().includes('no aplica') || valoresReales.dislipemia === 'No registrado') {
+        currentRedFlags.add('Perfil Lipídico (Pendiente)');
+    }
+
+    // Diabetes
+    if (factoresEvaluados.diabetes.riesgo) {
+        currentRedFlags.add('Diabetes');
+    } else if (valoresReales.diabetes.toLowerCase().includes('no se realiza') || valoresReales.diabetes.toLowerCase().includes('no aplica') || valoresReales.diabetes === 'No registrado') {
+        currentRedFlags.add('Control Glucémico (Pendiente)');
+    }
+
+    // Tabaquismo
+    if (factoresEvaluados.tabaquismo.riesgo) { // Si evaluarTabaquismo retorna riesgo=true
+        currentRedFlags.add('Tabaquismo');
+    } else if (valoresReales.tabaquismo.toLowerCase().includes('no se realiza') || valoresReales.tabaquismo.toLowerCase().includes('no aplica') || valoresReales.tabaquismo === 'No registrado') {
+        currentRedFlags.add('Hábito Tabáquico (Pendiente)');
+    }
+
+    // IMC / Obesidad
+    const imcNum = parseFloat(factoresEvaluados.imc.valor); // Obtén el IMC numérico de la función evaluarIMC
+    if (!isNaN(imcNum)) {
+        if (imcNum >= 30) {
+            currentRedFlags.add('Obesidad');
+        } else if (imcNum >= 25 && imcNum < 30) {
+            currentRedFlags.add('Sobrepeso'); // Puedes decidir si el sobrepeso es un "red flag" para seguimiento
+        }
+    } else if (valoresReales.imc.toLowerCase().includes('no se realiza') || valoresReales.imc.toLowerCase().includes('no aplica') || valoresReales.imc === 'No registrado') {
+        currentRedFlags.add('IMC (Pendiente)');
+    }
+
+    // Si el riesgo general es ALTO o MODERADO, añadirlo como motivo de seguimiento general
+    if (riesgo.nivel === "ALTO RIESGO" || riesgo.nivel === "RIESGO MODERADO") {
+        currentRedFlags.add(`Riesgo Cardiovascular: ${riesgo.nivel}`);
+    }
+
+
+    // Finalmente, llama a la función para mostrar los resultados en el DOM.
+    // Esta función DEBERÍA ser la que actualiza los colores y textos en tu interfaz.
     mostrarResultadosFinales({
         valoresReales,
         factoresEvaluados,
@@ -595,12 +661,18 @@ function evaluarPresion(presion) {
     let valor = presion;
     let riesgo = false;
     
-    if (presion.includes('Hipertensión')) {
+    // Asegura que la cadena sea insensible a mayúsculas/minúsculas y espacios
+    const presionClean = presion.toLowerCase().trim();
+
+    if (presionClean.includes('hipertensión') || presionClean.includes('hipertension')) {
         riesgo = true;
-    } else if (presion.match(/\d+\s*\/\s*\d+/)) {
-        const [sistolica, diastolica] = presion.split('/').map(Number);
+    } else if (presionClean.match(/\d+\s*\/\s*\d+/)) {
+        const [sistolica, diastolica] = presionClean.split('/').map(Number);
         riesgo = sistolica >= 140 || diastolica >= 90;
         valor = `${sistolica}/${diastolica}`;
+    } else if (presionClean.includes('no se realiza') || presionClean.includes('no aplica')) {
+        // No es un "riesgo" per se, pero es un pendiente
+        riesgo = false; 
     }
     
     return {valor, riesgo};
@@ -612,11 +684,12 @@ function evaluarIMC(imc) {
     const imcNum = parseFloat(imc);
     
     if (!isNaN(imcNum)) {
-        riesgo = imcNum >= 25;
+        riesgo = imcNum >= 25; // Si 25 es el umbral para sobrepeso/riesgo
         valor = imcNum.toFixed(1);
-    } else if (imc.includes('Sobrepeso') || imc.includes('Obesidad')) {
+    } else if (imc.toLowerCase().includes('sobrepeso') || imc.toLowerCase().includes('obesidad')) {
         riesgo = true;
     }
+    // No hace falta un 'else' aquí para 'No registrado', ya se maneja en 'evaluateCardiovascularRisk' al añadir el flag.
     
     return {valor, riesgo};
 }
@@ -624,16 +697,17 @@ function evaluarIMC(imc) {
 function evaluarTabaquismo(tabaco) {
     let valor = tabaco;
     let riesgo = false;
-    
-    if (tabaco === "Fuma") {
+    const tabacoClean = tabaco.toLowerCase().trim();
+
+    if (tabacoClean === "fuma") {
         riesgo = true;
         valor = "Fuma";
-    } else if (tabaco === "No fuma") {
+    } else if (tabacoClean === "no fuma") {
         riesgo = false;
         valor = "No fuma";
     } else {
         // Para casos como "No registrado" o valores inesperados
-        riesgo = false;
+        riesgo = false; // No hay riesgo si no está definido como "Fuma"
         valor = tabaco || "No registrado";
     }
     
@@ -643,26 +717,27 @@ function evaluarTabaquismo(tabaco) {
 function calcularPuntuacionRiesgo(factores) {
     let puntos = 0;
 
-    // Puntos por edad
+    // Puntos por edad (tu lógica actual)
     if (factores.edad.valor >= 70) puntos += (factores.sexo.valor === 'Masculino' ? 8 : 9);
     else if (factores.edad.valor >= 60) puntos += (factores.sexo.valor === 'Masculino' ? 6 : 7);
     else if (factores.edad.valor >= 50) puntos += 4;
     else if (factores.edad.valor >= 40) puntos += (factores.sexo.valor === 'Masculino' ? 3 : 2);
 
-    // Puntos por factores de riesgo
+    // Puntos por factores de riesgo (tu lógica actual)
     if (factores.presion.riesgo) puntos += 3;
     if (factores.diabetes.riesgo) puntos += 3;
     if (factores.tabaquismo.riesgo) puntos += 2;
-    if (factores.dislipemia.riesgo) puntos += 2;
+    if (factores.dislipemia.riesgo) puntos += 2; // Ya tenías esto, lo confirmamos.
     if (factores.imc.riesgo) {
-        const imcNum = parseFloat(factores.imc.valor);
-        puntos += (!isNaN(imcNum) && imcNum >= 30) ? 2 : 1;
+        const imcNum = parseFloat(factores.imc.valor); // Usamos el valor numérico del IMC
+        puntos += (!isNaN(imcNum) && imcNum >= 30) ? 2 : 1; // 2 puntos por Obesidad (IMC >= 30), 1 punto por Sobrepeso (IMC >= 25)
     }
 
     return puntos;
 }
 
 function clasificarRiesgo(puntuacion, diabetes, hipertension) {
+    // Tu lógica actual de clasificación de riesgo.
     if (puntuacion >= 15 || diabetes || hipertension) {
         return {
             nivel: "ALTO RIESGO",
@@ -686,36 +761,6 @@ function clasificarRiesgo(puntuacion, diabetes, hipertension) {
     };
 }
 
-function mostrarResultadosCompletos({presion, imc, diabetes, dislipemia, tabaquismo, edad, sexo, puntuacion, riesgo, datosOriginales}) {
-    const riskAssessmentDiv = document.getElementById('risk-assessment');
-    
-    // Mostrar valores REALES del paciente
-    document.getElementById('pressure-value').textContent = presion.valor;
-    document.getElementById('imc-value').textContent = imc.valor;
-    document.getElementById('diabetes-value').textContent = diabetes.valor;
-    document.getElementById('dislipemia-value').textContent = (datosOriginales.Dislipemias || '').includes('PRESENTA') ? 'PRESENTA' : 'No registrada';
-    document.getElementById('tabaquismo-value').textContent = (datosOriginales.Tabaco || '').includes('FUMA') ? 'FUMADOR' : 'No fumador';
-    document.getElementById('edad-value').textContent = `${edad.valor} años`;
-    document.getElementById('sexo-value').textContent = sexo.valor;
-
-    // Aplicar estilos según evaluación de riesgo
-    actualizarEstiloTarjeta('pressure', presion.riesgo);
-    actualizarEstiloTarjeta('imc', imc.riesgo);
-    actualizarEstiloTarjeta('diabetes', diabetes.riesgo);
-    actualizarEstiloTarjeta('dislipemia', dislipemia.riesgo);
-    actualizarEstiloTarjeta('tabaquismo', tabaquismo.riesgo);
-
-    // Mostrar resultado final
-    document.getElementById('risk-level').textContent = riesgo.nivel;
-    document.getElementById('risk-percentage').textContent = riesgo.porcentaje;
-    document.getElementById('risk-description').innerHTML = `
-        <strong>Puntuación:</strong> ${puntuacion}<br>
-        <strong>Recomendaciones:</strong> ${riesgo.recomendacion}
-    `;
-
-    document.getElementById('risk-card').className = `md:col-span-2 p-4 rounded-lg ${riesgo.clase}`;
-    riskAssessmentDiv.classList.remove('hidden');
-}
 function actualizarEstiloTarjeta(tipo, tieneRiesgo) {
     const card = document.getElementById(`${tipo}-card`);
     const notesElement = document.getElementById(`${tipo}-notes`);
@@ -754,8 +799,6 @@ function mostrarResultadosFinales({valoresReales, factoresEvaluados, puntuacion,
         <strong>Puntuación:</strong> ${puntuacion}<br>
         <strong>Recomendaciones:</strong> ${riesgo.recomendacion}
     `;
-}    
-
     // 4. Color del recuadro principal según riesgo
     document.getElementById('risk-card').className = `md:col-span-2 p-4 rounded-lg ${riesgo.clase}`;
     
@@ -852,6 +895,8 @@ function evaluateCancerPrevention(data) {
                     <strong>${testInfo.name}:</strong> Resultado patológico (${value}). Consultar con especialista urgentemente.
                 </li>
             `;
+            currentRedFlags.add(testInfo.name); // Esto añadirá "Test de HPV", "Papanicolaou", etc.
+                                                // al Set global 'currentRedFlags'.
         } else if (isNormal) {
             cardElement.className = 'p-4 rounded-lg risk-low';
             notesElement.innerHTML = '<span class="text-green-500"><i class="fas fa-check-circle"></i> Resultado normal</span>';
@@ -871,7 +916,9 @@ function evaluateCancerPrevention(data) {
                         <span class="text-blue-600">Considerar realizar.</span>
                     </li>
                 `;
+                currentRedFlags.add(`${testInfo.name} (Pendiente)`); // Por ejemplo, "Papanicolaou (Pendiente)"
             }
+            
         } else {
             cardElement.className = 'p-4 rounded-lg bg-gray-100';
             notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-question-circle"></i> No registrado</span>';
@@ -898,42 +945,42 @@ function evaluateInfectiousDiseases(data) {
         'its': {
             field: 'ITS',
             notesField: 'Observaciones - ITS',
-            name: 'Infecciones de Transmisión Sexual',
+            name: 'Infecciones de Transmisión Sexual', // Nombre legible para el flag
             riskGroups: ['Personas sexualmente activas', 'Múltiples parejas', 'Sin protección'],
             screening: 'Anual o según factores de riesgo'
         },
         'hepatitis-b': {
             field: 'Hepatitis_B',
             notesField: 'Observaciones - Hepatitis_B',
-            name: 'Hepatitis B',
+            name: 'Hepatitis B', // Nombre legible para el flag
             riskGroups: ['Personal de salud', 'Parejas de infectados', 'Usuarios de drogas IV'],
             screening: 'Al menos una vez en la vida'
         },
         'hepatitis-c': {
             field: 'Hepatitis_C',
             notesField: 'Observaciones - Hepatitis_C',
-            name: 'Hepatitis C',
+            name: 'Hepatitis C', // Nombre legible para el flag
             riskGroups: ['Nacidos entre 1945-1965', 'Transfusiones antes de 1992', 'Usuarios de drogas IV'],
             screening: 'Al menos una vez en la vida'
         },
         'vih': {
             field: 'VIH',
             notesField: 'Observaciones - VIH',
-            name: 'VIH',
+            name: 'VIH', // Nombre legible para el flag
             riskGroups: ['Personas sexualmente activas', 'Usuarios de drogas IV', 'Parejas de positivos'],
             screening: 'Al menos una vez en la vida, anual si factores de riesgo'
         },
         'vdrl': {
             field: 'VDRL',
             notesField: 'Observaciones - VDRL',
-            name: 'VDRL (Sífilis)',
+            name: 'VDRL (Sífilis)', // Nombre legible para el flag
             riskGroups: ['Embarazadas', 'Personas sexualmente activas', 'Hombres que tienen sexo con hombres'],
             screening: 'Anual si factores de riesgo'
         },
         'chagas': {
             field: 'Chagas',
             notesField: 'Observaciones - Chagas',
-            name: 'Chagas',
+            name: 'Chagas', // Nombre legible para el flag
             riskGroups: ['Zonas endémicas', 'Madres positivas', 'Transfusiones antes de 2005'],
             screening: 'Al menos una vez en la vida si factores de riesgo'
         }
@@ -970,6 +1017,9 @@ function evaluateInfectiousDiseases(data) {
                     <strong>${testInfo.name}:</strong> Resultado positivo (${value}). Consultar con especialista urgentemente.
                 </li>
             `;
+            // --- AÑADIR A RED FLAGS PARA RESULTADOS POSITIVOS ---
+            currentRedFlags.add(testInfo.name); 
+
         } else if (isNegative) {
             cardElement.className = 'p-4 rounded-lg risk-low';
             notesElement.innerHTML = '<span class="text-green-500"><i class="fas fa-check-circle"></i> Resultado negativo</span>';
@@ -977,16 +1027,22 @@ function evaluateInfectiousDiseases(data) {
             cardElement.className = 'p-4 rounded-lg bg-gray-100';
             notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-info-circle"></i> No realizado</span>';
             
-            // Recomendación de screening según factores de riesgo
+            // Recomendación de screening según factores de riesgo (aquí puedes añadir una lógica más compleja si lo necesitas)
+            // Por ahora, asumimos que si no está hecho y es una prueba de screening, se recomienda.
             recommendationsList.innerHTML += `
                 <li>
                     <strong>${testInfo.name}:</strong> Prueba recomendada para ${testInfo.riskGroups.join(', ')}. 
                     <span class="text-blue-600">Frecuencia: ${testInfo.screening}.</span>
                 </li>
             `;
+            // --- AÑADIR A RED FLAGS PARA PRUEBAS PENDIENTES ---
+            currentRedFlags.add(`${testInfo.name} (Pendiente)`);
+            
         } else {
             cardElement.className = 'p-4 rounded-lg bg-gray-100';
             notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-question-circle"></i> No registrado</span>';
+            // Puedes añadir a currentRedFlags aquí si un "No registrado" también se considera un pendiente de seguimiento
+            // currentRedFlags.add(`${testInfo.name} (No Registrado)`);
         }
         
         // Mostrar observaciones si existen
@@ -998,6 +1054,7 @@ function evaluateInfectiousDiseases(data) {
     // Mostrar la sección
     infectiousDiv.classList.remove('hidden');
 }
+
 function evaluateHealthyHabits(data) {
     const habitsDiv = document.getElementById('healthy-habits');
     const recommendationsList = document.getElementById('habits-recommendations');
@@ -1096,6 +1153,7 @@ function evaluateHealthyHabits(data) {
                     <strong>${habitInfo.name}:</strong> ${habitInfo.recommendationPositive}
                 </li>
             `;
+            
         } else if (isNegative) {
             cardElement.className = 'p-4 rounded-lg risk-high';
             notesElement.innerHTML = '<span class="text-red-500"><i class="fas fa-exclamation-triangle"></i> Requiere mejora</span>';
@@ -1106,6 +1164,9 @@ function evaluateHealthyHabits(data) {
                     <strong>${habitInfo.name}:</strong> ${habitInfo.recommendationNegative}
                 </li>
             `;
+            // --- AÑADIR A RED FLAGS PARA RESULTADOS NEGATIVOS (requiere mejora) ---
+            currentRedFlags.add(habitInfo.name); // <--- Usar habitInfo.name aquí
+
         } else if (isNotDone) {
             cardElement.className = 'p-4 rounded-lg bg-gray-100';
             notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-info-circle"></i> No realizado</span>';
@@ -1116,9 +1177,15 @@ function evaluateHealthyHabits(data) {
                     <strong>${habitInfo.name}:</strong> ${habitInfo.recommendationNotDone}
                 </li>
             `;
+            // --- AÑADIR A RED FLAGS PARA PRUEBAS PENDIENTES ---
+            currentRedFlags.add(`${habitInfo.name} (Pendiente)`); // <--- Usar habitInfo.name aquí
+            
         } else {
             cardElement.className = 'p-4 rounded-lg bg-gray-100';
             notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-question-circle"></i> No registrado</span>';
+             // Puedes añadir a currentRedFlags aquí si un "No registrado" también se considera un pendiente de seguimiento
+            currentRedFlags.add(`${habitInfo.name} (No Registrado)`); // <--- Usar habitInfo.name aquí
+            
         }
         
         // Mostrar observaciones si existen
@@ -1162,6 +1229,9 @@ function evaluateDentalHealth(data) {
             <li>Evaluación cada 3 meses</li>
             <li>Reforzar higiene bucal</li>
         `;
+        // --- AÑADIR A RED FLAGS PARA RIESGO ALTO ---
+        currentRedFlags.add('Control Odontológico (Riesgo Alto)');
+
     } else if (isModerateRisk) {
         cardElement.className = 'p-4 rounded-lg risk-medium';
         notesElement.innerHTML = '<span class="text-yellow-500"><i class="fas fa-exclamation-circle"></i> Riesgo Moderado</span>';
@@ -1184,9 +1254,13 @@ function evaluateDentalHealth(data) {
             <li>Recomendado: Control odontológico anual</li>
             <li>Importante para salud general</li>
         `;
+        // --- AÑADIR A RED FLAGS PARA PRUEBAS PENDIENTES ---
+        currentRedFlags.add('Control Odontológico (Pendiente)');
+        
     } else {
         cardElement.className = 'p-4 rounded-lg bg-gray-100';
         notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-question-circle"></i> No registrado</span>';
+        currentRedFlags.add('Control Odontológico (No Registrado)');
     }
     
     // Mostrar observaciones
@@ -1224,6 +1298,9 @@ function evaluateMentalHealth(data) {
             <li class="text-red-600 font-medium">Depresión detectada: Evaluación por especialista requerida</li>
             <li>Considerar intervención psicológica/psiquiátrica</li>
         `;
+         // --- AÑADIR A RED FLAGS PARA RESULTADOS POSITIVOS ---
+        currentRedFlags.add('Depresión (Se verifica)');
+        
     } else if (isNotDepresion) {
         depresionCard.className = 'p-4 rounded-lg risk-low';
         depresionNotesElement.innerHTML = '<span class="text-green-500"><i class="fas fa-check-circle"></i> No se verifica</span>';
@@ -1233,6 +1310,7 @@ function evaluateMentalHealth(data) {
     } else {
         depresionCard.className = 'p-4 rounded-lg bg-gray-100';
         depresionNotesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-question-circle"></i> No registrado</span>';
+        currentRedFlags.add('Depresión (No Registrado)'); 
     }
     
     // Evaluar Violencia (misma lógica corregida)
@@ -1255,6 +1333,9 @@ function evaluateMentalHealth(data) {
             <li>Contactar con servicios de protección</li>
             <li>Protocolo de actuación frente a violencia</li>
         `;
+         // --- AÑADIR A RED FLAGS PARA RESULTADOS POSITIVOS ---
+        currentRedFlags.add('Violencia (Se verifica)');
+        
     } else if (isNotViolencia) {
         violenciaCard.className = 'p-4 rounded-lg risk-low';
         violenciaNotesElement.innerHTML = '<span class="text-green-500"><i class="fas fa-check-circle"></i> No se verifica</span>';
@@ -1264,6 +1345,7 @@ function evaluateMentalHealth(data) {
     } else {
         violenciaCard.className = 'p-4 rounded-lg bg-gray-100';
         violenciaNotesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-question-circle"></i> No registrado</span>';
+        currentRedFlags.add('Violencia (No Registrado)');
     }
     
     // Mostrar observaciones si existen
@@ -1285,7 +1367,7 @@ function evaluateRenalHealth(data) {
     recommendationsList.innerHTML = '';
     
     // Obtener valores
-    const value = data['ERC'] || 'No registrado';
+    const value = data['ERC'] || '';
     const notes = data['Observaciones - ERC'] || '';
     
     // Mostrar valores
@@ -1294,7 +1376,7 @@ function evaluateRenalHealth(data) {
     // Evaluar resultado
     const isNormal = /normal/i.test(value);
     const isPathological = /patol[oó]gico/i.test(value);
-    const isNotDone = /no se realiza/i.test(value);
+    const isNotDone = /No se Realiza/i.test(value);
     
     // Aplicar estilos y recomendaciones
     const cardElement = document.getElementById('erc-card');
@@ -1308,6 +1390,8 @@ function evaluateRenalHealth(data) {
             <li>Control estricto de función renal</li>
             <li>Monitorizar presión arterial</li>
         `;
+        currentRedFlags.add('ERC (Patológico)');
+        
     } else if (isNormal) {
         cardElement.className = 'p-4 rounded-lg risk-low';
         notesElement.innerHTML = '<span class="text-green-500"><i class="fas fa-check-circle"></i> Normal</span>';
@@ -1317,14 +1401,17 @@ function evaluateRenalHealth(data) {
         `;
     } else if (isNotDone) {
         cardElement.className = 'p-4 rounded-lg bg-gray-100';
-        notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-info-circle"></i> No realizado</span>';
+        notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-info-circle"></i> No se Realiza</span>';
         recommendationsList.innerHTML = `
             <li>Recomendado: Evaluación de función renal</li>
             <li>Especialmente si hay factores de riesgo</li>
         `;
+        currentRedFlags.add('ERC (Pendiente)');
     } else {
         cardElement.className = 'p-4 rounded-lg bg-gray-100';
-        notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-question-circle"></i> No registrado</span>';
+        notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-question-circle"></i> No se Realiza</span>';
+        currentRedFlags.add('ERC (No se Realiza)');
+
     }
     
     // Mostrar observaciones
@@ -1347,7 +1434,7 @@ function evaluateEPOC(data) {
     const notes = data['Observaciones - EPOC'] || '';
     
     // Mostrar valores
-    document.getElementById('epoc-value').textContent = value || 'No registrado';
+    document.getElementById('epoc-value').textContent = value;
     
     // Evaluar resultado
     const isPositive = /^se\s*verifica$/i.test(value.trim());
@@ -1366,6 +1453,8 @@ function evaluateEPOC(data) {
             <li>Rehabilitación pulmonar recomendada</li>
             <li>Evitar exposición a humos/contaminantes</li>
         `;
+        currentRedFlags.add('EPOC (se verifica)');
+        
     } else if (isNegative) {
         cardElement.className = 'p-4 rounded-lg risk-low';
         notesElement.innerHTML = '<span class="text-green-500"><i class="fas fa-check-circle"></i> No se verifica</span>';
@@ -1383,6 +1472,7 @@ function evaluateEPOC(data) {
     } else {
         cardElement.className = 'p-4 rounded-lg bg-gray-100';
         notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-question-circle"></i> No registrado</span>';
+        currentRedFlags.add('EPOC (No registrado)');
     }
     
     // Mostrar observaciones
@@ -1406,7 +1496,7 @@ function evaluateAneurisma(data) {
     const notes = data['Observaciones - Aneurisma_aorta'] || '';
     
     // Mostrar valores
-    document.getElementById('aneurisma-value').textContent = value || 'No registrado';
+    document.getElementById('aneurisma-value').textContent = value;
     
     // Evaluar resultado
     const isPositive = /^se\s*verifica$/i.test(value.trim());
@@ -1425,6 +1515,8 @@ function evaluateAneurisma(data) {
             <li>Evaluación por cirugía vascular</li>
             <li>Control estricto de presión arterial</li>
         `;
+        currentRedFlags.add('Aneurisma aorta (se verifica)');
+        
     } else if (isNegative) {
         cardElement.className = 'p-4 rounded-lg risk-low';
         notesElement.innerHTML = '<span class="text-green-500"><i class="fas fa-check-circle"></i> No se verifica</span>';
@@ -1442,6 +1534,7 @@ function evaluateAneurisma(data) {
     } else {
         cardElement.className = 'p-4 rounded-lg bg-gray-100';
         notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-question-circle"></i> No registrado</span>';
+        currentRedFlags.add('Aneurisma aorta (No registrado)');
     }
     
     // Mostrar observaciones
@@ -1465,7 +1558,7 @@ function evaluateOsteoporosis(data) {
     const notes = data['Observaciones - Osteoporosis'] || '';
     
     // Mostrar valores
-    document.getElementById('osteoporosis-value').textContent = value || 'No registrado';
+    document.getElementById('osteoporosis-value').textContent = value;
     
     // Evaluar resultado
     const isPositive = /^se\s*verifica$/i.test(value.trim());
@@ -1484,6 +1577,8 @@ function evaluateOsteoporosis(data) {
             <li>Suplementación con calcio/vitamina D</li>
             <li>Evaluación para tratamiento específico</li>
         `;
+        currentRedFlags.add('Osteoporosis (se verifica)');
+    
     } else if (isNegative) {
         cardElement.className = 'p-4 rounded-lg risk-low';
         notesElement.innerHTML = '<span class="text-green-500"><i class="fas fa-check-circle"></i> No se verifica</span>';
@@ -1501,6 +1596,7 @@ function evaluateOsteoporosis(data) {
     } else {
         cardElement.className = 'p-4 rounded-lg bg-gray-100';
         notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-question-circle"></i> No registrado</span>';
+        currentRedFlags.add('Osteoporosis (No registrado)');
     }
     
     // Mostrar observaciones
@@ -1542,6 +1638,8 @@ function evaluateAspirina(data) {
             <li>Dosis usual: 75-100 mg/día</li>
             <li>Monitorizar efectos gastrointestinales</li>
         `;
+        currentRedFlags.add('Aspirina (Indicada)');
+        
     } else if (isNotIndicated) {
         cardElement.className = 'p-4 rounded-lg risk-low';
         notesElement.innerHTML = '<span class="text-green-500"><i class="fas fa-check-circle"></i> No indicada</span>';
@@ -1598,6 +1696,8 @@ function evaluateVisualHealth(data) {
             <li>Evaluación oftalmológica urgente recomendada</li>
             <li>Considerar corrección visual</li>
         `;
+        currentRedFlags.add('Agudeza visual (Alterada)');
+        
     } else if (isNormal || isControlNormal) {
         cardElement.className = 'p-4 rounded-lg risk-low';
         notesElement.innerHTML = '<span class="text-green-500"><i class="fas fa-check-circle"></i> Normal</span>';
@@ -1616,6 +1716,7 @@ function evaluateVisualHealth(data) {
     } else {
         cardElement.className = 'p-4 rounded-lg bg-gray-100';
         notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-question-circle"></i> No registrado</span>';
+        currentRedFlags.add('Agudeza visual (No registrada)');
     }
     
     // Mostrar observaciones
@@ -1873,6 +1974,7 @@ function mostrarResultadosResumen(resultados) {
 
     resultadosResumenDiv.appendChild(tabla);
 }
+
 function exportarResultados() {
     const dataParaExportar = exportarExcelBtn.data;
 
