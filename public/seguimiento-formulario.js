@@ -10,8 +10,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const pdfLinksTextarea = document.getElementById('pdf-links');
     const seguimientoFechaInput = document.getElementById('seguimiento-fecha');
     
-    let currentPatientData = null;
-    let redFlagsData = [];
+    let currentPatientData = null; // Variable para almacenar los datos completos del paciente
+    let redFlagsData = []; // Variable para almacenar los nombres de las banderas rojas
 
     // Precargar la fecha actual en el campo de fecha
     const today = new Date();
@@ -26,20 +26,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (patientDataJSON && redFlagsJSON) {
         currentPatientData = JSON.parse(patientDataJSON);
-        redFlagsData = JSON.parse(redFlagsJSON);
+        redFlagsData = JSON.parse(redFlagsJSON); // Estas son las banderas como 'IMC', 'Hipertension', etc.
 
         afiliadoNombreSpan.textContent = `${currentPatientData.Apellido || ''}, ${currentPatientData.Nombre || ''}`;
         afiliadoDniSpan.textContent = currentPatientData.DNI || currentPatientData.Documento || 'No especificado';
 
-        renderMotivosSeguimiento(redFlagsData);
+        // Llama a renderMotivosSeguimiento, pasando currentPatientData para acceder al IMC original
+        renderMotivosSeguimiento(redFlagsData, currentPatientData); 
     } else {
         alert('No se encontraron datos del paciente para generar el formulario de seguimiento. Vuelva a la página principal y busque un paciente.');
-        // Opcional: Redirigir o deshabilitar el formulario
         motivosSeguimientoContainer.innerHTML = '<p class="text-red-500">Error: No se pudieron cargar los datos del paciente.</p>';
         guardarSeguimientoBtn.disabled = true;
     }
 
-    function renderMotivosSeguimiento(motivos) {
+    // ///////////////////////////////////////////////////////////////////////////////////////////
+    // // MODIFICACIÓN CLAVE AQUÍ: AÑADIMOS 'patientData' como segundo parámetro              //
+    // ///////////////////////////////////////////////////////////////////////////////////////////
+    function renderMotivosSeguimiento(motivos, patientData) {
         motivosSeguimientoContainer.innerHTML = ''; // Limpiar el mensaje de carga
         if (motivos.length === 0) {
             motivosSeguimientoContainer.innerHTML = '<p class="text-gray-600">No se identificaron puntos de seguimiento para este paciente.</p>';
@@ -49,8 +52,36 @@ document.addEventListener('DOMContentLoaded', () => {
         motivos.forEach(motivo => {
             const motivoDiv = document.createElement('div');
             motivoDiv.className = 'bg-blue-50 p-4 rounded-lg shadow-sm border border-blue-200';
+            
+            let displayMotivo = motivo; // Variable para el texto que se mostrará en el h4
+
+            // ///////////////////////////////////////////////////////////////////////////////
+            // // Lógica para personalizar el texto de la bandera 'IMC' en el formulario  //
+            // ///////////////////////////////////////////////////////////////////////////////
+            if (motivo === 'IMC' && patientData && patientData.IMC) { // Asegúrate de que sea la bandera 'IMC' y tengamos los datos originales
+                const imcValueString = patientData.IMC.toLowerCase().trim(); 
+                
+                const imcDisplayMapping = [
+                    { keyword: 'obesidad morbida', display: 'IMC: Obesidad Mórbida' },
+                    { keyword: 'obesidad grado ii', display: 'IMC: Obesidad Grado II' },
+                    { keyword: 'obesidad', display: 'IMC: Obesidad' }, // Genérico, debe ir después de los específicos
+                    { keyword: 'sobrepeso', display: 'IMC: Sobrepeso' }
+                ];
+
+                for (const item of imcDisplayMapping) {
+                    if (imcValueString.includes(item.keyword)) {
+                        displayMotivo = item.display; // Actualiza el nombre a mostrar (ej. "IMC: Obesidad")
+                        break; 
+                    }
+                }
+            }
+            // ///////////////////////////////////////////////////////////////////////////////
+            // // FIN de la lógica de personalización de texto de IMC                     //
+            // ///////////////////////////////////////////////////////////////////////////////
+
+            // El H4 ahora usa 'displayMotivo' para el texto visible
             motivoDiv.innerHTML = `
-                <h4 class="text-lg font-semibold text-blue-800 mb-2">${motivo}</h4>
+                <h4 class="text-lg font-semibold text-blue-800 mb-2">${displayMotivo}</h4> 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-gray-700 text-sm font-bold mb-2">Calificación del Tratamiento y Autocuidado:</label>
@@ -79,7 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Manejar el guardado del formulario
+    // Manejar el guardado del formulario (ESTO NO SE MODIFICA, YA FUNCIONA)
     guardarSeguimientoBtn.addEventListener('click', async () => {
         const profesionalNombre = document.getElementById('profesional-nombre').value.trim();
         const profesionalMatricula = document.getElementById('profesional-matricula').value.trim();
@@ -106,11 +137,11 @@ document.addEventListener('DOMContentLoaded', () => {
             pdfLinks: pdfLinksTextarea.value.split('\n').map(link => link.trim()).filter(link => link !== '')
         };
 
-        redFlagsData.forEach(motivo => {
+        redFlagsData.forEach(motivo => { // Aquí 'motivo' sigue siendo 'IMC', 'Hipertension', etc.
             const calificacion = document.querySelector(`input[name="calificacion-${motivo.replace(/\s+/g, '-')}"]:checked`).value;
             const observaciones = document.getElementById(`observaciones-${motivo.replace(/\s+/g, '-')}`).value.trim();
             seguimientoData.evaluaciones.push({
-                motivo: motivo,
+                motivo: motivo, // Se envía el 'motivo' original, como 'IMC'
                 calificacion: calificacion,
                 observaciones: observaciones
             });
@@ -127,7 +158,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (result.success) {
                 alert('Informe de seguimiento guardado con éxito.');
-                // Opcional: Cerrar la ventana o redirigir
                 window.close(); 
             } else {
                 alert(`Error al guardar el informe de seguimiento: ${result.error}`);
@@ -138,7 +168,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Manejar el botón de cancelar
+    // Manejar el botón de cancelar (NO SE MODIFICA)
     cancelarSeguimientoBtn.addEventListener('click', () => {
         if (confirm('¿Está seguro que desea cancelar? Se perderán los cambios no guardados.')) {
             window.close();

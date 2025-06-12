@@ -600,10 +600,12 @@ function evaluateCardiovascularRisk(data) {
     const riesgo = clasificarRiesgo(puntuacion, factoresEvaluados.diabetes.riesgo, factoresEvaluados.presion.riesgo);
 
     // 5. Mostrar resultados y AÑADIR RED FLAGS
+    currentRedFlags.delete('IMC'); // Ahora solo borramos 'IMC'
+
     
     // Hipertensión
     if (factoresEvaluados.presion.riesgo) {
-        currentRedFlags.add('Hipertensión');
+        currentRedFlags.add('Hipertension');
     } else if (valoresReales.presion.toLowerCase().includes('no se realiza') || valoresReales.presion.toLowerCase().includes('no aplica')) {
         currentRedFlags.add('Control Presión Arterial (Pendiente)');
     }
@@ -630,17 +632,34 @@ function evaluateCardiovascularRisk(data) {
     }
 
     // IMC / Obesidad
-    const imcNum = parseFloat(factoresEvaluados.imc.valor); // Obtén el IMC numérico de la función evaluarIMC
-    if (!isNaN(imcNum)) {
-        if (imcNum >= 30) {
-            currentRedFlags.add('Obesidad');
-        } else if (imcNum >= 25 && imcNum < 30) {
-            currentRedFlags.add('Sobrepeso'); // Puedes decidir si el sobrepeso es un "red flag" para seguimiento
+    const imcValueString = valoresReales.imc.toLowerCase().trim(); 
+    
+    const imcRiesgoKeywords = [
+        'obesidad morbida',
+        'obesidad grado ii',
+        'obesidad', 
+        'sobrepeso'
+    ];
+
+    let shouldAddIMCFlag = false; // Bandera para decidir si añadir 'IMC'
+
+    // Verifica si es una condición de riesgo o sobrepeso
+    for (const keyword of imcRiesgoKeywords) {
+        if (imcValueString.includes(keyword)) {
+            shouldAddIMCFlag = true;
+            console.log(`DEBUG IMC: 'IMC' marcada para bandera por '${keyword}'!`);
+            break; 
         }
-    } else if (valoresReales.imc.toLowerCase().includes('no se realiza') || valoresReales.imc.toLowerCase().includes('no aplica') || valoresReales.imc === 'No registrado') {
-        currentRedFlags.add('IMC (Pendiente)');
     }
 
+
+    // Si alguna de las condiciones anteriores se cumplió, añadir la bandera genérica 'IMC'
+    if (shouldAddIMCFlag) {
+        currentRedFlags.add('IMC'); // ¡Siempre añade 'IMC' como la bandera!
+        console.log("DEBUG IMC: Bandera 'IMC' añadida a currentRedFlags.");
+    } else {
+        console.log("DEBUG IMC: IMC no es una categoría de riesgo/sobrepeso ni pendiente. No se añade bandera.");
+    }
     // Si el riesgo general es ALTO o MODERADO, añadirlo como motivo de seguimiento general
     if (riesgo.nivel === "ALTO RIESGO" || riesgo.nivel === "RIESGO MODERADO") {
         currentRedFlags.add(`Riesgo Cardiovascular: ${riesgo.nivel}`);

@@ -408,7 +408,8 @@ app.post('/obtener-estudios-paciente', async (req, res) => {
         res.status(500).json({ error: 'Error interno del servidor al obtener estudios.' });
     }
 });
-    app.post('/api/seguimiento/guardar', async (req, res) => {
+
+app.post('/api/seguimiento/guardar', async (req, res) => {
     const { fecha, profesional, paciente, evaluaciones, observacionProfesional, pdfLinks } = req.body;
     console.log(`SERVER: Recibido informe de seguimiento para DNI: ${paciente.dni} en fecha: ${fecha}`);
 
@@ -420,59 +421,90 @@ app.post('/obtener-estudios-paciente', async (req, res) => {
     try {
         await doc.loadInfo();
         let sheetSeguimiento = doc.sheetsByTitle['Seguimiento'];
+
+        // Si la hoja no existe, la crea con los encabezados.
+        // SIN EMBARGO, si ya la creaste manual, este bloque NO se ejecuta.
+        // Por eso es CRÍTICO que la hoja tenga los encabezados correctos manualmente.
         if (!sheetSeguimiento) {
-            console.log('SERVER: Creando nueva hoja "Seguimiento" en Google Sheet. (NOTA: Esto se ejecuta si la hoja no existe. SI YA LA CREASTE, NO SE EJECUTA ESTO)');
-            // Si la hoja ya existe, esta parte no se ejecuta. Asegúrate de que los encabezados estén en la hoja manual.
+            console.log('SERVER: Creando nueva hoja "Seguimiento" en Google Sheet con encabezados predefinidos.');
             sheetSeguimiento = await doc.addSheet({
                 title: 'Seguimiento',
                 headerValues: [
                     'Fecha_Seguimiento', 'DNI_Paciente', 'Nombre_Paciente',
                     'Profesional_Apellido_Nombre', 'Profesional_Matricula',
-                    'Diabetes_Calificacion', 'Diabetes_Observaciones', // Solo para la prueba
+                    // Incluye TODOS los encabezados de Motivos_Calificacion y Motivos_Observaciones aquí,
+                    // como en la lista de la Parte 1.
+                    // EJEMPLO (debes completarlo con todos tus motivos):
+                    'Riesgo_Cardiovascular_Calificacion', 'Riesgo_Cardiovascular_Observaciones',
+                    'Diabetes_Calificacion', 'Diabetes_Observaciones',
+                    'Dislipemia_Calificacion', 'Dislipemia_Observaciones',
+                    'Tabaquismo_Calificacion', 'Tabaquismo_Observaciones',
+                    'Actividad_fisica_Calificacion', 'Actividad_fisica_Observaciones',
                     'Observacion_Profesional', 'Links_PDFs'
                 ]
             });
         }
 
-        // --- INICIO DE LA MODIFICACIÓN TEMPORAL ---
-        let diabetesCalificacion = '';
-        let diabetesObservaciones = '';
-
-        // Buscar específicamente la evaluación de "Diabetes" si existe
-        const diabetesEval = evaluaciones.find(eval => eval.motivo === 'Diabetes');
-        if (diabetesEval) {
-            diabetesCalificacion = diabetesEval.calificacion;
-            diabetesObservaciones = diabetesEval.observaciones;
-        }
-        // --- FIN DE LA MODIFICACIÓN TEMPORAL ---
-
-
-        // Crear la nueva fila
-        await sheetSeguimiento.addRow({
+        // Crear el objeto para la nueva fila
+        const newRow = {
             Fecha_Seguimiento: fecha,
             DNI_Paciente: paciente.dni,
             Nombre_Paciente: paciente.nombre,
             Profesional_Apellido_Nombre: profesional.nombre,
             Profesional_Matricula: profesional.matricula,
-            
-            // --- CAMPOS TEMPORALES PARA DIABETES ---
-            Diabetes_Calificacion: diabetesCalificacion,
-            Diabetes_Observaciones: diabetesObservaciones,
-            // --- FIN CAMPOS TEMPORALES ---
-
             Observacion_Profesional: observacionProfesional,
-            Links_PDFs: JSON.stringify(pdfLinks) 
+            Links_PDFs: JSON.stringify(pdfLinks) // Convertir array a string JSON
+        };
+
+        // Rellenar las columnas de evaluación dinámicamente
+        evaluaciones.forEach(eval => {
+
+             let motivoSanitized = eval.motivo; // Empezamos con el motivo original
+            
+            console.log(`SERVER DEBUG: Motivo original recibido: "${eval.motivo}"`);
+
+            // 1. Reemplazar espacios con guiones bajos
+            motivoSanitized = motivoSanitized.replace(/\s+/g, '_'); 
+
+            // 2. Eliminar acentos (normalización para compatibilidad)
+            motivoSanitized = motivoSanitized.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); 
+
+            // 3. Eliminar caracteres especiales no alfanuméricos ni guiones (que puedan estar en paréntesis o dos puntos)
+            motivoSanitized = motivoSanitized.replace(/[^\w-]/g, ''); // Deja solo letras, números, guiones y guiones bajos
+
+            // 4. Reemplazar múltiples guiones bajos (si quedaron de sanitizaciones anteriores) por uno solo
+            motivoSanitized = motivoSanitized.replace(/_+/g, '_'); 
+            
+            // 5. Eliminar guiones bajos al inicio o al final si quedaron
+            motivoSanitized = motivoSanitized.replace(/^_|_$/g, '');
+            
+            // Opcional: Convertir a "PascalCase" o "CamelCase" si tus encabezados lo requieren.
+            // Por ejemplo, "actividad_fisica" a "Actividad_Fisica".
+            // Esto solo si tus encabezados en la hoja SIEMPRE usan mayúsculas en cada palabra.
+            // Para "Actividad_Fisica" necesitas esto si 'actividad fisica' es tu bandera:
+            // motivoSanitized = motivoSanitized.replace(/(^|_)([a-z])/g, (match, p1, p2) => p1 + p2.toUpperCase());
+
+
+            console.log(`SERVER DEBUG: Motivo sanitizado FINAL para columna: "${motivoSanitized}"`);
+            console.log(`SERVER DEBUG: Intentando guardar en columnas: ${motivoSanitized}_Calificacion y ${motivoSanitized}_Observaciones`);
+
+            // Reemplaza espacios y otros caracteres no seguros para nombres de columna
+            // Usa el mismo método de sanitización que usas para `name` en el frontend
+                // Asegúrate de que el nombre de la columna en la hoja coincida con esto
+            newRow[`${motivoSanitized}_Calificacion`] = eval.calificacion;
+            newRow[`${motivoSanitized}_Observaciones`] = eval.observaciones;
         });
+
+        await sheetSeguimiento.addRow(newRow);
 
         console.log('SERVER: Informe de seguimiento guardado con éxito.');
         res.json({ success: true, message: 'Informe de seguimiento guardado.' });
 
     } catch (error) {
         console.error('SERVER ERROR: Fallo al guardar informe de seguimiento:', error);
-        res.status(500).json({ error: 'Error interno del servidor al guardar el informe de seguimiento.', details: error.message }); // Añade details: error.message para ver más en consola
+        res.status(500).json({ success: false, error: 'Error interno del servidor al guardar el informe de seguimiento.', details: error.message });
     }
 });
-
 // ====================================================================
 // INICIO DEL SERVIDOR
 // ====================================================================
