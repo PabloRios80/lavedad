@@ -1136,83 +1136,136 @@ function evaluateHealthyHabits(data) {
             notesField: 'Observaciones - Acido_folico',
             name: 'Ácido Fólico',
             recommendationPositive: 'Niveles adecuados de ácido fólico',
-            recommendationNegative: 'Considera suplementación si estás en edad fértil',
+            recommendationNegative: 'Considera suplementación si estás en edad fértil', 
             recommendationNotDone: 'Recomendación: Evaluación de niveles de ácido fólico'
         }
     };
     
-    // Procesar cada hábito
-    for (const [habitId, habitInfo] of Object.entries(healthyHabits)) {
-        const valueElement = document.getElementById(`${habitId}-value`);
-        const notesElement = document.getElementById(`${habitId}-notes`);
-        const cardElement = document.getElementById(`${habitId}-card`);
-        
-        // Obtener el valor del campo
-        let value = data[habitInfo.field] || 'No registrado';
-        const notes = data[habitInfo.notesField] || '';
-        
-        // Normalizar valores
-        value = value.toString().trim();
-        
-        // Verificar patrones (similar al módulo de infecciosas)
-        const isPositive = /adecuad[ao]|buen[ao]|No se verifica|si|Cumple|no abusa|No fuma|nunca|Indicado/i.test(value);
-        const isNegative = /No Cumple|Se verifica|no|No cumple|abusa|excesiv[ao]|Fuma|sedentario|poc[ao]/i.test(value);
-        const isNotDone = /No se Realiza|no realizado|No indicado|pendiente/i.test(value);
-        
-        valueElement.textContent = value;
-        
-        // Establecer estilo según resultado
-        if (isPositive) {
-            cardElement.className = 'p-4 rounded-lg risk-low';
-            notesElement.innerHTML = '<span class="text-green-500"><i class="fas fa-check-circle"></i> Adecuado</span>';
-            
-            // Agregar recomendación positiva
-            recommendationsList.innerHTML += `
-                <li class="text-green-600">
-                    <strong>${habitInfo.name}:</strong> ${habitInfo.recommendationPositive}
-                </li>
-            `;
-            
-        } else if (isNegative) {
-            cardElement.className = 'p-4 rounded-lg risk-high';
-            notesElement.innerHTML = '<span class="text-red-500"><i class="fas fa-exclamation-triangle"></i> Requiere mejora</span>';
-            
-            // Agregar recomendación
-            recommendationsList.innerHTML += `
-                <li class="text-red-600 font-medium">
-                    <strong>${habitInfo.name}:</strong> ${habitInfo.recommendationNegative}
-                </li>
-            `;
-            // --- AÑADIR A RED FLAGS PARA RESULTADOS NEGATIVOS (requiere mejora) ---
-            currentRedFlags.add(habitInfo.name); // <--- Usar habitInfo.name aquí
 
-        } else if (isNotDone) {
-            cardElement.className = 'p-4 rounded-lg bg-gray-100';
-            notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-info-circle"></i> No realizado</span>';
-            
-            // Agregar recomendación
-            recommendationsList.innerHTML += `
-                <li>
-                    <strong>${habitInfo.name}:</strong> ${habitInfo.recommendationNotDone}
-                </li>
-            `;
-            // --- AÑADIR A RED FLAGS PARA PRUEBAS PENDIENTES ---
-            currentRedFlags.add(`${habitInfo.name} (Pendiente)`); // <--- Usar habitInfo.name aquí
-            
-        } else {
-            cardElement.className = 'p-4 rounded-lg bg-gray-100';
-            notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-question-circle"></i> No registrado</span>';
-             // Puedes añadir a currentRedFlags aquí si un "No registrado" también se considera un pendiente de seguimiento
-            currentRedFlags.add(`${habitInfo.name} (No Registrado)`); // <--- Usar habitInfo.name aquí
-            
-        }
+
+// Procesar cada hábito
+for (const [habitId, habitInfo] of Object.entries(healthyHabits)) {
+    const valueElement = document.getElementById(`${habitId}-value`);
+    const notesElement = document.getElementById(`${habitId}-notes`);
+    const cardElement = document.getElementById(`${habitId}-card`);
+    
+    // Obtener el valor original de la hoja (lo usaremos para mostrarlo si no lo quieres en minúsculas)
+    let originalValue = data[habitInfo.field] || 'No registrado'; 
+    const notes = data[habitInfo.notesField] || ''; 
+
+    // *** CAMBIO CRÍTICO: Normalizar a minúsculas y limpiar espacios para LA EVALUACIÓN ***
+    let evaluatedValue = String(originalValue).trim().toLowerCase(); 
+
+    // --- LOGS DEPURACIÓN (AHORA SÍ CON EL VALOR REAL) ---
+    console.log('DEBUG: Hábito: ' + habitInfo.name + ', Valor ORIGINAL leído: "' + originalValue + '"');
+    console.log('DEBUG: Hábito: ' + habitInfo.name + ', Valor EVALUADO (minúsculas): "' + evaluatedValue + '" (longitud: ' + evaluatedValue.length + ')');
+    // --- FIN LOGS DEPURACIÓN ---
+    
+    let isPositive = false;
+    let isNegative = false;
+    let isNotDone = false; // "No realizado / Pendiente" (gris)
+
+    // //////////////////////////////////////////////////////////////////////////////////
+    // // LÓGICA DE EVALUACIÓN ROBUSTA Y EXPLICITA (Listas de valores y prioridad)    //
+    // //////////////////////////////////////////////////////////////////////////////////
+
+    // --- Definir las listas de valores esperados (en minúsculas) ---
+
+    // Valores que indican que la evaluación/práctica NO SE REALIZÓ (pendiente, gris)
+    const pendingKeywords = [
+        'no se realiza', // Ej. La pregunta de caídas no se le hizo al paciente
+        'no realizado',
+        'pte',
+        'no aplica'
+    ];
+
+    // Valores que indican un resultado NEGATIVO o de RIESGO (rojo)
+    const negativeKeywords = [
+        'no cumple',        // Para Seguridad Vial
+        'no',               // Para Alimentación Saludable
+        'indicado',         // Para Ácido Fólico (asumiendo que significa "requiere")
+        'se verifica',      // Si esta frase es negativa en tu contexto
+        'abusa',
+        'excesivo', 'excesiva',
+        'fuma',
+        'sedentario', 'sedentaria',
+        'poco', 'poca',
+        'alto', 'alta',
+        'riesgo alto'
+    ];
+    
+    // Valores que indican un resultado POSITIVO o SALUDABLE (verde)
+    const positiveKeywords = [
+        'cumple',           // Para Seguridad Vial (solo "cumple", no "no cumple")
+        'si',
+        'adecuado', 'adecuada',
+        'bueno', 'buena',
+        'no abusa',         // Para Consumo de Alcohol
+        'no fuma',          // Para Consumo de Tabaco
+        'nunca',
+        'no indicado'       // Para Ácido Fólico (si significa que NO se requiere)
+    ];
+
+    // --- Aplicar la lógica de evaluación con prioridades ---
+
+    // 1. Primero, verificar el caso específico de Actividad Física "No realiza" (es negativo/rojo)
+    if (habitId === 'actividad' && evaluatedValue === 'no realiza') {
+        isNegative = true;
+    } 
+    // 2. Luego, verificar otros resultados NEGATIVOS (si no fue el caso de Actividad Física especial)
+    else if (negativeKeywords.includes(evaluatedValue)) {
+        isNegative = true;
+    }
+    // 3. Después, verificar resultados PENDIENTES / NO REALIZADOS (son gris)
+    else if (pendingKeywords.includes(evaluatedValue)) {
+        isNotDone = true;
+    }
+    // 4. Finalmente, verificar resultados POSITIVOS
+    else if (positiveKeywords.includes(evaluatedValue)) {
+        isPositive = true;
+    }
+    // Si no coincide con nada, se considerará "No categorizado" por el último else.
+
+    // //////////////////////////////////////////////////////////////////////////////////
+    // // FIN DE LA LÓGICA DE EVALUACIÓN                                                //
+    // //////////////////////////////////////////////////////////////////////////////////
+
+    // --- LOGS DEPURACIÓN (RESULTADO FINAL DE LAS BANDERAS) ---
+    console.log(`DEBUG: ${habitInfo.name} - FINAL isNotDone: ${isNotDone}, isNegative: ${isNegative}, isPositive: ${isPositive}`);
+    // --- FIN LOGS DEPURACIÓN ---
+    
+    valueElement.textContent = originalValue; // Muestra el valor original, no el en minúsculas
+
+    // Establecer estilo y agregar a red flags según el resultado final de las banderas
+    if (isNotDone) { // Si se marcó como "No realizado" / Pendiente (gris)
+        cardElement.className = 'p-4 rounded-lg bg-gray-100'; // Gris para pendiente
+        notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-info-circle"></i> No realizado / Pendiente</span>';
+        recommendationsList.innerHTML += `<li class="text-gray-600"><strong>${habitInfo.name}:</strong> ${habitInfo.recommendationNotDone}</li>`;
+        currentRedFlags.add(`${habitInfo.name} (Pendiente)`); 
         
-        // Mostrar observaciones si existen
-        if (notes) {
-            notesElement.innerHTML += `<div class="mt-1 text-gray-600">Obs: ${notes}</div>`;
-        }
+    } else if (isNegative) { // Si se marcó como Negativo / Requiere mejora (rojo)
+        cardElement.className = 'p-4 rounded-lg risk-high'; // Rojo para negativo
+        notesElement.innerHTML = '<span class="text-red-500"><i class="fas fa-exclamation-triangle"></i> Requiere mejora</span>';
+        recommendationsList.innerHTML += `<li class="text-red-600 font-medium"><strong>${habitInfo.name}:</strong> ${habitInfo.recommendationNegative}</li>`;
+        currentRedFlags.add(habitInfo.name); 
+
+    } else if (isPositive) { // Si se marcó como Positivo (verde)
+        cardElement.className = 'p-4 rounded-lg risk-low'; // Verde para positivo
+        notesElement.innerHTML = '<span class="text-green-500"><i class="fas fa-check-circle"></i> Adecuado</span>';
+        recommendationsList.innerHTML += `<li class="text-green-600"><strong>${habitInfo.name}:</strong> ${habitInfo.recommendationPositive}</li>`;
+        // No se añade a currentRedFlags si es positivo
+
+    } else { // Si el valor no coincide con ninguna categoría conocida (ni negativo, ni pendiente, ni positivo)
+        cardElement.className = 'p-4 rounded-lg bg-gray-100'; // Color por defecto (gris)
+        notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-question-circle"></i> Dato no categorizado / No registrado</span>';
+        currentRedFlags.add(`${habitInfo.name} (Dato No Reconocido)`); // Se marca para seguimiento por ser desconocido
     }
     
+    // Mostrar observaciones si existen
+    if (notes) {
+        notesElement.innerHTML += `<div class="mt-1 text-gray-600">Obs: ${notes}</div>`;
+    }
+}
     // Mostrar la sección
     habitsDiv.classList.remove('hidden');
 }
