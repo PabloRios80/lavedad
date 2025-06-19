@@ -455,45 +455,69 @@ app.post('/api/seguimiento/guardar', async (req, res) => {
             Observacion_Profesional: observacionProfesional,
             Links_PDFs: JSON.stringify(pdfLinks) // Convertir array a string JSON
         };
+ // Rellenar las columnas de evaluación dinámicamente
+        if (evaluaciones && evaluaciones.length > 0) {
+            evaluaciones.forEach(eval => {
+                let motivoOriginal = eval.motivo; // Ejemplo: "Violencia (Se verifica)"
 
-        // Rellenar las columnas de evaluación dinámicamente
-        evaluaciones.forEach(eval => {
+                // ///////////////////////////////////////////////////////////////////////////////
+                // // LÓGICA MEJORADA DE NORMALIZACIÓN PARA NOMBRES DE COLUMNA                 //
+                // // Elimina frases entre paréntesis y términos específicos para armonizar.    //
+                // ///////////////////////////////////////////////////////////////////////////////
+                let motivoParaColumna = motivoOriginal;
 
-             let motivoSanitized = eval.motivo; // Empezamos con el motivo original
-            
-            console.log(`SERVER DEBUG: Motivo original recibido: "${eval.motivo}"`);
+                // 1. Eliminar cualquier texto entre paréntesis y los paréntesis mismos (ej. "(Se verifica)", "(Riesgo Alto)")
+                motivoParaColumna = motivoParaColumna.replace(/\s*\([^)]*\)\s*/g, ' '); 
 
-            // 1. Reemplazar espacios con guiones bajos
-            motivoSanitized = motivoSanitized.replace(/\s+/g, '_'); 
+                // 2. Eliminar términos específicos como "Se verifica" si aparecen sueltos o al final (case-insensitive)
+                motivoParaColumna = motivoParaColumna.replace(/\s*Se verifica\s*$/i, '');
+                motivoParaColumna = motivoParaColumna.replace(/\s*Pendiente\s*$/i, ''); // Si tienes "X (Pendiente)" y quieres que quede solo "X"
+                motivoParaColumna = motivoParaColumna.replace(/\s*Riesgo Alto\s*$/i, ''); // Si tienes "Control Odontológico (Riesgo Alto)" y quieres solo "Control Odontologico"
 
-            // 2. Eliminar acentos (normalización para compatibilidad)
-            motivoSanitized = motivoSanitized.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); 
+                // 3. Normalizar casos especiales (estas reglas son las que ya tenías y siguen siendo útiles)
+                if (motivoOriginal.includes('Control Odontológico')) {
+                    motivoParaColumna = 'Control Odontologico'; // Asegura la ñ a n y consistencia
+                } else if (motivoOriginal.includes('Agudeza visual')) {
+                    motivoParaColumna = 'Agudeza visual';
+                } else if (motivoOriginal.includes('Seguridad Vial')) {
+                    motivoParaColumna = 'Seguridad Vial';
+                } else if (motivoOriginal === 'IMC') {
+                    motivoParaColumna = 'IMC';
+                }
+                motivoParaColumna = motivoParaColumna.trim(); 
+                // Añade aquí más condiciones 'else if' si tienes otras banderas que quieras normalizar
+                // antes de la sanitización general.
 
-            // 3. Eliminar caracteres especiales no alfanuméricos ni guiones (que puedan estar en paréntesis o dos puntos)
-            motivoSanitized = motivoSanitized.replace(/[^\w-]/g, ''); // Deja solo letras, números, guiones y guiones bajos
+                // ///////////////////////////////////////////////////////////////////////////////
+                // // FIN DE LÓGICA MEJORADA DE NORMALIZACIÓN                                 //
+                // ///////////////////////////////////////////////////////////////////////////////
 
-            // 4. Reemplazar múltiples guiones bajos (si quedaron de sanitizaciones anteriores) por uno solo
-            motivoSanitized = motivoSanitized.replace(/_+/g, '_'); 
-            
-            // 5. Eliminar guiones bajos al inicio o al final si quedaron
-            motivoSanitized = motivoSanitized.replace(/^_|_$/g, '');
-            
-            // Opcional: Convertir a "PascalCase" o "CamelCase" si tus encabezados lo requieren.
-            // Por ejemplo, "actividad_fisica" a "Actividad_Fisica".
-            // Esto solo si tus encabezados en la hoja SIEMPRE usan mayúsculas en cada palabra.
-            // Para "Actividad_Fisica" necesitas esto si 'actividad fisica' es tu bandera:
-            // motivoSanitized = motivoSanitized.replace(/(^|_)([a-z])/g, (match, p1, p2) => p1 + p2.toUpperCase());
+                // Ahora, sanitiza el nombre *ya normalizado* para obtener el nombre final de la columna
+                let columnaBase = motivoParaColumna;
 
+                // 1. Reemplazar espacios con guiones bajos
+                columnaBase = columnaBase.replace(/\s+/g, '_'); 
 
-            console.log(`SERVER DEBUG: Motivo sanitizado FINAL para columna: "${motivoSanitized}"`);
-            console.log(`SERVER DEBUG: Intentando guardar en columnas: ${motivoSanitized}_Calificacion y ${motivoSanitized}_Observaciones`);
+                // 2. Eliminar acentos
+                columnaBase = columnaBase.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); 
 
-            // Reemplaza espacios y otros caracteres no seguros para nombres de columna
-            // Usa el mismo método de sanitización que usas para `name` en el frontend
-                // Asegúrate de que el nombre de la columna en la hoja coincida con esto
-            newRow[`${motivoSanitized}_Calificacion`] = eval.calificacion;
-            newRow[`${motivoSanitized}_Observaciones`] = eval.observaciones;
-        });
+                // 3. Eliminar caracteres especiales no alfanuméricos ni guiones bajos (ahora sí, después de normalizar)
+                columnaBase = columnaBase.replace(/[^\w]/g, ''); 
+
+                // 4. Reemplazar múltiples guiones bajos por uno solo
+                columnaBase = columnaBase.replace(/_+/g, '_'); 
+                
+                // 5. Eliminar guiones bajos al inicio o al final
+                columnaBase = columnaBase.replace(/^_|_$/g, '');
+
+                console.log(`SERVER DEBUG: Motivo original recibido: "${motivoOriginal}"`);
+                console.log(`SERVER DEBUG: Motivo normalizado (para columna): "${motivoParaColumna}"`); // Debería ser "Violencia"
+                console.log(`SERVER DEBUG: Nombre de columna sanitizado FINAL: "${columnaBase}"`); // Debería ser "Violencia"
+
+                newRow[`${columnaBase}_Calificacion`] = eval.calificacion;
+                newRow[`${columnaBase}_Observaciones`] = eval.observaciones;
+            });
+        }
 
         await sheetSeguimiento.addRow(newRow);
 
@@ -505,7 +529,7 @@ app.post('/api/seguimiento/guardar', async (req, res) => {
         res.status(500).json({ success: false, error: 'Error interno del servidor al guardar el informe de seguimiento.', details: error.message });
     }
 });
-// ====================================================================
+        // ====================================================================
 // INICIO DEL SERVIDOR
 // ====================================================================
 

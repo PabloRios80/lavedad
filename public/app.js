@@ -868,7 +868,7 @@ function evaluateCancerPrevention(data) {
         'mamografia': {
             field: 'Cancer_mama_Mamografia',
             notesField: 'Observaciones - Mamografia',
-            name: 'Mamografía',
+            name: 'Mamografia',
             gender: 'Femenino',
             ageRange: '50-69 años',
             frequency: 'Cada 2 años'
@@ -889,19 +889,30 @@ function evaluateCancerPrevention(data) {
         const notesElement = document.getElementById(`${testId}-notes`);
         const cardElement = document.getElementById(`${testId}-card`);
         
-        // Obtener el valor del campo, normalizando posibles variaciones
-        let value = data[testInfo.field] || 'No registrado';
+        // Obtener el valor original del campo
+        let originalValue = data[testInfo.field] || 'No registrado';
         const notes = data[testInfo.notesField] || '';
         
-        // Normalizar valores (por si hay diferencias en mayúsculas/minúsculas o espacios)
-        value = value.toString().trim();
+        // --- NUEVOS LOGS DE DEPURACIÓN EN ESTA FUNCIÓN ---
+        console.log(`CANCER_DEBUG: Procesando test: ${testInfo.name} (ID: ${testId})`);
+        console.log(`CANCER_DEBUG: Valor ORIGINAL para ${testInfo.name}: "${originalValue}"`);
+
+        // *** CAMBIOS CRÍTICOS AQUÍ: Normalizar a minúsculas, limpiar espacios y remover acentos ***
+        let evaluatedValue = String(originalValue).trim().toLowerCase(); 
+        evaluatedValue = evaluatedValue.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); 
+        // ***********************************************************************************
+
+        console.log(`CANCER_DEBUG: Valor EVALUADO FINAL para ${testInfo.name} (minúsculas, sin acentos): "${evaluatedValue}"`);
+        // --- FIN NUEVOS LOGS ---
         
-        // Verificar si el valor contiene alguna de las palabras clave (insensible a mayúsculas)
-        const isPatologico = /patológico|patologica|alterado|positivo/i.test(value);
-        const isNormal = /normal|negativo/i.test(value);
-        const isNoRealizado = /no se realiza|no realizado|No aplica/i.test(value);
-        
-        valueElement.textContent = value;
+        // Verificar si el valor contiene alguna de las palabras clave (ahora `evaluatedValue` ya está normalizado)
+        // Usamos includes() para flexibilidad, o regex si necesitamos patrones más complejos
+        // Las regex ahora solo necesitan las versiones sin acento/minúscula
+        const isPatologico = /patologico|patologica|alterado|alterada|positivo/i.test(evaluatedValue); // Añadido 'patologico' y 'alterada'
+        const isNormal = /normal|negativo/i.test(evaluatedValue);
+        const isNoRealizado = /no se realiza|no realizado|no aplica/i.test(evaluatedValue); // Añadido 'no aplica' en minúsculas
+
+        valueElement.textContent = originalValue; // Muestra el valor original en la interfaz
         
         // Establecer estilo según resultado
         if (isPatologico) {
@@ -911,11 +922,10 @@ function evaluateCancerPrevention(data) {
             // Agregar recomendación urgente
             recommendationsList.innerHTML += `
                 <li class="text-red-600 font-medium">
-                    <strong>${testInfo.name}:</strong> Resultado patológico (${value}). Consultar con especialista urgentemente.
+                    <strong>${testInfo.name}:</strong> Resultado patológico (${originalValue}). Consultar con especialista urgentemente.
                 </li>
             `;
-            currentRedFlags.add(testInfo.name); // Esto añadirá "Test de HPV", "Papanicolaou", etc.
-                                                // al Set global 'currentRedFlags'.
+            currentRedFlags.add(testInfo.name); 
         } else if (isNormal) {
             cardElement.className = 'p-4 rounded-lg risk-low';
             notesElement.innerHTML = '<span class="text-green-500"><i class="fas fa-check-circle"></i> Resultado normal</span>';
@@ -923,7 +933,7 @@ function evaluateCancerPrevention(data) {
             cardElement.className = 'p-4 rounded-lg bg-gray-100';
             notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-info-circle"></i> No realizado</span>';
             
-            // Verificar si debería recomendarse según edad y sexo
+            // ... (Tu lógica para recomendar según edad y sexo es correcta aquí) ...
             const edad = parseInt(data.Edad || data.edad) || 0;
             const sexo = (data.Sexo || '').toUpperCase().startsWith('F') ? 'Femenino' : 'Masculino';
             
@@ -935,12 +945,13 @@ function evaluateCancerPrevention(data) {
                         <span class="text-blue-600">Considerar realizar.</span>
                     </li>
                 `;
-                currentRedFlags.add(`${testInfo.name} (Pendiente)`); // Por ejemplo, "Papanicolaou (Pendiente)"
+                currentRedFlags.add(`${testInfo.name} (Pendiente)`);
             }
             
         } else {
             cardElement.className = 'p-4 rounded-lg bg-gray-100';
-            notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-question-circle"></i> No registrado</span>';
+            notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-question-circle"></i> No registrado / Valor no reconocido</span>'; // Mensaje más claro
+            currentRedFlags.add(`${testInfo.name} (Dato No Reconocido)`);
         }
         
         // Mostrar observaciones si existen
@@ -1141,8 +1152,6 @@ function evaluateHealthyHabits(data) {
         }
     };
     
-
-
 // Procesar cada hábito
 for (const [habitId, habitInfo] of Object.entries(healthyHabits)) {
     const valueElement = document.getElementById(`${habitId}-value`);
@@ -1155,6 +1164,11 @@ for (const [habitId, habitInfo] of Object.entries(healthyHabits)) {
 
     // *** CAMBIO CRÍTICO: Normalizar a minúsculas y limpiar espacios para LA EVALUACIÓN ***
     let evaluatedValue = String(originalValue).trim().toLowerCase(); 
+
+    // Esto asegura que 'Patológico' y 'Patologico' se conviertan a 'patologico' para la comparación.
+    evaluatedValue = evaluatedValue.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); 
+
+    console.log(`DEBUG_COMPARISON: El valor final a comparar es: "${evaluatedValue}"`);
 
     // --- LOGS DEPURACIÓN (AHORA SÍ CON EL VALOR REAL) ---
     console.log('DEBUG: Hábito: ' + habitInfo.name + ', Valor ORIGINAL leído: "' + originalValue + '"');
@@ -1179,33 +1193,40 @@ for (const [habitId, habitInfo] of Object.entries(healthyHabits)) {
         'no aplica'
     ];
 
-    // Valores que indican un resultado NEGATIVO o de RIESGO (rojo)
-    const negativeKeywords = [
-        'no cumple',        // Para Seguridad Vial
-        'no',               // Para Alimentación Saludable
-        'indicado',         // Para Ácido Fólico (asumiendo que significa "requiere")
-        'se verifica',      // Si esta frase es negativa en tu contexto
-        'abusa',
-        'excesivo', 'excesiva',
-        'fuma',
-        'sedentario', 'sedentaria',
-        'poco', 'poca',
-        'alto', 'alta',
-        'riesgo alto'
-    ];
-    
-    // Valores que indican un resultado POSITIVO o SALUDABLE (verde)
-    const positiveKeywords = [
-        'cumple',           // Para Seguridad Vial (solo "cumple", no "no cumple")
-        'si',
-        'adecuado', 'adecuada',
-        'bueno', 'buena',
-        'no abusa',         // Para Consumo de Alcohol
-        'no fuma',          // Para Consumo de Tabaco
-        'nunca',
-        'no indicado'       // Para Ácido Fólico (si significa que NO se requiere)
-    ];
+// Valores que indican un resultado NEGATIVO o de RIESGO (rojo)
+const negativeKeywords = [
+    'no cumple',        
+    'no',               
+    'indicado',         
+    'se verifica',      
+    'abusa',
+    'excesivo', 'excesiva',
+    'fuma',
+    'sedentario', 'sedentaria',
+    'poco', 'poca',
+    'alto', 'alta',
+    'riesgo alto',
+    'patologico',       // Solo necesitas la versión en minúsculas y sin acentos
+    'alterada',         // Solo necesitas la versión en minúsculas
+    'positivo'          
+];
 
+// Valores que indican un resultado POSITIVO o SALUDABLE (verde)
+const positiveKeywords = [
+    'cumple',           
+    'si',
+    'adecuado', 'adecuada',
+    'bueno', 'buena',
+    'no abusa',
+    'no se verifica',         
+    'no fuma',          
+    'nunca',
+    'no indicado',
+    'normal',
+    'si realiza',           
+    'negativo',         
+    'no detectable'     
+];
     // --- Aplicar la lógica de evaluación con prioridades ---
 
     // 1. Primero, verificar el caso específico de Actividad Física "No realiza" (es negativo/rojo)
