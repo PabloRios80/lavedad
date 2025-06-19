@@ -35,7 +35,7 @@ async function initializeGoogleSheet() {
         }
         await doc.useServiceAccountAuth({
             client_email: credentials.client_email,
-            private_key: creds.private_key.replace(/\\n/g, '\n'), // Reemplaza saltos de línea para la clave privada
+            private_key: credentials.private_key.replace(/\\n/g, '\n'),
         });
         await doc.loadInfo(); // Carga la información de todas las hojas (pestañas)
         console.log('✅ Google Sheet document loaded successfully.');
