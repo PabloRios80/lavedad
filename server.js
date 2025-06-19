@@ -1,6 +1,6 @@
 const express = require('express');
 const { GoogleSpreadsheet } = require('google-spreadsheet');
-const creds = require('./credentials.json'); // Asegúrate de que este archivo exista y esté bien configurado
+//const creds = require('./credentials.json'); // Asegúrate de que este archivo exista y esté bien configurado
 
 const app = express();
 const PORT = 3000;
@@ -17,6 +17,22 @@ let doc;
 async function initializeGoogleSheet() {
     try {
         doc = new GoogleSpreadsheet(SPREADSHEET_ID);
+
+        // === COMIENZO DEL CAMBIO CLAVE ===
+        let credentials;
+        if (process.env.CREDENTIALS_JSON) {
+            // Si la variable de entorno existe (estamos en Render), parseamos el JSON
+            credentials = JSON.parse(process.env.CREDENTIALS_JSON);
+        } else {
+            // Si no existe (estamos localmente), intentamos cargar el archivo local
+            try {
+                credentials = require('./credentials.json');
+            } catch (localError) {
+                console.error('❌ Error: credentials.json no encontrado localmente y CREDENTIALS_JSON no está en el entorno.');
+                console.error('Asegúrate de tener credentials.json en la raíz del proyecto para desarrollo local o configura la variable de entorno.');
+                process.exit(1); // Salir si no hay credenciales disponibles
+            }
+        }
         await doc.useServiceAccountAuth({
             client_email: creds.client_email,
             private_key: creds.private_key.replace(/\\n/g, '\n'), // Reemplaza saltos de línea para la clave privada
