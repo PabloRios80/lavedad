@@ -16,6 +16,9 @@ function resetProfile() {
     document.getElementById('visual-health').classList.add('hidden');
 }
 
+const PENDING_KEYWORDS_FOR_VISUALS = ['no se realiza', 'no registrado'];
+const NOT_APPLICABLE_KEYWORDS = ['no aplica']; // Nueva lista para "No aplica"
+
 document.addEventListener('DOMContentLoaded', () => {
     const consultarBtn = document.getElementById('consultar');
     const dniInput = document.getElementById('dni');
@@ -582,6 +585,12 @@ function evaluateCardiovascularRisk(data) {
         tabaquismo: data['Tabaquismo'] || data['Tabaco'] || 'No registrado', // Asumo 'Tabaquismo' o 'Tabaco'
     };
 
+
+    // --- Definir pendingKeywords aquí para usarla en todas las funciones ---
+    const pendingKeywords = ['no se realiza', 'no registrado']; // Asegúrate de que 'no registrado' también es un pendiente
+    // --- Fin pendingKeywords ---
+
+
     // 2. Evaluar factores de riesgo (lógica que funciona bien)
     const factoresEvaluados = {
         presion: evaluarPresion(valoresReales.presion),
@@ -659,6 +668,11 @@ function evaluateCardiovascularRisk(data) {
         console.log("DEBUG IMC: Bandera 'IMC' añadida a currentRedFlags.");
     } else {
         console.log("DEBUG IMC: IMC no es una categoría de riesgo/sobrepeso ni pendiente. No se añade bandera.");
+        // AÑADE ESTA LÍNEA AQUÍ para que el IMC pendiente también pase a seguimiento:
+        if (pendingKeywords.includes(imcValueString) && !currentRedFlags.has('IMC (Pendiente)')) {
+            currentRedFlags.add('IMC (Pendiente)');
+            console.log("DEBUG IMC: IMC (Pendiente) añadido a currentRedFlags.");
+        }
     }
     // Si el riesgo general es ALTO o MODERADO, añadirlo como motivo de seguimiento general
     if (riesgo.nivel === "ALTO RIESGO" || riesgo.nivel === "RIESGO MODERADO") {
@@ -672,7 +686,8 @@ function evaluateCardiovascularRisk(data) {
         valoresReales,
         factoresEvaluados,
         puntuacion,
-        riesgo
+        riesgo,
+        pendingKeywords
     });
 }
 
@@ -783,15 +798,36 @@ function clasificarRiesgo(puntuacion, diabetes, hipertension) {
 function actualizarEstiloTarjeta(tipo, tieneRiesgo) {
     const card = document.getElementById(`${tipo}-card`);
     const notesElement = document.getElementById(`${tipo}-notes`);
+    const valueElement = document.getElementById(`${tipo}-value`);
     
-    if (tieneRiesgo) {
-        card.className = `p-4 rounded-lg bg-red-100 border-l-4 border-red-500`;
-        if (notesElement) notesElement.innerHTML = '<span class="text-red-500"><i class="fas fa-exclamation-triangle"></i> Riesgo detectado</span>';
-    } else {
+    if (!card || !notesElement || !valueElement) {
+        console.warn(`Elementos de tarjeta, notas o valor no encontrados para ID: ${tipo}`);
+        return;
+    }
+
+    // Obtenemos el valor real del elemento y lo normalizamos para la comparación
+    const actualValueClean = String(valueElement.textContent).trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+    // --- Lógica de prioridades para el ESTILO y la NOTA ---
+    if (PENDING_KEYWORDS_FOR_VISUALS.includes(actualValueClean)) {
+        // Si es "No se realiza" o "No registrado" -> GRIS (y debería estar en seguimiento por tu otra lógica)
+        card.className = `p-4 rounded-lg bg-gray-100 border-l-4 border-gray-500`;
+        notesElement.innerHTML = '<span class="text-gray-500"><i class="fas fa-info-circle"></i> No realizado / Pendiente</span>';
+    } else if (NOT_APPLICABLE_KEYWORDS.includes(actualValueClean)) {
+        // Si es "No aplica" -> VERDE (no es riesgo, no es pendiente, no necesita seguimiento)
         card.className = `p-4 rounded-lg bg-green-100 border-l-4 border-green-500`;
-        if (notesElement) notesElement.innerHTML = '<span class="text-green-500"><i class="fas fa-check-circle"></i> Normal</span>';
+        notesElement.innerHTML = '<span class="text-green-500"><i class="fas fa-check-circle"></i> No aplica</span>';
+    } else if (tieneRiesgo) {
+        // Si hay riesgo -> ROJO
+        card.className = `p-4 rounded-lg bg-red-100 border-l-4 border-red-500`;
+        notesElement.innerHTML = '<span class="text-red-500"><i class="fas fa-exclamation-triangle"></i> Riesgo detectado</span>';
+    } else {
+        // Si no es ninguno de los anteriores y no tiene riesgo -> VERDE (Normal)
+        card.className = `p-4 rounded-lg bg-green-100 border-l-4 border-green-500`;
+        notesElement.innerHTML = '<span class="text-green-500"><i class="fas fa-check-circle"></i> Normal</span>';
     }
 }
+
 function mostrarResultadosFinales({valoresReales, factoresEvaluados, puntuacion, riesgo}) {
     const riskAssessmentDiv = document.getElementById('risk-assessment');
     
