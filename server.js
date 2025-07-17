@@ -328,6 +328,7 @@ app.post('/obtener-estudios-paciente', async (req, res) => {
             'Densitometria',
             'VCC',
             'Biopsia',
+            'Odontologia'
             // Si tenías 'Laboratorio' dos veces, lo dejé una sola vez aquí por claridad.
             // Si tienes otras hojas, agrégalas.
         ];
@@ -438,9 +439,6 @@ app.post('/api/seguimiento/guardar', async (req, res) => {
         await doc.loadInfo();
         let sheetSeguimiento = doc.sheetsByTitle['Seguimiento'];
 
-        // Si la hoja no existe, la crea con los encabezados.
-        // SIN EMBARGO, si ya la creaste manual, este bloque NO se ejecuta.
-        // Por eso es CRÍTICO que la hoja tenga los encabezados correctos manualmente.
         if (!sheetSeguimiento) {
             console.log('SERVER: Creando nueva hoja "Seguimiento" en Google Sheet con encabezados predefinidos.');
             sheetSeguimiento = await doc.addSheet({
@@ -448,9 +446,6 @@ app.post('/api/seguimiento/guardar', async (req, res) => {
                 headerValues: [
                     'Fecha_Seguimiento', 'DNI_Paciente', 'Nombre_Paciente',
                     'Profesional_Apellido_Nombre', 'Profesional_Matricula',
-                    // Incluye TODOS los encabezados de Motivos_Calificacion y Motivos_Observaciones aquí,
-                    // como en la lista de la Parte 1.
-                    // EJEMPLO (debes completarlo con todos tus motivos):
                     'Riesgo_Cardiovascular_Calificacion', 'Riesgo_Cardiovascular_Observaciones',
                     'Diabetes_Calificacion', 'Diabetes_Observaciones',
                     'Dislipemia_Calificacion', 'Dislipemia_Observaciones',
@@ -461,7 +456,9 @@ app.post('/api/seguimiento/guardar', async (req, res) => {
             });
         }
 
-        // Crear el objeto para la nueva fila
+        // *************************************************************************
+        // ** ESTE CÓDIGO DEBE ESTAR DENTRO DE LA RUTA /api/seguimiento/guardar **
+        // *************************************************************************
         const newRow = {
             Fecha_Seguimiento: fecha,
             DNI_Paciente: paciente.dni,
@@ -469,30 +466,21 @@ app.post('/api/seguimiento/guardar', async (req, res) => {
             Profesional_Apellido_Nombre: profesional.nombre,
             Profesional_Matricula: profesional.matricula,
             Observacion_Profesional: observacionProfesional,
-            Links_PDFs: JSON.stringify(pdfLinks) // Convertir array a string JSON
+            Links_PDFs: JSON.stringify(pdfLinks)
         };
- // Rellenar las columnas de evaluación dinámicamente
+
         if (evaluaciones && evaluaciones.length > 0) {
             evaluaciones.forEach(eval => {
-                let motivoOriginal = eval.motivo; // Ejemplo: "Violencia (Se verifica)"
-
-                // ///////////////////////////////////////////////////////////////////////////////
-                // // LÓGICA MEJORADA DE NORMALIZACIÓN PARA NOMBRES DE COLUMNA                 //
-                // // Elimina frases entre paréntesis y términos específicos para armonizar.    //
-                // ///////////////////////////////////////////////////////////////////////////////
+                let motivoOriginal = eval.motivo;
                 let motivoParaColumna = motivoOriginal;
 
-                // 1. Eliminar cualquier texto entre paréntesis y los paréntesis mismos (ej. "(Se verifica)", "(Riesgo Alto)")
-                motivoParaColumna = motivoParaColumna.replace(/\s*\([^)]*\)\s*/g, ' '); 
-
-                // 2. Eliminar términos específicos como "Se verifica" si aparecen sueltos o al final (case-insensitive)
+                motivoParaColumna = motivoParaColumna.replace(/\s*\([^)]*\)\s*/g, ' ');
                 motivoParaColumna = motivoParaColumna.replace(/\s*Se verifica\s*$/i, '');
-                motivoParaColumna = motivoParaColumna.replace(/\s*Pendiente\s*$/i, ''); // Si tienes "X (Pendiente)" y quieres que quede solo "X"
-                motivoParaColumna = motivoParaColumna.replace(/\s*Riesgo Alto\s*$/i, ''); // Si tienes "Control Odontológico (Riesgo Alto)" y quieres solo "Control Odontologico"
+                motivoParaColumna = motivoParaColumna.replace(/\s*Pendiente\s*$/i, '');
+                motivoParaColumna = motivoParaColumna.replace(/\s*Riesgo Alto\s*$/i, '');
 
-                // 3. Normalizar casos especiales (estas reglas son las que ya tenías y siguen siendo útiles)
                 if (motivoOriginal.includes('Control Odontológico')) {
-                    motivoParaColumna = 'Control Odontologico'; // Asegura la ñ a n y consistencia
+                    motivoParaColumna = 'Control Odontologico';
                 } else if (motivoOriginal.includes('Agudeza visual')) {
                     motivoParaColumna = 'Agudeza visual';
                 } else if (motivoOriginal.includes('Seguridad Vial')) {
@@ -500,35 +488,18 @@ app.post('/api/seguimiento/guardar', async (req, res) => {
                 } else if (motivoOriginal === 'IMC') {
                     motivoParaColumna = 'IMC';
                 }
-                motivoParaColumna = motivoParaColumna.trim(); 
-                // Añade aquí más condiciones 'else if' si tienes otras banderas que quieras normalizar
-                // antes de la sanitización general.
+                motivoParaColumna = motivoParaColumna.trim();
 
-                // ///////////////////////////////////////////////////////////////////////////////
-                // // FIN DE LÓGICA MEJORADA DE NORMALIZACIÓN                                 //
-                // ///////////////////////////////////////////////////////////////////////////////
-
-                // Ahora, sanitiza el nombre *ya normalizado* para obtener el nombre final de la columna
                 let columnaBase = motivoParaColumna;
-
-                // 1. Reemplazar espacios con guiones bajos
-                columnaBase = columnaBase.replace(/\s+/g, '_'); 
-
-                // 2. Eliminar acentos
-                columnaBase = columnaBase.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); 
-
-                // 3. Eliminar caracteres especiales no alfanuméricos ni guiones bajos (ahora sí, después de normalizar)
-                columnaBase = columnaBase.replace(/[^\w]/g, ''); 
-
-                // 4. Reemplazar múltiples guiones bajos por uno solo
-                columnaBase = columnaBase.replace(/_+/g, '_'); 
-                
-                // 5. Eliminar guiones bajos al inicio o al final
+                columnaBase = columnaBase.replace(/\s+/g, '_');
+                columnaBase = columnaBase.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                columnaBase = columnaBase.replace(/[^\w]/g, '');
+                columnaBase = columnaBase.replace(/_+/g, '_');
                 columnaBase = columnaBase.replace(/^_|_$/g, '');
 
                 console.log(`SERVER DEBUG: Motivo original recibido: "${motivoOriginal}"`);
-                console.log(`SERVER DEBUG: Motivo normalizado (para columna): "${motivoParaColumna}"`); // Debería ser "Violencia"
-                console.log(`SERVER DEBUG: Nombre de columna sanitizado FINAL: "${columnaBase}"`); // Debería ser "Violencia"
+                console.log(`SERVER DEBUG: Motivo normalizado (para columna): "${motivoParaColumna}"`);
+                console.log(`SERVER DEBUG: Nombre de columna sanitizado FINAL: "${columnaBase}"`);
 
                 newRow[`${columnaBase}_Calificacion`] = eval.calificacion;
                 newRow[`${columnaBase}_Observaciones`] = eval.observaciones;
@@ -543,6 +514,53 @@ app.post('/api/seguimiento/guardar', async (req, res) => {
     } catch (error) {
         console.error('SERVER ERROR: Fallo al guardar informe de seguimiento:', error);
         res.status(500).json({ success: false, error: 'Error interno del servidor al guardar el informe de seguimiento.', details: error.message });
+    }
+}); // <--- ESTA ES LA LLAVE DE CIERRE CORRECTA PARA LA RUTA DE SEGUIMIENTO
+// *************************************************************************
+// ** LA RUTA /api/cierre/guardar DEBE IR DESPUÉS DE LA RUTA DE SEGUIMIENTO **
+// *************************************************************************
+app.post('/api/cierre/guardar', async (req, res) => {
+    const formData = req.body;
+
+    const dni = String(formData['DNI']).trim();
+    const fechaCierre = String(formData['Fecha_cierre_dp']).trim();
+
+    if (!doc) {
+        console.error('SERVER ERROR: Google Sheet document not initialized.');
+        return res.status(500).json({ error: 'Error interno del servidor: Base de datos no disponible.' });
+    }
+
+    if (!dni || !fechaCierre) {
+        return res.status(400).json({ success: false, error: 'DNI del paciente y Fecha de Cierre son requeridos para guardar el cierre.' });
+    }
+
+    try {
+        await doc.loadInfo();
+        const pacientesSheet = doc.sheetsByTitle['Hoja 1'];
+        
+        if (!pacientesSheet) {
+            console.error('SERVER ERROR: Hoja "Hoja 1" no encontrada. Por favor, asegúrese de que la hoja exista y se llame "Hoja 1".');
+            return res.status(500).json({ success: false, error: 'Error interno del servidor: La hoja de pacientes ("Hoja 1") no fue encontrada.' });
+        }
+
+        await pacientesSheet.loadHeaderRow();
+
+        const newRowData = {};
+        pacientesSheet.headerValues.forEach(header => {
+            newRowData[header] = formData[header] !== undefined ? String(formData[header]) : '';
+        });
+
+        newRowData['DNI'] = dni;
+        newRowData['Fecha_cierre_dp'] = fechaCierre;
+
+        await pacientesSheet.addRow(newRowData);
+
+        console.log(`SERVER: Nuevo registro de cierre guardado para DNI: ${dni} en fecha: ${fechaCierre}`);
+        return res.json({ success: true, message: 'Formulario de cierre guardado exitosamente como nuevo registro.' });
+
+    } catch (error) {
+        console.error('SERVER ERROR: Fallo al guardar el formulario de cierre:', error);
+        res.status(500).json({ success: false, error: 'Error interno del servidor al guardar el formulario de cierre.', details: error.message });
     }
 });
         // ====================================================================

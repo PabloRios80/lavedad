@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Formulario de Cierre de Módulo</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+</head>
+<body class="bg-gray-100 flex flex-col min-h-screen">
+
+    <header class="bg-blue-600 text-white shadow-lg">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
+                <div class="flex items-center space-x-4">
+                    <div class="bg-blue-500 rounded-full p-2">
+                        <img src="images/logo_iapos.png" alt="Logo IAPOS" class="h-20"> </div>
+                    <h1 class="text-xl font-bold">Formulario de Cierre de Módulo</h1> </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow flex items-center justify-center py-8">
+        <div class="container mx-auto p-6 bg-white rounded-xl shadow-lg max-w-4xl">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">Datos del Paciente</h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 border-b pb-4">
+                <div>
+                    <label for="paciente-dni" class="block text-gray-700 text-sm font-bold mb-2">DNI:</label>
+                    <div class="flex">
+                        <input type="text" id="paciente-dni" class="shadow appearance-none border rounded-l w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required pattern="[0-9]*" title="Ingrese solo números">
+                        <button id="cargar-datos-btn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-r focus:outline-none focus:shadow-outline">
+                            Cargar Datos
+                        </button>
+                    </div>
+                <div>
+                    <label for="paciente-apellido" class="block text-gray-700 text-sm font-bold mb-2">Apellido:</label>
+                    <input type="text" id="paciente-apellido" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required readonly>
+                </div>
+                <div>
+                    <label for="paciente-nombre" class="block text-gray-700 text-sm font-bold mb-2">Nombre:</label>
+                    <input type="text" id="paciente-nombre" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required readonly>
+                </div>
+                <div>
+                    <label for="paciente-edad" class="block text-gray-700 text-sm font-bold mb-2">Edad:</label>
+                    <input type="number" id="paciente-edad" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required readonly>
+                </div>
+                <div>
+                    <label for="paciente-sexo" class="block text-gray-700 text-sm font-bold mb-2">Sexo:</label>
+                    <select id="paciente-sexo" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required disabled>
+                        <option value="">Seleccione</option>
+                        <option value="Femenino">Femenino</option>
+                        <option value="Masculino">Masculino</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="fecha_cierre_dp" class="block text-gray-700 text-sm font-bold mb-2">Fecha de Cierre:</label>
+                    <input type="date" id="fecha_cierre_dp" name="Fecha_cierre_dp" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                </div>
+            </div>
+
+            <div id="rest-of-form-fields">
+                <p class="text-gray-500 text-center">Ingrese un DNI y haga clic en "Cargar Datos" para ver el resto del formulario.</p>
+            </div>
+
+            <div class="flex justify-center space-x-4 mt-8">
+                <button id="guardar-cierre-btn" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-6 rounded focus:outline-none focus:shadow-outline" disabled>
+                    Guardar Cierre
+                </button>
+                <button id="cancelar-cierre-btn" class="bg-gray-400 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded focus:outline-none focus:shadow-outline">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <script src="cierre-formulario.js"></script>
+</body>
+</html>
