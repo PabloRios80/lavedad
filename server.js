@@ -9,8 +9,6 @@ const SPREADSHEET_ID = '15YPfBG9PBfN3nBW5xXJYjIXEgYIS9z71pI0VpeCtAAU'; // Tu ID 
 app.use(express.json());
 app.use(express.static('public')); // Sirve archivos estáticos desde la carpeta 'public'
 
-// Variable global para el objeto del documento de Google Spreadsheet
-// Se inicializará una vez al inicio del servidor para evitar re-autenticaciones
 let doc;
 
 // Función para inicializar el documento de Google Sheet y cargar su información
@@ -329,8 +327,7 @@ app.post('/obtener-estudios-paciente', async (req, res) => {
             'VCC',
             'Biopsia',
             'Odontologia'
-            // Si tenías 'Laboratorio' dos veces, lo dejé una sola vez aquí por claridad.
-            // Si tienes otras hojas, agrégalas.
+            
         ];
 
         // >>>>>>>> NUEVO: Definición de campos específicos para la hoja de Laboratorio <<<<<<<<

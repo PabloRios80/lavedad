@@ -1,154 +1,151 @@
 document.addEventListener('DOMContentLoaded', () => {
     const dniInput = document.getElementById('paciente-dni');
     const cargarDatosBtn = document.getElementById('cargar-datos-btn');
+    const patientInfoDisplay = document.getElementById('patient-info-display'); // Nuevo contenedor para campos fijos
     const pacienteApellidoInput = document.getElementById('paciente-apellido');
     const pacienteNombreInput = document.getElementById('paciente-nombre');
     const pacienteEdadInput = document.getElementById('paciente-edad');
     const pacienteSexoSelect = document.getElementById('paciente-sexo');
-    const restOfFormFieldsDiv = document.getElementById('rest-of-form-fields');
+    
+    const cierreForm = document.getElementById('cierre-form'); // El formulario completo, incluyendo pasos
+    const formStepsContainer = document.getElementById('form-steps-container');
+    const progressBar = document.getElementById('progress-bar');
+    const prevStepBtn = document.getElementById('prev-step-btn');
+    const nextStepBtn = document.getElementById('next-step-btn');
     const guardarCierreBtn = document.getElementById('guardar-cierre-btn');
     const cancelarCierreBtn = document.getElementById('cancelar-cierre-btn');
-    const fechaCierreDpInput = document.getElementById('fecha_cierre_dp'); // Esta línea ahora dará NULL inicialmente, lo corregiremos
-                                                                        // Más abajo, al generar el formulario.
-    let currentPatientData = null; // Para almacenar los datos del paciente actual
-    let formattedDate = ''; // Declarar aquí para que sea accesible en otras funciones.
 
-    // Deshabilita el botón de guardar y los campos inicialmente
-    guardarCierreBtn.disabled = true;    
-     // Función para limpiar y deshabilitar los campos de paciente
-    function resetPatientFields() {
-        dniInput.value = ''; // Limpiamos el DNI también al resetear
-        pacienteApellidoInput.value = '';
-        pacienteNombreInput.value = '';
-        pacienteEdadInput.value = '';
-        pacienteSexoSelect.value = '';
-        pacienteApellidoInput.readOnly = true;
-        pacienteNombreInput.readOnly = true;
-        pacienteEdadInput.readOnly = true;
-        pacienteSexoSelect.disabled = true;
-        
-        // =========================================================================================
-        // COMIENZO DE LA MODIFICACIÓN: Ajustar el contenido inicial de restOfFormFieldsDiv
-        restOfFormFieldsDiv.innerHTML = '<p class="text-gray-500 text-center">Ingrese un DNI y haga clic en "Cargar Datos" para ver el resto del formulario.</p>';
-        // FIN DE LA MODIFICACIÓN
-        // =========================================================================================
+      // Elementos del Modal
+    const estudiosModal = document.getElementById('estudiosModal');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    const modalCloseButtonBottom = document.getElementById('modalCloseButtonBottom');
+    const modalDNI = document.getElementById('modalDNI');
+    const estudiosModalContent = document.getElementById('estudiosModalContent');
 
-        guardarCierreBtn.disabled = true;
-        currentPatientData = null;
+    let currentPatientData = null;
+    let currentStep = 0; // Para el formulario multi-paso
+    let formSteps = []; // Almacenará los divs de cada paso
 
-        // =========================================================================================
-        // COMIENZO DE LA MODIFICACIÓN: Restablecer la fecha de cierre aquí también
-        const today = new Date();
-        formattedDate = today.getFullYear() + '-' +
-                            String(today.getMonth() + 1).padStart(2, '0') + '-' +
-                            String(today.getDate()).padStart(2, '0');
-        // Si fechaCierreDpInput no es null (es decir, ya se generó el campo), actualízalo.
-        // Si no, no hacemos nada porque se generará con la fecha correcta más tarde.
-        const currentFechaCierreInput = document.getElementById('fecha_cierre_dp');
-        if (currentFechaCierreInput) {
-            currentFechaCierreInput.value = formattedDate;
-        }
-        
+    // Deshabilitar el botón de cargar datos al inicio si el DNI está vacío
+    if (!dniInput.value.trim()) {
+        cargarDatosBtn.disabled = true;
     }
 
-    // Función para generar dinámicamente el resto de los campos del formulario
-    function generateRestOfForm(patientData) {
-        restOfFormFieldsDiv.innerHTML = ''; // Limpiar contenido previo
+    // Inicializar el formulario: ocultar campos de paciente y el formulario de cierre
+    patientInfoDisplay.classList.add('hidden');
+    cierreForm.classList.add('hidden');
+    prevStepBtn.classList.add('hidden'); // Ocultar botón anterior al inicio
 
-        // Define la estructura de tus campos con sus opciones y si necesitan botón de estudio
-        // IMPORTANTÍSIMO: Los 'name' y 'id' deben coincidir con las columnas de tu Google Sheet
-        const fieldsConfig = [
-            { name: 'Presion_Arterial', label: 'Presión Arterial', type: 'select', options: ['Control Normal', 'Hipertensión', 'No se realiza'], required: true },
-            { name: 'Observaciones_Presion_Arterial', label: 'Obs. Presión Arterial', type: 'textarea', required: false },
-            { name: 'IMC', label: 'IMC', type: 'select', options: ['Bajo Peso', 'Control Normal', 'Sobrepeso', 'Obesidad', 'Obesidad Grado II', 'Obesidad Mórbida', 'No se realiza'], required: true },
-            { name: 'Observaciones_IMC', label: 'Obs. IMC', type: 'textarea', required: false },
-            { name: 'Agudeza_visual', label: 'Agudeza Visual', type: 'select', options: ['Alterada', 'Control Normal', 'No se realiza'], required: true },
-            { name: 'Observaciones_Agudeza_visual', label: 'Obs. Agudeza Visual', type: 'textarea', required: false },
-            { name: 'Control_odontologico', label: 'Control Odontológico', type: 'select', options: ['Control Normal', 'No se realiza', 'Riesgo'], hasStudyButton: true, studyType: 'Odontologia', required: true },
-            { name: 'Observaciones_Control_odontologico', label: 'Obs. Control Odontológico', type: 'textarea', required: false },
-            { name: 'Alimentacion_saludable', label: 'Alimentación Saludable', type: 'select', options: ['Sí', 'No'], required: true },
-            { name: 'Observaciones_Alimentacion_saludable', label: 'Obs. Alimentación Saludable', type: 'textarea', required: false },
-            { name: 'Actividad_fisica', label: 'Actividad Física', type: 'select', options: ['Sí realiza', 'No realiza'], required: true },
-            { name: 'Observaciones_Actividad_fisica', label: 'Obs. Actividad Física', type: 'textarea', required: false },
-            { name: 'Seguridad_vial', label: 'Seguridad Vial', type: 'select', options: ['Cumple', 'No cumple', 'No realiza'], required: true },
-            { name: 'Observaciones_Seguridad_vial', label: 'Obs. Seguridad Vial', type: 'textarea', required: false },
-            { name: 'Cuidados_adultos_mayores', label: 'Cuidados Adultos Mayores', type: 'select', options: ['No se realiza', 'Se verifica'], required: true },
-            { name: 'Observaciones_Cuidados_adultos_mayores', label: 'Obs. Cuidados Adultos Mayores', type: 'textarea', required: false },
-            { name: 'Acido_folico', label: 'Ácido Fólico', type: 'select', options: ['Indicado', 'No indicado'], required: true },
-            { name: 'Observaciones_Acido_folico', label: 'Obs. Ácido Fólico', type: 'textarea', required: false },
-            { name: 'Abuso_alcohol', label: 'Abuso Alcohol', type: 'select', options: ['Abuso', 'No abusa', 'No se realiza'], required: true },
-            { name: 'Observaciones_Abuso_alcohol', label: 'Obs. Abuso Alcohol', type: 'textarea', required: false },
-            { name: 'Tabaco', label: 'Tabaco', type: 'select', options: ['Fuma', 'No fuma'], required: true },
-            { name: 'Observaciones_Tabaco', label: 'Obs. Tabaco', type: 'textarea', required: false },
-            { name: 'Violencia', label: 'Violencia', type: 'select', options: ['Se verifica', 'No se verifica', 'No se realiza'], required: true },
-            { name: 'Observaciones_Violencia', label: 'Obs. Violencia', type: 'textarea', required: false },
-            { name: 'Depresion', label: 'Depresión', type: 'select', options: ['Se verifica', 'No se verifica', 'No se realiza'], required: true },
-            { name: 'Observaciones_Depresion', label: 'Obs. Depresión', type: 'textarea', required: false },
-            { name: 'ITS', label: 'ITS', type: 'select', options: ['Negativo', 'Positivo', 'No se realiza'], hasStudyButton: true, studyType: 'Laboratorio', required: true },
-            { name: 'Observaciones_ITS', label: 'Obs. ITS', type: 'textarea', required: false },
-            { name: 'Hepatitis_B', label: 'Hepatitis B', type: 'select', options: ['Negativo', 'Positivo', 'No se realiza'], hasStudyButton: true, studyType: 'Laboratorio', required: true },
-            { name: 'Observaciones_Hepatitis_B', label: 'Obs. Hepatitis B', type: 'textarea', required: false },
-            { name: 'Hepatitis_C', label: 'Hepatitis C', type: 'select', options: ['Negativo', 'Positivo', 'No se realiza'], hasStudyButton: true, studyType: 'Laboratorio', required: true },
-            { name: 'Observaciones_Hepatitis_C', label: 'Obs. Hepatitis C', type: 'textarea', required: false },
-            { name: 'VIH', label: 'VIH', type: 'select', options: ['Negativo', 'Positivo', 'No se realiza'], hasStudyButton: true, studyType: 'Laboratorio', required: true },
-            { name: 'Observaciones_VIH', label: 'Obs. VIH', type: 'textarea', required: false },
-            { name: 'Dislipemias', label: 'Dislipemias', type: 'select', options: ['No presenta', 'Presenta', 'No se realiza'], hasStudyButton: true, studyType: 'Laboratorio', required: true },
-            { name: 'Observaciones_Dislipemias', label: 'Obs. Dislipemias', type: 'textarea', required: false },
-            { name: 'Diabetes', label: 'Diabetes', type: 'select', options: ['No presenta', 'Presenta', 'No se realiza'], hasStudyButton: true, studyType: 'Laboratorio', required: true },
-            { name: 'Observaciones_Diabetes', label: 'Obs. Diabetes', type: 'textarea', required: false },
-            { name: 'Cancer_cervico_uterino_HPV', label: 'Cáncer Cérvico Uterino (HPV)', type: 'select', options: ['Normal', 'Pendiente', 'No se realiza', 'Patologico'], hasStudyButton: true, studyType: 'Laboratorio', required: true },
-            { name: 'Observaciones_Cancer_cervico_uterino_HPV', label: 'Obs. Cáncer Cérvico Uterino (HPV)', type: 'textarea', required: false },
-            { name: 'Cancer_cervico_uterino_PAP', label: 'Cáncer Cérvico Uterino (PAP)', type: 'select', options: ['Normal', 'Pendiente', 'No se realiza', 'Patologico'], hasStudyButton: true, studyType: 'Biopsia', required: true },
-            { name: 'Observaciones_PAP', label: 'Obs. PAP', type: 'textarea', required: false },
-            { name: 'Cancer_colon_SOMF', label: 'Cáncer Colon (SOMF)', type: 'select', options: ['Normal', 'Pendiente', 'No se realiza', 'Patologico'], hasStudyButton: true, studyType: 'Laboratorio', required: true },
-            { name: 'Observaciones_Cancer_colon_SOMF', label: 'Obs. Cáncer Colon (SOMF)', type: 'textarea', required: false },
-            { name: 'Cancer_colon_Colonoscopia', label: 'Cáncer Colon (Colonoscopia)', type: 'select', options: ['Normal', 'Pendiente', 'No se realiza', 'Patologico'], hasStudyButton: true, studyType: 'VCC', required: true },
-            { name: 'Observaciones_Colonoscopia', label: 'Obs. Colonoscopia', type: 'textarea', required: false },
-            { name: 'Cancer_mama_Mamografia', label: 'Cáncer Mama (Mamografía)', type: 'select', options: ['Normal', 'Pendiente', 'No se realiza', 'Patologico'], hasStudyButton: true, studyType: 'Mamografia', required: true },
-            { name: 'Observaciones_Mamografia', label: 'Obs. Mamografía', type: 'textarea', required: false },
-            { name: 'ERC', label: 'ERC', type: 'select', options: ['Normal', 'Pendiente', 'No se realiza', 'Patologico'], hasStudyButton: true, studyType: 'Laboratorio', required: true },
-            { name: 'Observaciones_ECG', label: 'Obs. ECG', type: 'textarea', required: false },
-            { name: 'EPOC', label: 'EPOC', type: 'select', options: ['Se verifica', 'No se verifica', 'No se realiza'], required: true },
-            { name: 'Observaciones_EPOC', label: 'Obs. EPOC', type: 'textarea', required: false },
-            { name: 'Aneurisma_aorta', label: 'Aneurisma Aorta', type: 'select', options: ['Se verifica', 'No se verifica', 'No se realiza'], hasStudyButton: true, studyType: 'Ecografia', required: true },
-            { name: 'Observaciones_Aneurisma_aorta', label: 'Obs. Aneurisma Aorta', type: 'textarea', required: false },
-            { name: 'Osteoporosis', label: 'Osteoporosis', type: 'select', options: ['Se verifica', 'No se verifica', 'No se realiza'], hasStudyButton: true, studyType: 'Densitometria', required: true },
-            { name: 'Observaciones_Osteoporosis', label: 'Obs. Osteoporosis', type: 'textarea', required: false },
-            { name: 'Estratificacion_riesgo_CV', label: 'Estratificación Riesgo CV', type: 'select', options: ['Alto', 'Bajo', 'Medio', 'Muy Alto'], required: true },
-            { name: 'Observaciones_Riesgo_CV', label: 'Obs. Riesgo CV', type: 'textarea', required: false },
-            { name: 'Aspirina', label: 'Aspirina', type: 'select', options: ['Indicado', 'No indicado'], required: true },
-            { name: 'Observaciones_Aspirina', label: 'Obs. Aspirina', type: 'textarea', required: false },
-            { name: 'Inmunizaciones', label: 'Inmunizaciones', type: 'select', options: ['Completo', 'Incompleto'], required: true },
-            { name: 'Observaciones_Inmunizaciones', label: 'Obs. Inmunizaciones', type: 'textarea', required: false },
-            { name: 'VDRL', label: 'VDRL', type: 'select', options: ['Negativo', 'Positivo', 'No aplica', 'Pendiente'], hasStudyButton: true, studyType: 'Laboratorio', required: true },
-            { name: 'Observaciones_VDRL', label: 'Obs. VDRL', type: 'textarea', required: false },
-            { name: 'Prostata_PSA', label: 'Próstata (PSA)', type: 'select', options: ['Normal', 'Pendiente', 'No aplica', 'Patologico'], hasStudyButton: true, studyType: 'Laboratorio', required: true },
-            { name: 'Observaciones_PSA', label: 'Obs. PSA', type: 'textarea', required: false },
-            { name: 'Chagas', label: 'Chagas', type: 'select', options: ['Negativo', 'Positivo', 'No aplica', 'Pendiente'], hasStudyButton: true, studyType: 'Laboratorio', required: true },
-            { name: 'Observaciones_Chagas', label: 'Obs. Chagas', type: 'textarea', required: false },
-            { name: 'Fecha_cierre_dp', label: 'Fecha Cierre DP', type: 'date', required: true }
-        ];
+    // Definición de los campos del formulario con iconos
+    const fieldsConfig = [
+        { name: 'Presion_Arterial', label: 'Presión Arterial', type: 'select', options: ['Control Normal', 'Hipertensión', 'No se realiza'], required: true, icon: 'fas fa-heartbeat' },
+        { name: 'Observaciones_Presion_Arterial', label: 'Obs. Presión Arterial', type: 'textarea', required: false, icon: 'fas fa-comment' },
+        { name: 'IMC', label: 'IMC', type: 'select', options: ['Bajo Peso', 'Control Normal', 'Sobrepeso', 'Obesidad', 'Obesidad Grado II', 'Obesidad Mórbida', 'No se realiza'], required: true, icon: 'fas fa-weight' },
+        { name: 'Observaciones_IMC', label: 'Obs. IMC', type: 'textarea', required: false, icon: 'fas fa-comment' },
+        { name: 'Agudeza_visual', label: 'Agudeza Visual', type: 'select', options: ['Alterada', 'Control Normal', 'No se realiza'], required: true, icon: 'fas fa-eye' },
+        { name: 'Observaciones_Agudeza_visual', label: 'Obs. Agudeza Visual', type: 'textarea', required: false, icon: 'fas fa-comment' },
+        { name: 'Control_odontologico', label: 'Control Odontológico', type: 'select', options: ['Control Normal', 'No se realiza', 'Riesgo'], hasStudyButton: true, studyType: 'Odontologia', required: true, icon: 'fas fa-tooth' },
+        { name: 'Observaciones_Control_odontologico', label: 'Obs. Control Odontológico', type: 'textarea', required: false, icon: 'fas fa-comment' },
+        { name: 'Alimentacion_saludable', label: 'Alimentación Saludable', type: 'select', options: ['Sí', 'No'], required: true, icon: 'fas fa-apple-alt' },
+        { name: 'Observaciones_Alimentacion_saludable', label: 'Obs. Alimentación Saludable', type: 'textarea', required: false, icon: 'fas fa-comment' },
+        { name: 'Actividad_fisica', label: 'Actividad Física', type: 'select', options: ['Sí realiza', 'No realiza'], required: true, icon: 'fas fa-running' },
+        { name: 'Observaciones_Actividad_fisica', label: 'Obs. Actividad Física', type: 'textarea', required: false, icon: 'fas fa-comment' },
+        { name: 'Seguridad_vial', label: 'Seguridad Vial', type: 'select', options: ['Cumple', 'No cumple', 'No realiza'], required: true, icon: 'fas fa-car' },
+        { name: 'Observaciones_Seguridad_vial', label: 'Obs. Seguridad Vial', type: 'textarea', required: false, icon: 'fas fa-comment' },
+        { name: 'Cuidados_adultos_mayores', label: 'Cuidados Adultos Mayores', type: 'select', options: ['No se realiza', 'Se verifica'], required: true, icon: 'fas fa-hands-helping' },
+        { name: 'Observaciones_Cuidados_adultos_mayores', label: 'Obs. Cuidados Adultos Mayores', type: 'textarea', required: false, icon: 'fas fa-comment' },
+        { name: 'Acido_folico', label: 'Ácido Fólico', type: 'select', options: ['Indicado', 'No indicado'], required: true, icon: 'fas fa-pills' },
+        { name: 'Observaciones_Acido_folico', label: 'Obs. Ácido Fólico', type: 'textarea', required: false, icon: 'fas fa-comment' },
+        { name: 'Abuso_alcohol', label: 'Abuso Alcohol', type: 'select', options: ['Abuso', 'No abusa', 'No se realiza'], required: true, icon: 'fas fa-beer' },
+        { name: 'Observaciones_Abuso_alcohol', label: 'Obs. Abuso Alcohol', type: 'textarea', required: false, icon: 'fas fa-comment' },
+        { name: 'Tabaco', label: 'Tabaco', type: 'select', options: ['Fuma', 'No fuma'], required: true, icon: 'fas fa-smoking' },
+        { name: 'Observaciones_Tabaco', label: 'Obs. Tabaco', type: 'textarea', required: false, icon: 'fas fa-comment' },
+        { name: 'Violencia', label: 'Violencia', type: 'select', options: ['Se verifica', 'No se verifica', 'No se realiza'], required: true, icon: 'fas fa-hand-rock' },
+        { name: 'Observaciones_Violencia', label: 'Obs. Violencia', type: 'textarea', required: false, icon: 'fas fa-comment' },
+        { name: 'Depresion', label: 'Depresión', type: 'select', options: ['Se verifica', 'No se verifica', 'No se realiza'], required: true, icon: 'fas fa-sad-tear' },
+        { name: 'Observaciones_Depresion', label: 'Obs. Depresión', type: 'textarea', required: false, icon: 'fas fa-comment' },
+        { name: 'ITS', label: 'ITS', type: 'select', options: ['Negativo', 'Positivo', 'No se realiza'], hasStudyButton: true, studyType: 'Laboratorio', required: true, icon: 'fas fa-microscope' },
+        { name: 'Observaciones_ITS', label: 'Obs. ITS', type: 'textarea', required: false, icon: 'fas fa-comment' },
+        { name: 'Hepatitis_B', label: 'Hepatitis B', type: 'select', options: ['Negativo', 'Positivo', 'No se realiza'], hasStudyButton: true, studyType: 'Laboratorio', required: true, icon: 'fas fa-virus' },
+        { name: 'Observaciones_Hepatitis_B', label: 'Obs. Hepatitis B', type: 'textarea', required: false, icon: 'fas fa-comment' },
+        { name: 'Hepatitis_C', label: 'Hepatitis C', type: 'select', options: ['Negativo', 'Positivo', 'No se realiza'], hasStudyButton: true, studyType: 'Laboratorio', required: true, icon: 'fas fa-virus' },
+        { name: 'Observaciones_Hepatitis_C', label: 'Obs. Hepatitis C', type: 'textarea', required: false, icon: 'fas fa-comment' },
+        { name: 'VIH', label: 'VIH', type: 'select', options: ['Negativo', 'Positivo', 'No se realiza'], hasStudyButton: true, studyType: 'Laboratorio', required: true, icon: 'fas fa-viruses' },
+        { name: 'Observaciones_VIH', label: 'Obs. VIH', type: 'textarea', required: false, icon: 'fas fa-comment' },
+        { name: 'Dislipemias', label: 'Dislipemias', type: 'select', options: ['No presenta', 'Presenta', 'No se realiza'], hasStudyButton: true, studyType: 'Laboratorio', required: true, icon: 'fas fa-blood-drop' },
+        { name: 'Observaciones_Dislipemias', label: 'Obs. Dislipemias', type: 'textarea', required: false, icon: 'fas fa-comment' },
+        { name: 'Diabetes', label: 'Diabetes', type: 'select', options: ['No presenta', 'Presenta', 'No se realiza'], hasStudyButton: true, studyType: 'Laboratorio', required: true, icon: 'fas fa-candy-cane' }, // Icono simbólico
+        { name: 'Observaciones_Diabetes', label: 'Obs. Diabetes', type: 'textarea', required: false, icon: 'fas fa-comment' },
+        { name: 'Cancer_cervico_uterino_HPV', label: 'Cáncer Cérvico Uterino (HPV)', type: 'select', options: ['Normal', 'Pendiente', 'No se realiza', 'Patologico'], hasStudyButton: true, studyType: 'Laboratorio', required: true, icon: 'fas fa-dna' },
+        { name: 'Observaciones_Cancer_cervico_uterino_HPV', label: 'Obs. Cáncer Cérvico Uterino (HPV)', type: 'textarea', required: false, icon: 'fas fa-comment' },
+        { name: 'Cancer_cervico_uterino_PAP', label: 'Cáncer Cérvico Uterino (PAP)', type: 'select', options: ['Normal', 'Pendiente', 'No se realiza', 'Patologico'], hasStudyButton: true, studyType: 'Biopsia', required: true, icon: 'fas fa-flask' },
+        { name: 'Observaciones_PAP', label: 'Obs. PAP', type: 'textarea', required: false, icon: 'fas fa-comment' },
+        { name: 'Cancer_colon_SOMF', label: 'Cáncer Colon (SOMF)', type: 'select', options: ['Normal', 'Pendiente', 'No se realiza', 'Patologico'], hasStudyButton: true, studyType: 'Laboratorio', required: true, icon: 'fas fa-poop' }, // Icono simbólico
+        { name: 'Observaciones_Cancer_colon_SOMF', label: 'Obs. Cáncer Colon (SOMF)', type: 'textarea', required: false, icon: 'fas fa-comment' },
+        { name: 'Cancer_colon_Colonoscopia', label: 'Cáncer Colon (Colonoscopia)', type: 'select', options: ['Normal', 'Pendiente', 'No se realiza', 'Patologico'], hasStudyButton: true, studyType: 'VCC', required: true, icon: 'fas fa-colon-sign' }, // Icono simbólico
+        { name: 'Observaciones_Colonoscopia', label: 'Obs. Colonoscopia', type: 'textarea', required: false, icon: 'fas fa-comment' },
+        { name: 'Cancer_mama_Mamografia', label: 'Cáncer Mama (Mamografía)', type: 'select', options: ['Normal', 'Pendiente', 'No se realiza', 'Patologico'], hasStudyButton: true, studyType: 'Mamografia', required: true, icon: 'fas fa-x-ray' },
+        { name: 'Observaciones_Mamografia', label: 'Obs. Mamografía', type: 'textarea', required: false, icon: 'fas fa-comment' },
+        { name: 'ERC', label: 'ERC', type: 'select', options: ['Normal', 'Pendiente', 'No se realiza', 'Patologico'], hasStudyButton: true, studyType: 'Laboratorio', required: true, icon: 'fas fa-kidneys' },
+        { name: 'Observaciones_ECG', label: 'Obs. ECG', type: 'textarea', required: false, icon: 'fas fa-comment' },
+        { name: 'EPOC', label: 'EPOC', type: 'select', options: ['Se verifica', 'No se verifica', 'No se realiza'], required: true, icon: 'fas fa-lungs' },
+        { name: 'Observaciones_EPOC', label: 'Obs. EPOC', type: 'textarea', required: false, icon: 'fas fa-comment' },
+        { name: 'Aneurisma_aorta', label: 'Aneurisma Aorta', type: 'select', options: ['Se verifica', 'No se verifica', 'No se realiza'], hasStudyButton: true, studyType: 'Ecografia', required: true, icon: 'fas fa-heart' },
+        { name: 'Observaciones_Aneurisma_aorta', label: 'Obs. Aneurisma Aorta', type: 'textarea', required: false, icon: 'fas fa-comment' },
+        { name: 'Osteoporosis', label: 'Osteoporosis', type: 'select', options: ['Se verifica', 'No se verifica', 'No se realiza'], hasStudyButton: true, studyType: 'Densitometria', required: true, icon: 'fas fa-bone' },
+        { name: 'Observaciones_Osteoporosis', label: 'Obs. Osteoporosis', type: 'textarea', required: false, icon: 'fas fa-comment' },
+        { name: 'Estratificacion_riesgo_CV', label: 'Estratificación Riesgo CV', type: 'select', options: ['Alto', 'Bajo', 'Medio', 'Muy Alto'], required: true, icon: 'fas fa-chart-line' },
+        { name: 'Observaciones_Riesgo_CV', label: 'Obs. Riesgo CV', type: 'textarea', required: false, icon: 'fas fa-comment' },
+        { name: 'Aspirina', label: 'Aspirina', type: 'select', options: ['Indicado', 'No indicado'], required: true, icon: 'fas fa-prescription-bottle-alt' },
+        { name: 'Observaciones_Aspirina', label: 'Obs. Aspirina', type: 'textarea', required: false, icon: 'fas fa-comment' },
+        { name: 'Inmunizaciones', label: 'Inmunizaciones', type: 'select', options: ['Completo', 'Incompleto'], required: true, icon: 'fas fa-syringe' },
+        { name: 'Observaciones_Inmunizaciones', label: 'Obs. Inmunizaciones', type: 'textarea', required: false, icon: 'fas fa-comment' },
+        { name: 'VDRL', label: 'VDRL', type: 'select', options: ['Negativo', 'Positivo', 'No aplica', 'Pendiente'], hasStudyButton: true, studyType: 'Laboratorio', required: true, icon: 'fas fa-vial' },
+        { name: 'Observaciones_VDRL', label: 'Obs. VDRL', type: 'textarea', required: false, icon: 'fas fa-comment' },
+        { name: 'Prostata_PSA', label: 'Próstata (PSA)', type: 'select', options: ['Normal', 'Pendiente', 'No aplica', 'Patologico'], hasStudyButton: true, studyType: 'Laboratorio', required: true, icon: 'fas fa-male' },
+        { name: 'Observaciones_PSA', label: 'Obs. PSA', type: 'textarea', required: false, icon: 'fas fa-comment' },
+        { name: 'Chagas', label: 'Chagas', type: 'select', options: ['Negativo', 'Positivo', 'No aplica', 'Pendiente'], hasStudyButton: true, studyType: 'Laboratorio', required: true, icon: 'fas fa-bug' }, // Icono simbólico
+        { name: 'Observaciones_Chagas', label: 'Obs. Chagas', type: 'textarea', required: false, icon: 'fas fa-comment' },
+        { name: 'Fecha_cierre_DP', label: 'Fecha Cierre DP', type: 'date', required: true, icon: 'fas fa-calendar-alt' } // Único campo de fecha
+    ];
 
-        const formGrid = document.createElement('div');
-        formGrid.className = 'grid grid-cols-1 md:grid-cols-2 gap-4'; // Grid para 2 columnas en pantallas medianas
+    // Función para generar los pasos del formulario
+    function generateFormSteps() {
+        formStepsContainer.innerHTML = ''; // Limpiar contenido previo
+        formSteps = []; // Resetear los pasos
+        let stepDiv;
+        let fieldCounter = 0;
 
         fieldsConfig.forEach(field => {
+            if (fieldCounter % 2 === 0) { // Cada 2 campos, crear un nuevo paso
+                stepDiv = document.createElement('div');
+                stepDiv.className = 'form-step grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-white rounded-lg shadow-inner border border-blue-100 hidden'; // Inicialmente ocultos
+                formStepsContainer.appendChild(stepDiv);
+                formSteps.push(stepDiv);
+            }
+
             const fieldContainer = document.createElement('div');
             fieldContainer.className = 'mb-4';
 
             const label = document.createElement('label');
             label.htmlFor = field.name;
-            label.className = 'block text-gray-700 text-sm font-bold mb-2';
-            label.textContent = field.label + ':';
+            label.className = 'block text-gray-700 text-sm font-bold mb-2 flex items-center';
+            if (field.icon) {
+                const icon = document.createElement('i');
+                icon.className = `${field.icon} mr-2 text-blue-600`;
+                label.appendChild(icon);
+            }
+            label.appendChild(document.createTextNode(field.label + ':'));
 
             let inputElement;
+            const inputClasses = 'shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500';
 
             if (field.type === 'select') {
                 inputElement = document.createElement('select');
-                inputElement.className = 'shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline';
+                inputElement.className = inputClasses;
                 inputElement.id = field.name;
                 inputElement.name = field.name;
-                inputElement.required = field.required !== false; // <-- CAMBIO AQUÍ
+                inputElement.required = field.required !== false;
 
                 const defaultOption = document.createElement('option');
                 defaultOption.value = '';
@@ -165,33 +162,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             } else if (field.type === 'textarea') {
                 inputElement = document.createElement('textarea');
-                inputElement.className = 'shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline h-20 resize-y';
+                inputElement.className = `${inputClasses} h-20 resize-y`;
                 inputElement.id = field.name;
                 inputElement.name = field.name;
-                inputElement.required = field.required !== false; // <-- CAMBIO AQUÍ
+                inputElement.required = field.required !== false;
             } else { // type 'text' o 'date' o 'number'
                 inputElement = document.createElement('input');
                 inputElement.type = field.type;
-                inputElement.className = 'shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline';
+                inputElement.className = inputClasses;
                 inputElement.id = field.name;
                 inputElement.name = field.name;
                 inputElement.required = field.required !== false;
             }
 
-            // Precargar valor si existe en patientData
-            if (patientData[field.name]) {
-                inputElement.value = patientData[field.name];
-            }
-            // COMIENZO DE LA MODIFICACIÓN
-            else if (field.name === 'Fecha_cierre_dp') {
-                // Establecer la fecha actual solo si el campo es Fecha_cierre_dp y no hay un valor previo
+            // Setear la fecha actual para el campo 'Fecha_cierre_dp' al generarse
+            if (field.name === 'Fecha_cierre_DP') {
                 const today = new Date();
-                const currentFormattedDate = today.getFullYear() + '-' +
-                                            String(today.getMonth() + 1).padStart(2, '0') + '-' +
-                                            String(today.getDate()).padStart(2, '0');
-                inputElement.value = currentFormattedDate;
+                const formattedDate = today.getFullYear() + '-' +
+                                    String(today.getMonth() + 1).padStart(2, '0') + '-' +
+                                    String(today.getDate()).padStart(2, '0');
+                inputElement.value = formattedDate;
             }
-            // FIN DE LA MODIFICACIÓN
 
             fieldContainer.appendChild(label);
 
@@ -201,10 +192,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 inputGroup.appendChild(inputElement);
 
                 const studyButton = document.createElement('button');
-                studyButton.className = 'bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-r ml-2 focus:outline-none focus:shadow-outline flex-shrink-0';
-                studyButton.innerHTML = `<i class="fas fa-search mr-2"></i>Ver Estudio`;
-                studyButton.dataset.studyType = field.studyType; // Almacenar el tipo de estudio
-                studyButton.addEventListener('click', () => handleVerEstudio(studyButton.dataset.studyType, currentPatientData.DNI)); // Pasar DNI
+                studyButton.className = 'bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-r ml-2 focus:outline-none focus:shadow-outline flex-shrink-0 text-sm';
+                studyButton.innerHTML = `<i class="fas fa-search mr-1"></i>Ver Estudio`; // Añadido texto "Ver Estudio"
+                studyButton.title = `Ver Estudio de ${field.label}`; // Tooltip
+                studyButton.dataset.studyType = field.studyType;
+                studyButton.addEventListener('click', (e) => {
+                    e.preventDefault(); // Prevenir envío del formulario
+                    if (currentPatientData && currentPatientData.DNI) {
+                        mostrarEstudiosModal(currentPatientData.DNI, studyButton.dataset.studyType); // <-- ESTA ES LA CORRECCIÓN
+                    } else {
+                        alert('DNI del paciente no disponible para ver estudios.');
+                    }
+                });
 
                 inputGroup.appendChild(studyButton);
                 fieldContainer.appendChild(inputGroup);
@@ -212,205 +211,292 @@ document.addEventListener('DOMContentLoaded', () => {
                 fieldContainer.appendChild(inputElement);
             }
 
-            formGrid.appendChild(fieldContainer);
+            stepDiv.appendChild(fieldContainer);
+            fieldCounter++;
+        });
+        showStep(0); // Mostrar el primer paso al generar
+    }
+
+    // Función para mostrar un paso específico
+    function showStep(stepIndex) {
+        formSteps.forEach((step, index) => {
+            step.classList.add('hidden');
+            if (index === stepIndex) {
+                step.classList.remove('hidden');
+            }
         });
 
-        restOfFormFieldsDiv.appendChild(formGrid);
+        currentStep = stepIndex;
+        updateProgressBar();
+        updateNavigationButtons();
     }
 
-    async function handleVerEstudio(studyType, dni) {
-        if (!dni) {
-            alert('DNI del paciente no disponible para ver estudios.');
-            return;
-        }
+    // Función para actualizar la barra de progreso
+    function updateProgressBar() {
+        const progress = ((currentStep + 1) / formSteps.length) * 100;
+        progressBar.style.width = `${progress}%`;
+    }
 
-        console.log(`Intentando ver estudio tipo: ${studyType} para DNI: ${dni}`);
-        
-        // Ejemplo hipotético de cómo podría ser tu función existente:
-        if (typeof mostrarEstudiosModal === 'function') {
-             mostrarEstudiosModal(dni, studyType); // Pasa el DNI y el tipo de estudio
+    // Función para actualizar la visibilidad de los botones de navegación
+    function updateNavigationButtons() {
+        if (currentStep === 0) {
+            prevStepBtn.classList.add('hidden');
         } else {
-            alert('Función para mostrar estudios no encontrada. Asegúrate de que `mostrarEstudiosModal` esté definida globalmente o importada.');
-            // Si no tienes una función global, tendríamos que implementar la lógica
-            // para el fetch a /obtener-estudios-paciente y la creación del modal aquí.
-            // Por ahora, mostrará un mensaje básico de la búsqueda del estudio.
-            try {
-                const response = await fetch('/obtener-estudios-paciente', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ dni: dni })
-                });
-                const data = await response.json();
-                if (data.success && data.estudios.length > 0) {
-                    const filteredStudies = data.estudios.filter(s => s.TipoEstudio === studyType);
-                    if (filteredStudies.length > 0) {
-                        let studyDetails = `Estudios de ${studyType} para DNI ${dni}:\n\n`;
-                        filteredStudies.forEach(s => {
-                            studyDetails += `Fecha: ${s.Fecha || 'N/A'}\n`;
-                            studyDetails += `Resultado: ${s.Resultado || s.ResultadosLaboratorio ? JSON.stringify(s.ResultadosLaboratorio, null, 2) : 'N/A'}\n`;
-                            if (s.LinkPDF) {
-                                studyDetails += `Link PDF: ${s.LinkPDF}\n`;
-                            }
-                            studyDetails += '--------------------\n';
-                        });
-                         alert(studyDetails); // Solo para pruebas, idealmente esto iría en un modal
-                    } else {
-                        alert(`No se encontraron estudios de tipo "${studyType}" para este DNI.`);
-                    }
-                } else {
-                    alert(data.message || 'No se encontraron estudios para este DNI.');
-                }
-            } catch (error) {
-                console.error('Error al obtener estudios:', error);
-                alert('Error al obtener los estudios.');
-            }
+            prevStepBtn.classList.remove('hidden');
+        }
+
+        if (currentStep === formSteps.length - 1) {
+            nextStepBtn.classList.add('hidden');
+            guardarCierreBtn.classList.remove('hidden'); // Mostrar el botón Guardar en la última página
+        } else {
+            nextStepBtn.classList.remove('hidden');
+            guardarCierreBtn.classList.add('hidden'); // Ocultar Guardar si no es la última página
         }
     }
-// Event Listener para el botón "Cargar Datos" (Simplificado, no busca en Google Sheets)
-    cargarDatosBtn.addEventListener('click', () => {
-        const dni = dniInput.value.trim();
-        if (!dni) {
-            alert('Por favor, ingrese un DNI.');
-            return;
-        }
 
-        // Habilitar la edición de Nombre, Apellido, Edad, Sexo
-        pacienteApellidoInput.removeAttribute('readOnly');
-        pacienteNombreInput.removeAttribute('readOnly');
-        pacienteEdadInput.removeAttribute('readOnly');
-        pacienteSexoSelect.removeAttribute('disabled');
-
-        // Limpiar los campos de paciente al "cargar" un nuevo DNI, ya que no estamos precargando
+    // Función para limpiar el formulario y resetear el estado
+    function resetForm() {
+        dniInput.value = '';
         pacienteApellidoInput.value = '';
         pacienteNombreInput.value = '';
         pacienteEdadInput.value = '';
         pacienteSexoSelect.value = '';
 
-        // Generar el resto del formulario (pasamos un objeto vacío porque no hay datos previos)
-        generateRestOfForm({}); // Llama a la función para dibujar los campos
-
-        // Habilitar el botón de guardar
-        guardarCierreBtn.disabled = false;
+        patientInfoDisplay.classList.add('hidden');
+        cierreForm.classList.add('hidden');
+        formStepsContainer.innerHTML = ''; // Limpiar los pasos generados
+        currentStep = 0;
+        formSteps = [];
+        updateProgressBar();
         
-        // Ahora que el campo de fecha está generado, podemos asignarle la fecha actual.
-        // Asegúrate de que 'fechaCierreDpInput' (que es global) tenga el valor correcto.
-        // O lo buscas de nuevo si prefieres.
-        const currentFechaCierreInput = document.getElementById('Fecha_cierre_dp'); // Nota: mayúscula en 'F'
-        if (currentFechaCierreInput) {
-            const today = new Date();
-            const currentFormattedDate = today.getFullYear() + '-' +
-                                        String(today.getMonth() + 1).padStart(2, '0') + '-' +
-                                        String(today.getDate()).padStart(2, '0');
-            currentFechaCierreInput.value = currentFormattedDate;
-        }
-    });
+        // Restablecer el estado inicial de los campos fijos
+        pacienteApellidoInput.setAttribute('readonly', true);
+        pacienteNombreInput.setAttribute('readonly', true);
+        pacienteEdadInput.setAttribute('readonly', true);
+        pacienteSexoSelect.setAttribute('disabled', true);
 
-    // Validar DNI en tiempo real para habilitar/deshabilitar el botón de cargar datos
+        cargarDatosBtn.disabled = true; // Deshabilitar botón de carga hasta que se ingrese DNI
+    }
+
+    // --- LÓGICA DE EVENTOS ---
+
+    // Event Listener para el DNI input: habilita el botón Cargar Datos
     dniInput.addEventListener('input', () => {
         if (dniInput.value.trim().length > 0) {
             cargarDatosBtn.disabled = false;
         } else {
             cargarDatosBtn.disabled = true;
-            resetPatientFields(); // Llama a tu función para limpiar y ocultar
+            resetForm(); // Resetear el formulario si el DNI se borra
         }
     });
 
-    // Asegurarse de que el botón cargarDatosBtn esté deshabilitado al cargar la página si el DNI está vacío
-    if (!dniInput.value.trim()) {
-        cargarDatosBtn.disabled = true;
-    }
+    // Event Listener para el botón "Cargar Datos"
+    cargarDatosBtn.addEventListener('click', () => {
+        const dni = dniInput.value.trim();
+        if (!dni) {
+            alert('Por favor, ingrese un DNI para cargar los datos.');
+            return;
+        }
+        
+        // Asignar DNI a currentPatientData para el botón "Ver Estudio"
+        currentPatientData = { DNI: dni };
+
+        // Mostrar campos fijos de paciente y el formulario de cierre
+        patientInfoDisplay.classList.remove('hidden');
+        cierreForm.classList.remove('hidden');
+
+        // Habilitar edición de campos fijos
+        pacienteApellidoInput.removeAttribute('readonly');
+        pacienteNombreInput.removeAttribute('readonly');
+        pacienteEdadInput.removeAttribute('readonly');
+        pacienteSexoSelect.removeAttribute('disabled');
+        
+        // Limpiar campos fijos al cargar para que el usuario los complete si son nuevos
+        pacienteApellidoInput.value = '';
+        pacienteNombreInput.value = '';
+        pacienteEdadInput.value = '';
+        pacienteSexoSelect.value = '';
+
+        // Generar y mostrar el primer paso del formulario dinámico
+        generateFormSteps();
+    });
+
+    // Event Listeners para los botones de navegación del formulario multi-paso
+    nextStepBtn.addEventListener('click', () => {
+        // Validar campos de la página actual antes de avanzar
+        const currentStepFields = formSteps[currentStep].querySelectorAll('input, select, textarea');
+        let stepIsValid = true;
+        currentStepFields.forEach(field => {
+            if (field.required && !field.value.trim()) {
+                field.classList.add('border-red-500', 'ring-red-500');
+                stepIsValid = false;
+            } else {
+                field.classList.remove('border-red-500', 'ring-red-500');
+            }
+        });
+
+        if (!stepIsValid) {
+            alert('Por favor, complete todos los campos obligatorios antes de avanzar.');
+            return;
+        }
+
+        if (currentStep < formSteps.length - 1) {
+            showStep(currentStep + 1);
+        }
+    });
+
+    prevStepBtn.addEventListener('click', () => {
+        if (currentStep > 0) {
+            showStep(currentStep - 1);
+        }
+    });
+
     // Event Listener para el botón "Guardar Cierre"
-    guardarCierreBtn.addEventListener('click', async () => {
-        // Validar que todos los campos obligatorios estén llenos
-        const formInputs = restOfFormFieldsDiv.querySelectorAll('input, select, textarea');
+    guardarCierreBtn.addEventListener('click', async (e) => {
+        e.preventDefault(); // Prevenir el envío tradicional del formulario
+
+        // Validar todos los campos del formulario (incluyendo el último paso)
+        const allFormInputs = cierreForm.querySelectorAll('input:not([readonly]), select:not([disabled]), textarea');
         let allFieldsValid = true;
         const formData = {};
 
-        // Incluir DNI, Apellido, Nombre, Edad, Sexo desde los campos fijos
+        // Recolectar datos de campos fijos de paciente
         formData['DNI'] = dniInput.value.trim();
         formData['Apellido'] = pacienteApellidoInput.value.trim();
         formData['Nombre'] = pacienteNombreInput.value.trim();
         formData['Edad'] = pacienteEdadInput.value.trim();
         formData['Sexo'] = pacienteSexoSelect.value.trim();
 
-    formInputs.forEach(input => {
-    // Solo validar si el campo es requerido
-    if (input.required && !input.value.trim()) { // input.required ya viene del field.required !== false
-        allFieldsValid = false;
-        input.classList.add('border-red-500'); // Resaltar campos vacíos
-    } else {
-        input.classList.remove('border-red-500');
-    }
-    formData[input.name] = input.value.trim(); // Recolectar todos los datos
-});
+        // Recolectar datos de campos dinámicos y validar
+        allFormInputs.forEach(input => {
+            if (input.required && !input.value.trim()) {
+                allFieldsValid = false;
+                input.classList.add('border-red-500', 'ring-red-500'); // Resaltar campos vacíos
+            } else {
+                input.classList.remove('border-red-500', 'ring-red-500');
+            }
+            formData[input.name] = input.value.trim();
+        });
+
         if (!allFieldsValid) {
-            alert('Por favor, complete todos los campos obligatorios.');
+            alert('Por favor, complete todos los campos obligatorios del formulario.');
             return;
         }
 
-        guardarCierreBtn.disabled = true; // Deshabilitar para evitar múltiples envíos
+        guardarCierreBtn.disabled = true;
         guardarCierreBtn.textContent = 'Guardando...';
 
         try {
             const response = await fetch('/api/cierre/guardar', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(formData)
             });
 
             const result = await response.json();
-if (result.success) {
+
+            if (result.success) {
                 alert(result.message);
-                // =========================================================================================
-                // COMIENZO DE LA MODIFICACIÓN: Lógica de reseteo (REEMPLAZA window.location.reload();)
-                // Limpiar campos fijos
-                dniInput.value = '';
-                pacienteApellidoInput.value = '';
-                pacienteNombreInput.value = '';
-                pacienteEdadInput.value = '';
-                pacienteSexoSelect.value = '';
-
-                // Volver a poner los campos fijos como readonly/disabled
-                pacienteApellidoInput.readOnly = true;
-                pacienteNombreInput.readOnly = true;
-                pacienteEdadInput.readOnly = true;
-                pacienteSexoSelect.disabled = true;
-
-                // Restablecer la fecha actual en el campo de fecha de cierre
-                // Lo buscamos de nuevo porque se generó dinámicamente
-                const currentFechaCierreInput = document.getElementById('Fecha_cierre_dp'); // O 'fecha_cierre_dp' si cambiaste el config
-                if (currentFechaCierreInput) {
-                    const today = new Date();
-                    const newFormattedDate = today.getFullYear() + '-' +
-                                            String(today.getMonth() + 1).padStart(2, '0') + '-' +
-                                            String(today.getDate()).padStart(2, '0');
-                    currentFechaCierreInput.value = newFormattedDate;
-                }
-
-                // Ocultar el resto del formulario y deshabilitar el botón de guardar
-                restOfFormFieldsDiv.innerHTML = '<p class="text-gray-500 text-center">Ingrese un DNI y haga clic en "Cargar Datos" para ver el resto del formulario.</p>';
-                guardarCierreBtn.disabled = true;
-                // FIN DE LA MODIFICACIÓN
-                // =========================================================================================
+                resetForm(); // Resetear el formulario y volver al estado inicial
             } else {
                 alert(`Error al guardar: ${result.error}`);
             }
-
         } catch (error) {
             console.error('Error al guardar el formulario de cierre:', error);
             alert('Ocurrió un error al guardar el formulario. Intente nuevamente.');
         } finally {
             guardarCierreBtn.disabled = false;
-            guardarCierreBtn.textContent = 'Guardar Cierre';
+            guardarCierreBtn.innerHTML = '<i class="fas fa-save mr-2"></i>Guardar Cierre';
         }
     });
 
     // Event Listener para el botón "Cancelar"
     cancelarCierreBtn.addEventListener('click', () => {
         if (confirm('¿Está seguro de que desea cancelar? Se perderán los cambios no guardados.')) {
-            window.location.reload(); // Simplemente recarga la página para resetear el formulario
+            resetForm(); // Volver al estado inicial
         }
     });
+// --- FUNCIÓN GLOBAL PARA MOSTRAR ESTUDIOS EN UN MODAL ---
+    // Esta función será llamada por los botones "Ver Estudio"
+    async function mostrarEstudiosModal(dni, studyType) {
+        if (!dni) {
+            alert('DNI del paciente no disponible para ver estudios.');
+            return;
+        }
+
+        modalDNI.textContent = `DNI: ${dni} - Tipo: ${studyType}`;
+        estudiosModalContent.innerHTML = '<p class="text-center text-gray-500">Cargando estudios...</p>';
+        estudiosModal.classList.remove('hidden'); // Mostrar el modal
+
+        try {
+            const response = await fetch('/obtener-estudios-paciente', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ dni: dni })
+            });
+            const data = await response.json();
+
+            estudiosModalContent.innerHTML = ''; // Limpiar el contenido de carga
+
+            if (data.success && data.estudios.length > 0) {
+                const filteredStudies = data.estudios.filter(s => s.TipoEstudio === studyType);
+                
+                if (filteredStudies.length > 0) {
+                    filteredStudies.forEach(estudio => {
+                        const estudioCard = document.createElement('div');
+                        estudioCard.className = 'bg-blue-50 p-4 rounded-lg shadow-sm border border-blue-200';
+                        
+                        let contentHtml = `<h4 class="font-bold text-blue-700 mb-2">${estudio.TipoEstudio} - Fecha: ${estudio.Fecha || 'N/A'}</h4>`;
+                        contentHtml += `<p><strong>Prestador:</strong> ${estudio.Prestador || 'N/A'}</p>`;
+
+                        if (estudio.TipoEstudio === 'Laboratorio' && estudio.ResultadosLaboratorio) {
+                            contentHtml += `<p class="font-semibold mt-2">Resultados de Laboratorio:</p>`;
+                            contentHtml += `<ul class="list-disc list-inside ml-4">`;
+                            for (const key in estudio.ResultadosLaboratorio) {
+                                contentHtml += `<li><strong>${key}:</strong> ${estudio.ResultadosLaboratorio[key]}</li>`;
+                            }
+                            contentHtml += `</ul>`;
+                        } else {
+                            contentHtml += `<p><strong>Resultado:</strong> ${estudio.Resultado || 'N/A'}</p>`;
+                            if (estudio.Observaciones) { // Para odontología y otros que puedan tener obs
+                                contentHtml += `<p><strong>Observaciones:</strong> ${estudio.Observaciones}</p>`;
+                            }
+                        }
+
+                        if (estudio.LinkPDF) {
+                            contentHtml += `<p class="mt-2"><a href="${estudio.LinkPDF}" target="_blank" class="text-blue-600 hover:underline"><i class="fas fa-file-pdf mr-1"></i>Ver PDF</a></p>`;
+                        }
+                        estudioCard.innerHTML = contentHtml;
+                        estudiosModalContent.appendChild(estudioCard);
+                    });
+                } else {
+                    estudiosModalContent.innerHTML = `<p class="text-center text-gray-600">No se encontraron estudios de tipo "${studyType}" para este DNI.</p>`;
+                }
+            } else {
+                estudiosModalContent.innerHTML = `<p class="text-center text-gray-600">${data.message || 'No se encontraron estudios para este DNI.'}</p>`;
+            }
+        } catch (error) {
+            console.error('Error al obtener estudios para el modal:', error);
+            estudiosModalContent.innerHTML = `<p class="text-center text-red-600">Error al cargar los estudios. Intente nuevamente.</p>`;
+        }
+    }
+
+    // Eventos para cerrar el modal
+    closeModalBtn.addEventListener('click', () => {
+        estudiosModal.classList.add('hidden');
+    });
+
+    modalCloseButtonBottom.addEventListener('click', () => {
+        estudiosModal.classList.add('hidden');
+    });
+
+    // Cerrar modal al hacer clic fuera de él (opcional)
+    estudiosModal.addEventListener('click', (e) => {
+        if (e.target === estudiosModal) {
+            estudiosModal.classList.add('hidden');
+        }
+    });
+
+    // Asegurarse de que la función mostrarEstudiosModal esté disponible globalmente (opcional si ya está ahí)
+    // window.mostrarEstudiosModal = mostrarEstudiosModal; // Descomentar si realmente necesitas que sea global para otras partes del código
 });
