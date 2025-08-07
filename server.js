@@ -1,49 +1,89 @@
 const express = require('express');
 const { GoogleSpreadsheet } = require('google-spreadsheet');
-//const creds = require('./credentials.json'); // Asegúrate de que este archivo exista y esté bien configurado
+const { google } = require('googleapis');
+const multer = require('multer');
+const streamifier = require('streamifier');
 
 const app = express();
 const PORT = 3000;
-const SPREADSHEET_ID = '15YPfBG9PBfN3nBW5xXJYjIXEgYIS9z71pI0VpeCtAAU'; // Tu ID de la hoja de cálculo de Google
+const SPREADSHEET_ID = '15YPfBG9PBfN3nBW5xXJYjIXEgYIS9z71pI0VpeCtAAU';
 
 app.use(express.json());
-app.use(express.static('public')); // Sirve archivos estáticos desde la carpeta 'public'
+app.use(express.static('public'));
 
 let doc;
+let credentials; // <--- La única declaración global de 'credentials'
+
+const upload = multer({ storage: multer.memoryStorage() });
+
+app.post('/api/enfermeria/guardar', upload.fields([
+    { name: 'agudeza_visual_pdf', maxCount: 1 },
+    { name: 'espirometria_pdf', maxCount: 1 }
+]), async (req, res) => {
+    try {
+        if (!doc) {
+            await initializeGoogleSheet();
+        }
+        
+        const sheet = doc.sheetsByTitle["Enfermeria"];
+        if (!sheet) {
+            return res.status(500).json({ message: 'Hoja de cálculo "Enfermeria" no encontrada.' });
+        }
+
+        const newRow = req.body;
+        
+        if (req.files) {
+            if (req.files.agudeza_visual_pdf) {
+                const pdfFile = req.files.agudeza_visual_pdf[0];
+                const pdfName = `Agudeza_Visual_${newRow.DNI}_${Date.now()}.pdf`;
+                const fileLink = await uploadFileToDrive(pdfFile.buffer, pdfName, pdfFile.mimetype);
+                newRow['Agudeza Visual (PDF)'] = fileLink;
+            }
+            if (req.files.espirometria_pdf) {
+                const pdfFile = req.files.espirometria_pdf[0];
+                const pdfName = `Espirometria_${newRow.DNI}_${Date.now()}.pdf`;
+                const fileLink = await uploadFileToDrive(pdfFile.buffer, pdfName, pdfFile.mimetype);
+                newRow['Espirometria (PDF)'] = fileLink;
+            }
+        }
+        
+        await sheet.addRow(newRow);
+        res.status(200).json({ message: 'Datos guardados correctamente.' });
+
+    } catch (error) {
+        console.error('Error al guardar datos de enfermería:', error);
+        res.status(500).json({ message: 'Error interno del servidor.' });
+    }
+});
 
 // Función para inicializar el documento de Google Sheet y cargar su información
 async function initializeGoogleSheet() {
     try {
         doc = new GoogleSpreadsheet(SPREADSHEET_ID);
-
-        // === COMIENZO DEL CAMBIO CLAVE ===
-        let credentials;
+        
+        // NO usamos 'let' aquí, para que se le asigne el valor a la variable global 'credentials'
         if (process.env.CREDENTIALS_JSON) {
-            // Si la variable de entorno existe (estamos en Render), parseamos el JSON
             credentials = JSON.parse(process.env.CREDENTIALS_JSON);
         } else {
-            // Si no existe (estamos localmente), intentamos cargar el archivo local
             try {
                 credentials = require('./credentials.json');
             } catch (localError) {
                 console.error('❌ Error: credentials.json no encontrado localmente y CREDENTIALS_JSON no está en el entorno.');
                 console.error('Asegúrate de tener credentials.json en la raíz del proyecto para desarrollo local o configura la variable de entorno.');
-                process.exit(1); // Salir si no hay credenciales disponibles
+                process.exit(1);
             }
         }
         await doc.useServiceAccountAuth({
             client_email: credentials.client_email,
             private_key: credentials.private_key.replace(/\\n/g, '\n'),
         });
-        await doc.loadInfo(); // Carga la información de todas las hojas (pestañas)
+        await doc.loadInfo();
         console.log('✅ Google Sheet document loaded successfully.');
     } catch (error) {
         console.error('❌ Error initializing Google Sheet document:', error);
-        // Es crítico que esto funcione. Si falla, el servidor no podrá acceder a las hojas.
-        process.exit(1); // Sale del proceso si la inicialización falla
+        process.exit(1);
     }
 }
-
 // Función para obtener todos los datos de una hoja específica (por nombre o índice)
 // Usaremos esta función para ambas: la hoja principal y las hojas de estudios.
 async function getDataFromSpecificSheet(sheetIdentifier) { // sheetIdentifier puede ser el nombre o el índice
@@ -79,6 +119,40 @@ async function getDataFromSpecificSheet(sheetIdentifier) { // sheetIdentifier pu
         console.error(`Error al leer la hoja de cálculo "${sheetIdentifier}":`, error);
         throw error; // Re-lanza el error para que sea manejado por la ruta que la llamó
     }
+}
+async function uploadFileToDrive(fileBuffer, fileName, mimeType) {
+    const FOLDER_ID = '1JhWxc3eFhZaT3edEjiUM-vHY4Y9MgVy-';
+
+    const auth = new google.auth.GoogleAuth({
+        credentials: {
+            client_email: credentials.client_email,
+            private_key: credentials.private_key.replace(/\\n/g, '\n'),
+        },
+        // The scopes must be changed to allow writing to shared folders.
+        scopes: ['https://www.googleapis.com/auth/drive'], 
+    });
+
+    const drive = google.drive({ version: 'v3', auth });
+    const fileStream = streamifier.createReadStream(fileBuffer);
+    
+    const fileMetadata = {
+        name: fileName,
+        mimeType: mimeType,
+        parents: [FOLDER_ID],
+    };
+
+    const media = {
+        mimeType: mimeType,
+        body: fileStream,
+    };
+
+    const response = await drive.files.create({
+        requestBody: fileMetadata,
+        media: media,
+        fields: 'id, webViewLink',
+    });
+
+    return response.data.webViewLink;
 }
 
 // ====================================================================

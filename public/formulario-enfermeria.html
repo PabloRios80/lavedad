@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Formulario de Enfermería</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-gray-100">
+
+    <div class="container mx-auto p-4 max-w-2xl bg-white shadow-lg mt-10 rounded-lg">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-3xl font-bold text-gray-800">Formulario de Enfermería</h1>
+            <img src="https://i.imgur.com/w4pB505.png" alt="Logo" class="h-16">
+        </div>
+        <hr class="border-gray-300 mb-6">
+
+        <form id="formulario-enfermeria" class="space-y-6" enctype="multipart/form-data">
+            <div>
+                <label for="dni" class="block text-sm font-medium text-gray-700">DNI</label>
+                <input type="text" id="dni" name="DNI" placeholder="DNI del paciente" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+            </div>
+            <div>
+                <label for="nombre" class="block text-sm font-medium text-gray-700">Nombre</label>
+                <input type="text" id="nombre" name="Nombre" placeholder="Nombre del paciente" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+            </div>
+            <div>
+                <label for="apellido" class="block text-sm font-medium text-gray-700">Apellido</label>
+                <input type="text" id="apellido" name="Apellido" placeholder="Apellido del paciente" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label for="altura" class="block text-sm font-medium text-gray-700">Altura (cm)</label>
+                    <input type="number" id="altura" name="Altura (cm)" placeholder="Ej: 175" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div>
+                    <label for="peso" class="block text-sm font-medium text-gray-700">Peso (kg)</label>
+                    <input type="number" id="peso" name="Peso (kg)" placeholder="Ej: 70" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+            </div>
+            <div>
+                <label for="circunferencia" class="block text-sm font-medium text-gray-700">Circunferencia de cintura (cm)</label>
+                <input type="number" id="circunferencia" name="Circunferencia de cintura (cm)" placeholder="Ej: 85" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+            </div>
+            <div>
+                <label for="presion_arterial" class="block text-sm font-medium text-gray-700">Presión Arterial (mmhg)</label>
+                <input type="text" id="presion_arterial" name="Presion Arterial (mmhg)" placeholder="Ej: 120/80" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+            </div>
+
+            <div>
+                <label for="agudeza_visual_pdf" class="block text-sm font-medium text-gray-700">Agudeza Visual (PDF)</label>
+                <input type="file" id="agudeza_visual_pdf" name="agudeza_visual_pdf" accept="application/pdf" class="mt-1 block w-full text-sm text-gray-500
+                    file:mr-4 file:py-2 file:px-4
+                    file:rounded-full file:border-0
+                    file:text-sm file:font-semibold
+                    file:bg-indigo-50 file:text-indigo-700
+                    hover:file:bg-indigo-100
+                ">
+            </div>
+            <div>
+                <label for="espirometria_pdf" class="block text-sm font-medium text-gray-700">Espirometría (PDF)</label>
+                <input type="file" id="espirometria_pdf" name="espirometria_pdf" accept="application/pdf" class="mt-1 block w-full text-sm text-gray-500
+                    file:mr-4 file:py-2 file:px-4
+                    file:rounded-full file:border-0
+                    file:text-sm file:font-semibold
+                    file:bg-indigo-50 file:text-indigo-700
+                    hover:file:bg-indigo-100
+                ">
+            </div>
+
+            <div class="flex justify-end space-x-4 pt-4">
+                <button type="submit" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                    <i class="fas fa-save mr-2"></i>Guardar Datos
+                </button>
+                <button type="reset" class="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
+                    <i class="fas fa-eraser mr-2"></i>Limpiar Formulario
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <script src="formulario-enfermeria.js"></script>
+</body>
+</html>
