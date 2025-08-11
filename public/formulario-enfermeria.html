@@ -17,7 +17,7 @@
         </div>
         <hr class="border-gray-300 mb-6">
 
-        <form id="formulario-enfermeria" class="space-y-6" enctype="multipart/form-data">
+        <form id="enfermeriaForm">
             <div>
                 <label for="dni" class="block text-sm font-medium text-gray-700">DNI</label>
                 <input type="text" id="dni" name="DNI" placeholder="DNI del paciente" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
@@ -51,24 +51,12 @@
             </div>
 
             <div>
-                <label for="agudeza_visual_pdf" class="block text-sm font-medium text-gray-700">Agudeza Visual (PDF)</label>
-                <input type="file" id="agudeza_visual_pdf" name="agudeza_visual_pdf" accept="application/pdf" class="mt-1 block w-full text-sm text-gray-500
-                    file:mr-4 file:py-2 file:px-4
-                    file:rounded-full file:border-0
-                    file:text-sm file:font-semibold
-                    file:bg-indigo-50 file:text-indigo-700
-                    hover:file:bg-indigo-100
-                ">
+                <label for="agudeza_visual_pdf" class="block text-sm font-medium text-gray-700">Agudeza Visual (Enlace a PDF)</label>
+                <input type="text" id="agudeza_visual_pdf" name="Agudeza Visual (Enlace a PDF)" placeholder="Pega aquí el enlace al PDF" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
             </div>
             <div>
-                <label for="espirometria_pdf" class="block text-sm font-medium text-gray-700">Espirometría (PDF)</label>
-                <input type="file" id="espirometria_pdf" name="espirometria_pdf" accept="application/pdf" class="mt-1 block w-full text-sm text-gray-500
-                    file:mr-4 file:py-2 file:px-4
-                    file:rounded-full file:border-0
-                    file:text-sm file:font-semibold
-                    file:bg-indigo-50 file:text-indigo-700
-                    hover:file:bg-indigo-100
-                ">
+                <label for="espirometria_pdf" class="block text-sm font-medium text-gray-700">Espirometria (Enlace a PDF)</label>
+                <input type="text" id="espirometria_pdf" name="Espirometria (Enlace a PDF)" placeholder="Pega aquí el enlace al PDF" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
             </div>
 
             <div class="flex justify-end space-x-4 pt-4">

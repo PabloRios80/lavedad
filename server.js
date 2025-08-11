@@ -1,8 +1,7 @@
 const express = require('express');
+const path = require('path');
 const { GoogleSpreadsheet } = require('google-spreadsheet');
 const { google } = require('googleapis');
-const multer = require('multer');
-const streamifier = require('streamifier');
 
 const app = express();
 const PORT = 3000;
@@ -13,49 +12,30 @@ app.use(express.static('public'));
 
 let doc;
 let credentials; // <--- La única declaración global de 'credentials'
-
-const upload = multer({ storage: multer.memoryStorage() });
-
-app.post('/api/enfermeria/guardar', upload.fields([
-    { name: 'agudeza_visual_pdf', maxCount: 1 },
-    { name: 'espirometria_pdf', maxCount: 1 }
-]), async (req, res) => {
+app.post('/api/enfermeria/guardar', async (req, res) => {
     try {
         if (!doc) {
             await initializeGoogleSheet();
         }
-        
+
         const sheet = doc.sheetsByTitle["Enfermeria"];
         if (!sheet) {
             return res.status(500).json({ message: 'Hoja de cálculo "Enfermeria" no encontrada.' });
         }
 
         const newRow = req.body;
-        
-        if (req.files) {
-            if (req.files.agudeza_visual_pdf) {
-                const pdfFile = req.files.agudeza_visual_pdf[0];
-                const pdfName = `Agudeza_Visual_${newRow.DNI}_${Date.now()}.pdf`;
-                const fileLink = await uploadFileToDrive(pdfFile.buffer, pdfName, pdfFile.mimetype);
-                newRow['Agudeza Visual (PDF)'] = fileLink;
-            }
-            if (req.files.espirometria_pdf) {
-                const pdfFile = req.files.espirometria_pdf[0];
-                const pdfName = `Espirometria_${newRow.DNI}_${Date.now()}.pdf`;
-                const fileLink = await uploadFileToDrive(pdfFile.buffer, pdfName, pdfFile.mimetype);
-                newRow['Espirometria (PDF)'] = fileLink;
-            }
-        }
-        
-        await sheet.addRow(newRow);
-        res.status(200).json({ message: 'Datos guardados correctamente.' });
 
+        // La variable `newRow` ya contiene los enlaces de los PDFs
+        // en los campos 'agudeza_visual_pdf' y 'espirometria_pdf'
+
+        await sheet.addRow(newRow);
+
+        res.status(200).json({ message: 'Datos guardados correctamente.' });
     } catch (error) {
         console.error('Error al guardar datos de enfermería:', error);
         res.status(500).json({ message: 'Error interno del servidor.' });
     }
 });
-
 // Función para inicializar el documento de Google Sheet y cargar su información
 async function initializeGoogleSheet() {
     try {
@@ -120,6 +100,7 @@ async function getDataFromSpecificSheet(sheetIdentifier) { // sheetIdentifier pu
         throw error; // Re-lanza el error para que sea manejado por la ruta que la llamó
     }
 }
+
 async function uploadFileToDrive(fileBuffer, fileName, mimeType) {
     const FOLDER_ID = '1JhWxc3eFhZaT3edEjiUM-vHY4Y9MgVy-';
 

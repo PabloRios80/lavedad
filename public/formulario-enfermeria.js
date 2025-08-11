@@ -1,11 +1,13 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const form = document.getElementById('formulario-enfermeria');
+    const form = document.getElementById('enfermeriaForm');
 
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
 
         // Crear un objeto FormData para incluir campos de texto y archivos
         const formData = new FormData(form);
+        // Convierte FormData a un objeto JSON
+        const data = Object.fromEntries(formData.entries());
 
         // Validar que los campos básicos no estén vacíos
         if (!formData.get('DNI') || !formData.get('Nombre') || !formData.get('Apellido')) {
@@ -15,9 +17,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             const response = await fetch('/api/enfermeria/guardar', {
-                method: 'POST',
-                body: formData // FormData se envía directamente con fetch
-            });
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json' // Especifica que el cuerpo es JSON
+        },
+        body: JSON.stringify(data) // Envía el objeto como una cadena JSON
+    });
 
             const result = await response.json();
 
