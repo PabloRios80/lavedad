@@ -381,8 +381,8 @@ app.post('/obtener-estudios-paciente', async (req, res) => {
             'Densitometria',
             'VCC',
             'Biopsia',
-            'Odontologia'
-            
+            'Odontologia',
+            'Enfermeria'
         ];
 
         // >>>>>>>> NUEVO: Definición de campos específicos para la hoja de Laboratorio <<<<<<<<
@@ -438,6 +438,31 @@ app.post('/obtener-estudios-paciente', async (req, res) => {
                             // >>>>>>>> IMPORTANTE: Para Laboratorio, enviamos los resultados específicos <<<<<<<<
                             ResultadosLaboratorio: labResultados // Objeto con todos los resultados de laboratorio
                         });
+
+                                 // --- NUEVA LÓGICA PARA LA HOJA 'Enfermeria' ---
+                    } else if (sheetName === 'Enfermeria') {
+                        // Obtenemos los campos específicos de Enfermeria
+                        const datosEnfermeria = {
+                            Altura: estudio['Altura (cm)'] || 'N/A',
+                            Peso: estudio['Peso (kg)'] || 'N/A',
+                            Circunferencia_cintura: estudio['Circunferencia de cintura (cm)'] || 'N/A',
+                            Presion_Arterial: estudio['Presion Arterial (mmhg)'] || 'N/A',
+                            // Asegúrate de que estos nombres de campos coincidan EXACTAMENTE con las columnas en Google Sheets
+                            Agudeza_Visual_PDF: estudio['Agudeza Visual (Enlace a PDF)'] || '',
+                            Espirometria_PDF: estudio['Espirometria (Enlace a PDF)'] || ''
+                        };
+
+                        estudiosEncontrados.push({
+                            TipoEstudio: sheetName,
+                            DNI: estudio['DNI'] || 'N/A',
+                            Nombre: estudio['Nombre'] || 'N/A',
+                            Apellido: estudio['Apellido'] || 'N/A',
+                            // Agrega otros campos si son relevantes
+                            Fecha: estudio['Fecha'] || 'N/A',
+                            Prestador: estudio['Prestador'] || 'N/A',
+                            ResultadosEnfermeria: datosEnfermeria // Un objeto que contiene todos los resultados de enfermería
+                        });
+
 
                     } else {
                         // Lógica para Mamografia, Ecografia, etc. (los que tienen Resultado y/o LinkPDF)

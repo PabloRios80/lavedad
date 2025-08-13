@@ -311,7 +311,41 @@ if (estudiosPrevios && estudiosPrevios.length > 0) {
         labResultsModalContent.innerHTML = tableHtml;
         labResultsModal.classList.remove('hidden'); // Muestra el modal
     }
+// >>> NUEVA FUNCIÓN PARA ABRIR EL MODAL DE ENFERMERIA <<<
+// ¡INSERTA ESTA FUNCIÓN AQUÍ, JUSTO DESPUÉS DE LA LLAVE DE CIERRE DE LA FUNCIÓN DE LABORATORIO!
+    function openEnfermeriaResultsModal(results) {
+        let tableHtml = `<h3 class="text-lg font-semibold mb-4 text-gray-800">Resultados de Enfermería</h3>`;
+        tableHtml += `<table class="min-w-full bg-white border border-gray-300">
+                    <thead>
+                        <tr class="bg-gray-100">
+                            <th class="py-2 px-4 border-b">Campo</th>
+                            <th class="py-2 px-4 border-b">Resultado</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
 
+        const camposEnfermeria = {
+            'Altura': results.Altura || 'N/A',
+            'Peso': results.Peso || 'N/A',
+            'Circunferencia cintura': results.Circunferencia_cintura || 'N/A',
+            'Presión Arterial': results.Presion_Arterial || 'N/A'
+        };
+
+        for (const campo in camposEnfermeria) {
+            tableHtml += `<tr>
+                            <td class="py-2 px-4 border-b text-gray-700">${campo}</td>
+                            <td class="py-2 px-4 border-b text-gray-900 font-medium">${camposEnfermeria[campo]}</td>
+                        </tr>`;
+        }
+
+        tableHtml += `</tbody></table>`;
+    
+        // Asumiendo que usas el mismo modal, simplemente rellenamos su contenido y lo mostramos
+        const labResultsModalContent = document.getElementById('lab-results-modal-content');
+        const labResultsModal = document.getElementById('lab-results-modal');
+        labResultsModalContent.innerHTML = tableHtml;
+        labResultsModal.classList.remove('hidden');
+    }
     if (verEstudiosBtn) {
         verEstudiosBtn.addEventListener('click', async () => {
             if (!currentPatientDNI) {
@@ -349,8 +383,8 @@ if (estudiosPrevios && estudiosPrevios.length > 0) {
                         </thead>
                         <tbody>
                     `;
-                    result.estudios.forEach((estudio, index) => { 
-                        console.log(`DEBUG (app.js - Procesando estudio ${index}):`, estudio);
+                    result.estudios.forEach((estudio, index) => {
+                        console.log(`DEBUG (app.js - Procesando estudio ${index}):`, JSON.stringify(estudio, null, 2));
 
                         const tipoEstudio = estudio.TipoEstudio || 'Desconocido';
                         const fechaEstudio = estudio.Fecha || 'N/A';
@@ -359,21 +393,31 @@ if (estudiosPrevios && estudiosPrevios.length > 0) {
                         let resultadoCeldaContent = '';
                         let informeCeldaContent = '';
 
-                        if (tipoEstudio === 'Laboratorio' && estudio.ResultadosLaboratorio && typeof estudio.ResultadosLaboratorio === 'object' && Object.keys(estudio.ResultadosLaboratorio).length > 0) {
+                        if (tipoEstudio === 'Laboratorio' && estudio.ResultadosLaboratorio && typeof estudio.ResultadosLaboratorio === 'object') {
                             resultadoCeldaContent = '<p class="text-gray-600 text-sm">Ver detalles en tabla.</p>';
-                            
-                            // Aseguramos que data-index se imprime correctamente
-                            informeCeldaContent = `<button type="button" class="ver-lab-results-btn bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded text-sm" 
-                                data-index="${index}">Ver Tabla Resultados</button>`; // Usamos index directamente aquí
-
+                            informeCeldaContent = `<button type="button" class="ver-lab-results-btn bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded text-sm" data-index="${index}">Ver Tabla Resultados</button>`;
+                        } else if (tipoEstudio === 'Enfermeria' && estudio.ResultadosEnfermeria) {
+                           // Nueva lógica para estudios de Enfermería: creamos un botón para el modal
+                            resultadoCeldaContent = `<button type="button" class="ver-enfermeria-results-btn bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-3 rounded text-sm" data-index="${index}">Ver Resultados</button>`;
+        
+                            let linksHtml = [];
+                            const resultadosEnfermeria = estudio.ResultadosEnfermeria;
+                            if (resultadosEnfermeria.Agudeza_Visual_PDF) {
+                            linksHtml.push(`<a href="${resultadosEnfermeria.Agudeza_Visual_PDF}" target="_blank" class="text-blue-500 hover:underline">Ver Agudeza Visual</a>`);
+                            }
+                            if (resultadosEnfermeria.Espirometria_PDF) {
+                            linksHtml.push(`<a href="${resultadosEnfermeria.Espirometria_PDF}" target="_blank" class="text-blue-500 hover:underline">Ver Espirometria</a>`);
+                            }
+                            informeCeldaContent = linksHtml.length > 0 ? linksHtml.join('<br>') : '<span class="text-gray-500">No disponible</span>';
                         } else {
-                            // >>>>>>> CORRECCIÓN CRÍTICA AQUÍ: LinkPDF en lugar de LinkPdf <<<<<<<
-                            const linkPdf = estudio.LinkPDF && String(estudio.LinkPDF).trim() !== '' && String(estudio.LinkPDF).trim().toLowerCase() !== 'n/a' ? estudio.LinkPDF : null;
+                         // Lógica para el resto de los estudios
+                            resultadoCeldaContent = estudio.Resultado || 'N/A';
+                            const linkPdf = estudio.LinkPDF && String(estudio.LinkPDF).trim() !== '' ? estudio.LinkPDF : null;
                             informeCeldaContent = linkPdf ?
                                 `<a href="${linkPdf}" target="_blank" class="text-blue-500 hover:underline">Ver PDF <i class="fas fa-external-link-alt ml-1"></i></a>` :
                                 '<span class="text-gray-500">No disponible</span>';
                         }
-
+    
                         estudiosHtml += `
                             <tr class="hover:bg-gray-50">
                                 <td class="px-4 py-2 border">${tipoEstudio}</td>
@@ -383,18 +427,19 @@ if (estudiosPrevios && estudiosPrevios.length > 0) {
                                 <td class="px-4 py-2 border text-center">${informeCeldaContent}</td>
                             </tr>
                         `;
-                    });
+});
+
                     estudiosHtml += `</tbody></table>`;
                     resultadosEstudiosPacienteDiv.innerHTML = estudiosHtml;
 
-                    // >>> DELEGACIÓN DE EVENTOS PARA BOTONES DE LABORATORIO <<<
+                    // DELEGACIÓN DE EVENTOS PARA BOTONES DE LABORATORIO y ENFERMERÍA
                     // Adjuntamos un solo listener al contenedor principal de resultados
                     resultadosEstudiosPacienteDiv.addEventListener('click', (event) => {
-                        // Verificamos si el clic fue en un botón con la clase 'ver-lab-results-btn'
+                       // Verificamos si el clic fue en un botón de Laboratorio
                         if (event.target.classList.contains('ver-lab-results-btn')) {
                             const button = event.target;
                             const index = parseInt(button.dataset.index, 10); 
-                            
+        
                             console.log('DEBUG (app.js): Botón de Laboratorio clicado, index:', index);
 
                             if (!isNaN(index) && allFetchedStudies[index]) {
@@ -407,12 +452,31 @@ if (estudiosPrevios && estudiosPrevios.length > 0) {
                                     alert('El estudio de laboratorio encontrado no contiene la propiedad "ResultadosLaboratorio".');
                                     console.error('ERROR: El estudio de laboratorio en el índice', index, 'no tiene ResultadosLaboratorio:', labStudy);
                                 }
-                            } else {
-                                alert('Error al identificar el estudio de laboratorio. Intente de nuevo.');
-                                console.error('ERROR: No se pudo obtener un índice válido para el estudio de laboratorio clicado. Index:', index);
-                            }
+                        } else {
+                            alert('Error al identificar el estudio de laboratorio. Intente de nuevo.');
+                            console.error('ERROR: No se pudo obtener un índice válido para el estudio de laboratorio clicado. Index:', index);
                         }
-                    });
+                    } 
+    // Si el clic no fue en un botón de Laboratorio, verificamos si fue en uno de Enfermería
+                    else if (event.target.classList.contains('ver-enfermeria-results-btn')) {
+                        const button = event.target;
+                        const index = parseInt(button.dataset.index, 10);
+        
+                        if (!isNaN(index) && allFetchedStudies[index]) {
+                            const enfermeriaStudy = allFetchedStudies[index];
+                            if (enfermeriaStudy.ResultadosEnfermeria) {
+                // Llamamos a la nueva función del modal de enfermería
+                            openEnfermeriaResultsModal(enfermeriaStudy.ResultadosEnfermeria);
+                        } else {
+                            alert('El estudio de enfermería no contiene la propiedad "ResultadosEnfermeria".');
+                            console.error('ERROR: Estudio de enfermería sin ResultadosEnfermeria:', enfermeriaStudy);
+                        }
+                    } else {
+                        alert('Error al identificar el estudio de enfermería. Intente de nuevo.');
+                        console.error('ERROR: No se pudo obtener un índice válido para el estudio de enfermería clicado. Index:', index);
+                    }
+                }
+            });
 
                 } else {
                     resultadosEstudiosPacienteDiv.innerHTML = `<p class="text-gray-600">No se encontraron estudios complementarios para este paciente.</p>`;
