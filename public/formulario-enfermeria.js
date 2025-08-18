@@ -1,34 +1,84 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Definición de elementos del DOM
     const form = document.getElementById('enfermeriaForm');
+    const formStepsContainer = document.getElementById('form-steps-container');
+    const steps = document.querySelectorAll('.form-step');
+    const progressBar = document.getElementById('progress-bar');
+    const prevBtn = document.getElementById('prev-step-btn');
+    const nextBtn = document.getElementById('next-step-btn');
+    const guardarBtn = document.getElementById('guardar-enfermeria-btn');
 
+    // Variables de estado
+    let currentStep = 0;
+    const totalSteps = steps.length;
+
+    // Función para mostrar el paso actual y actualizar la barra de progreso
+    function showStep(stepIndex) {
+        steps.forEach((step, index) => {
+            if (index === stepIndex) {
+                step.classList.remove('hidden');
+            } else {
+                step.classList.add('hidden');
+            }
+        });
+
+        // Actualiza la barra de progreso
+        const progress = (stepIndex + 1) / totalSteps * 100;
+        progressBar.style.width = `${progress}%`;
+
+        // Muestra/oculta los botones de navegación
+        prevBtn.classList.toggle('hidden', stepIndex === 0);
+        nextBtn.classList.toggle('hidden', stepIndex === totalSteps - 1);
+        guardarBtn.classList.toggle('hidden', stepIndex !== totalSteps - 1);
+    }
+
+    // Eventos para los botones de navegación de pasos
+    nextBtn.addEventListener('click', () => {
+        currentStep++;
+        showStep(currentStep);
+    });
+
+    prevBtn.addEventListener('click', () => {
+        currentStep--;
+        showStep(currentStep);
+    });
+ // Evento para el envío del formulario final
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
 
-        // Crear un objeto FormData para incluir campos de texto y archivos
+        // 1. Obtener los datos de los campos DNI, Nombre y Apellido manualmente
+        const dni = document.getElementById('dni').value;
+        const nombre = document.getElementById('nombre').value;
+        const apellido = document.getElementById('apellido').value;
+
+        // 2. Obtener el resto de los datos del formulario
         const formData = new FormData(form);
-        // Convierte FormData a un objeto JSON
-        const data = Object.fromEntries(formData.entries());
+        const formValues = Object.fromEntries(formData.entries());
 
-        // Validar que los campos básicos no estén vacíos
-        if (!formData.get('DNI') || !formData.get('Nombre') || !formData.get('Apellido')) {
-            alert('Por favor, completa los campos de DNI, Nombre y Apellido.');
-            return;
-        }
-
+        // 3. Unir todos los datos en un solo objeto
+        const finalData = {
+            DNI: dni,
+            Nombre: nombre,
+            Apellido: apellido,
+            ...formValues,
+        };
+        
         try {
             const response = await fetch('/api/enfermeria/guardar', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json' // Especifica que el cuerpo es JSON
-        },
-        body: JSON.stringify(data) // Envía el objeto como una cadena JSON
-    });
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(finalData)
+            });
 
             const result = await response.json();
 
             if (response.ok) {
                 alert('Datos de enfermería guardados correctamente.');
-                form.reset(); // Limpiar el formulario después del éxito
+                form.reset();
+                currentStep = 0;
+                showStep(currentStep);
             } else {
                 alert(`Error al guardar los datos: ${result.message}`);
             }
@@ -37,4 +87,8 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('Ocurrió un error al intentar guardar los datos.');
         }
     });
+
+    // Muestra el formulario directamente, sin buscar DNI
+    form.classList.remove('hidden');
+    showStep(0);
 });
