@@ -1,6 +1,18 @@
 // Aumentar el límite de memoria de Node.js
 const v8 = require('v8');
 v8.setFlagsFromString('--max-old-space-size=4096'); // 4GB
+
+
+// Manejo de errores no capturados
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+
 const express = require('express');
 const path = require('path');
 const { GoogleSpreadsheet } = require('google-spreadsheet');
