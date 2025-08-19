@@ -4,14 +4,27 @@ const { GoogleSpreadsheet } = require('google-spreadsheet');
 const { google } = require('googleapis');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000; // Usa el puerto que Render te asigne o el 3000 para local
 const SPREADSHEET_ID = '15YPfBG9PBfN3nBW5xXJYjIXEgYIS9z71pI0VpeCtAAU';
+// Determina la URL base de la API
+const API_BASE_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+
+// Nueva ruta para que el frontend obtenga la URL base de la API
+app.get('/api/config', (req, res) => {
+    res.json({ apiBaseUrl: API_BASE_URL });
+});
 
 app.use(express.json());
 app.use(express.static('public'));
 
 let doc;
 let credentials; // <--- La única declaración global de 'credentials'
+
+// Iniciar el servidor
+app.listen(PORT, () => {
+    console.log(`Servidor escuchando en ${API_BASE_URL}`);
+});
+
 app.post('/api/enfermeria/guardar', async (req, res) => {
     try {
         if (!doc) {

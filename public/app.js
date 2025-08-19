@@ -19,6 +19,24 @@ function resetProfile() {
 const PENDING_KEYWORDS_FOR_VISUALS = ['no se realiza', 'no registrado'];
 const NOT_APPLICABLE_KEYWORDS = ['no aplica']; // Nueva lista para "No aplica"
 
+// Variable global para almacenar la URL base
+let apiBaseUrl = '';
+
+// Función para obtener la configuración del servidor
+async function fetchApiConfig() {
+    try {
+        const response = await fetch('/api/config');
+        const config = await response.json();
+        apiBaseUrl = config.apiBaseUrl;
+        console.log(`URL base de la API establecida: ${apiBaseUrl}`);
+    } catch (error) {
+        console.error('Error al obtener la configuración de la API:', error);
+        // Fallback en caso de error
+        apiBaseUrl = 'http://localhost:3000';
+    }
+}
+
+
 document.addEventListener('DOMContentLoaded', () => {
     const consultarBtn = document.getElementById('consultar');
     const dniInput = document.getElementById('dni');
@@ -55,7 +73,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentPatientDNI = null; // Asumiendo que esta variable ya existe y se actualiza en la función consultarDNI
     
     let allFetchedStudies = []; // Almacenará todos los estudios para poder accederlos por ID
-    
+
+        
     if (!estudiosComplementariosSeccion || !verEstudiosBtn || !resultadosEstudiosPacienteDiv) {
         console.warn('Algunos elementos DOM para estudios complementarios no se encontraron. Asegúrate de que index.html los tenga.');
     }
