@@ -328,7 +328,8 @@ if (estudiosPrevios && estudiosPrevios.length > 0) {
             'Altura': results.Altura || 'N/A',
             'Peso': results.Peso || 'N/A',
             'Circunferencia cintura': results.Circunferencia_cintura || 'N/A',
-            'Presión Arterial': results.Presion_Arterial || 'N/A'
+            'Presión Arterial': results.Presion_Arterial || 'N/A',
+            'Vacunas': results.Vacunas || 'N/A'
         };
 
         for (const campo in camposEnfermeria) {

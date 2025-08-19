@@ -443,14 +443,14 @@ app.post('/obtener-estudios-paciente', async (req, res) => {
                     } else if (sheetName === 'Enfermeria') {
                         // Obtenemos los campos específicos de Enfermeria
                         const datosEnfermeria = {
-                            Altura: estudio['Altura (cm)'] || 'N/A',
-                            Peso: estudio['Peso (kg)'] || 'N/A',
-                            Circunferencia_cintura: estudio['Circunferencia de cintura (cm)'] || 'N/A',
-                            Presion_Arterial: estudio['Presion Arterial (mmhg)'] || 'N/A',
-                            // Asegúrate de que estos nombres de campos coincidan EXACTAMENTE con las columnas en Google Sheets
-                            Agudeza_Visual_PDF: estudio['Agudeza Visual (Enlace a PDF)'] || '',
-                            Espirometria_PDF: estudio['Espirometria (Enlace a PDF)'] || ''
-                        };
+                            Altura: estudio['Altura (cm)'] || 'N/A',
+                            Peso: estudio['Peso (kg)'] || 'N/A',
+                            Circunferencia_cintura: estudio['Circunferencia de cintura (cm)'] || 'N/A',
+                            Presion_Arterial: estudio['Presion Arterial (mmhg)'] || 'N/A',
+                            Vacunas: estudio['Vacunas'] || 'N/A', // <-- ¡Agrega esta línea!
+                            Agudeza_Visual_PDF: estudio['Agudeza Visual (Enlace a PDF)'] || '',
+                            Espirometria_PDF: estudio['Espirometria (Enlace a PDF)'] || ''
+                        };
 
                         estudiosEncontrados.push({
                             TipoEstudio: sheetName,

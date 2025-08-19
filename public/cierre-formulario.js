@@ -38,11 +38,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Definición de los campos del formulario con iconos
     const fieldsConfig = [
-        { name: 'Presion_Arterial', label: 'Presión Arterial', type: 'select', options: ['Control Normal', 'Hipertensión', 'No se realiza'], required: true, icon: 'fas fa-heartbeat' },
+        { name: 'Presion_Arterial', label: 'Presión Arterial', type: 'select', options: ['Control Normal', 'Hipertensión', 'No se realiza'], hasStudyButton: true, studyType: 'Enfermeria', required: true, icon: 'fas fa-heartbeat' },
         { name: 'Observaciones_Presion_Arterial', label: 'Obs. Presión Arterial', type: 'textarea', required: false, icon: 'fas fa-comment' },
-        { name: 'IMC', label: 'IMC', type: 'select', options: ['Bajo Peso', 'Control Normal', 'Sobrepeso', 'Obesidad', 'Obesidad Grado II', 'Obesidad Mórbida', 'No se realiza'], required: true, icon: 'fas fa-weight' },
+        { name: 'IMC', label: 'IMC', type: 'select', options: ['Bajo Peso', 'Control Normal', 'Sobrepeso', 'Obesidad', 'Obesidad Grado II', 'Obesidad Mórbida', 'No se realiza'], hasStudyButton: true, studyType: 'Enfermeria', required: true, icon: 'fas fa-weight' },
         { name: 'Observaciones_IMC', label: 'Obs. IMC', type: 'textarea', required: false, icon: 'fas fa-comment' },
-        { name: 'Agudeza_visual', label: 'Agudeza Visual', type: 'select', options: ['Alterada', 'Control Normal', 'No se realiza'], required: true, icon: 'fas fa-eye' },
+        { name: 'Agudeza_visual', label: 'Agudeza Visual', type: 'select', options: ['Alterada', 'Control Normal', 'No se realiza'], hasStudyButton: true, studyType: 'Enfermeria', required: true, icon: 'fas fa-eye' },
         { name: 'Observaciones_Agudeza_visual', label: 'Obs. Agudeza Visual', type: 'textarea', required: false, icon: 'fas fa-comment' },
         { name: 'Control_odontologico', label: 'Control Odontológico', type: 'select', options: ['Control Normal', 'No se realiza', 'Riesgo'], hasStudyButton: true, studyType: 'Odontologia', required: true, icon: 'fas fa-tooth' },
         { name: 'Observaciones_Control_odontologico', label: 'Obs. Control Odontológico', type: 'textarea', required: false, icon: 'fas fa-comment' },
@@ -88,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
         { name: 'Observaciones_Mamografia', label: 'Obs. Mamografía', type: 'textarea', required: false, icon: 'fas fa-comment' },
         { name: 'ERC', label: 'ERC', type: 'select', options: ['Normal', 'Pendiente', 'No se realiza', 'Patologico'], hasStudyButton: true, studyType: 'Laboratorio', required: true, icon: 'fas fa-kidneys' },
         { name: 'Observaciones_ECG', label: 'Obs. ECG', type: 'textarea', required: false, icon: 'fas fa-comment' },
-        { name: 'EPOC', label: 'EPOC', type: 'select', options: ['Se verifica', 'No se verifica', 'No se realiza'], required: true, icon: 'fas fa-lungs' },
+        { name: 'EPOC', label: 'EPOC', type: 'select', options: ['Se verifica', 'No se verifica', 'No se realiza'], hasStudyButton: true, studyType: 'Espirometria', required: true, icon: 'fas fa-lungs' },
         { name: 'Observaciones_EPOC', label: 'Obs. EPOC', type: 'textarea', required: false, icon: 'fas fa-comment' },
         { name: 'Aneurisma_aorta', label: 'Aneurisma Aorta', type: 'select', options: ['Se verifica', 'No se verifica', 'No se realiza'], hasStudyButton: true, studyType: 'Ecografia', required: true, icon: 'fas fa-heart' },
         { name: 'Observaciones_Aneurisma_aorta', label: 'Obs. Aneurisma Aorta', type: 'textarea', required: false, icon: 'fas fa-comment' },
@@ -98,7 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
         { name: 'Observaciones_Riesgo_CV', label: 'Obs. Riesgo CV', type: 'textarea', required: false, icon: 'fas fa-comment' },
         { name: 'Aspirina', label: 'Aspirina', type: 'select', options: ['Indicado', 'No indicado'], required: true, icon: 'fas fa-prescription-bottle-alt' },
         { name: 'Observaciones_Aspirina', label: 'Obs. Aspirina', type: 'textarea', required: false, icon: 'fas fa-comment' },
-        { name: 'Inmunizaciones', label: 'Inmunizaciones', type: 'select', options: ['Completo', 'Incompleto'], required: true, icon: 'fas fa-syringe' },
+        { name: 'Inmunizaciones', label: 'Inmunizaciones', type: 'select', options: ['Completo', 'Incompleto'], hasStudyButton: true, studyType: 'Enfermeria', required: true, icon: 'fas fa-syringe' },
         { name: 'Observaciones_Inmunizaciones', label: 'Obs. Inmunizaciones', type: 'textarea', required: false, icon: 'fas fa-comment' },
         { name: 'VDRL', label: 'VDRL', type: 'select', options: ['Negativo', 'Positivo', 'No aplica', 'Pendiente'], hasStudyButton: true, studyType: 'Laboratorio', required: true, icon: 'fas fa-vial' },
         { name: 'Observaciones_VDRL', label: 'Obs. VDRL', type: 'textarea', required: false, icon: 'fas fa-comment' },
@@ -417,70 +417,102 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 // --- FUNCIÓN GLOBAL PARA MOSTRAR ESTUDIOS EN UN MODAL ---
-    // Esta función será llamada por los botones "Ver Estudio"
-    async function mostrarEstudiosModal(dni, studyType) {
-        if (!dni) {
-            alert('DNI del paciente no disponible para ver estudios.');
-            return;
-        }
-
-        modalDNI.textContent = `DNI: ${dni} - Tipo: ${studyType}`;
-        estudiosModalContent.innerHTML = '<p class="text-center text-gray-500">Cargando estudios...</p>';
-        estudiosModal.classList.remove('hidden'); // Mostrar el modal
-
-        try {
-            const response = await fetch('/obtener-estudios-paciente', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ dni: dni })
-            });
-            const data = await response.json();
-
-            estudiosModalContent.innerHTML = ''; // Limpiar el contenido de carga
-
-            if (data.success && data.estudios.length > 0) {
-                const filteredStudies = data.estudios.filter(s => s.TipoEstudio === studyType);
-                
-                if (filteredStudies.length > 0) {
-                    filteredStudies.forEach(estudio => {
-                        const estudioCard = document.createElement('div');
-                        estudioCard.className = 'bg-blue-50 p-4 rounded-lg shadow-sm border border-blue-200';
-                        
-                        let contentHtml = `<h4 class="font-bold text-blue-700 mb-2">${estudio.TipoEstudio} - Fecha: ${estudio.Fecha || 'N/A'}</h4>`;
-                        contentHtml += `<p><strong>Prestador:</strong> ${estudio.Prestador || 'N/A'}</p>`;
-
-                        if (estudio.TipoEstudio === 'Laboratorio' && estudio.ResultadosLaboratorio) {
-                            contentHtml += `<p class="font-semibold mt-2">Resultados de Laboratorio:</p>`;
-                            contentHtml += `<ul class="list-disc list-inside ml-4">`;
-                            for (const key in estudio.ResultadosLaboratorio) {
-                                contentHtml += `<li><strong>${key}:</strong> ${estudio.ResultadosLaboratorio[key]}</li>`;
-                            }
-                            contentHtml += `</ul>`;
-                        } else {
-                            contentHtml += `<p><strong>Resultado:</strong> ${estudio.Resultado || 'N/A'}</p>`;
-                            if (estudio.Observaciones) { // Para odontología y otros que puedan tener obs
-                                contentHtml += `<p><strong>Observaciones:</strong> ${estudio.Observaciones}</p>`;
-                            }
-                        }
-
-                        if (estudio.LinkPDF) {
-                            contentHtml += `<p class="mt-2"><a href="${estudio.LinkPDF}" target="_blank" class="text-blue-600 hover:underline"><i class="fas fa-file-pdf mr-1"></i>Ver PDF</a></p>`;
-                        }
-                        estudioCard.innerHTML = contentHtml;
-                        estudiosModalContent.appendChild(estudioCard);
-                    });
-                } else {
-                    estudiosModalContent.innerHTML = `<p class="text-center text-gray-600">No se encontraron estudios de tipo "${studyType}" para este DNI.</p>`;
-                }
-            } else {
-                estudiosModalContent.innerHTML = `<p class="text-center text-gray-600">${data.message || 'No se encontraron estudios para este DNI.'}</p>`;
-            }
-        } catch (error) {
-            console.error('Error al obtener estudios para el modal:', error);
-            estudiosModalContent.innerHTML = `<p class="text-center text-red-600">Error al cargar los estudios. Intente nuevamente.</p>`;
-        }
+// Esta función será llamada por los botones "Ver Estudio"
+async function mostrarEstudiosModal(dni, studyType) {
+    if (!dni) {
+        alert('DNI del paciente no disponible para ver estudios.');
+        return;
     }
 
+    modalDNI.textContent = `DNI: ${dni} - Tipo: ${studyType}`;
+    estudiosModalContent.innerHTML = '<p class="text-center text-gray-500">Cargando estudios...</p>';
+    estudiosModal.classList.remove('hidden'); // Mostrar el modal
+
+    try {
+        const response = await fetch('/obtener-estudios-paciente', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dni: dni })
+        });
+        const data = await response.json();
+
+        estudiosModalContent.innerHTML = ''; // Limpiar el contenido de carga
+
+        if (data.success && data.estudios.length > 0) {
+            const filteredStudies = data.estudios.filter(s => s.TipoEstudio === studyType);
+            
+            if (filteredStudies.length > 0) {
+                filteredStudies.forEach(estudio => {
+                    const estudioCard = document.createElement('div');
+                    estudioCard.className = 'bg-blue-50 p-4 rounded-lg shadow-sm border border-blue-200 mb-4';
+                    
+                    let contentHtml = `<h4 class="font-bold text-blue-700 mb-2">${estudio.TipoEstudio} - Fecha: ${estudio.Fecha || 'N/A'}</h4>`;
+                    contentHtml += `<p><strong>Prestador:</strong> ${estudio.Prestador || 'N/A'}</p>`;
+
+                    // LÓGICA UNIFICADA PARA RESULTADOS DETALLADOS
+                    const resultados = estudio.ResultadosLaboratorio || estudio.ResultadosEnfermeria;
+                    
+                    if (resultados) {
+                        const tituloResultados = estudio.TipoEstudio === 'Laboratorio' ? 'Resultados de Laboratorio' : 'Resultados de Enfermería';
+                        contentHtml += `<p class="font-semibold mt-2">${tituloResultados}:</p>`;
+                        contentHtml += `<ul class="list-disc list-inside ml-4">`;
+
+                        for (const key in resultados) {
+                            let value = resultados[key];
+                            if (!value || String(value).trim() === '') {
+                                value = 'N/A';
+                            }
+                            
+                            // Manejo de enlaces PDF dentro de los resultados detallados
+                            if ((key === 'Agudeza_Visual_PDF' || key === 'Espirometria_PDF') && value !== 'N/A') {
+                                const label = key.replace(/_/g, ' ').replace('PDF', '').trim();
+                                contentHtml += `<li><strong>${label}:</strong> <a href="${value}" target="_blank" class="text-blue-600 hover:underline"><i class="fas fa-file-pdf mr-1"></i>Ver Informe</a></li>`;
+                            } 
+                            // Manejo especial para IMC (cálculo)
+                            else if (key === 'Peso') {
+                                const alturaCm = parseFloat(resultados.Altura);
+                                const pesoKg = parseFloat(value);
+                                
+                                if (!isNaN(alturaCm) && !isNaN(pesoKg) && alturaCm > 0) {
+                                    const imc = (pesoKg / ((alturaCm / 100) ** 2)).toFixed(2);
+                                    contentHtml += `<li><strong>IMC:</strong> ${imc}</li>`;
+                                }
+                                contentHtml += `<li><strong>Peso:</strong> ${value} kg</li>`;
+                            }
+                            // Ignorar el campo Altura para evitar duplicados en la lista cuando se calcula el IMC
+                            else if (key === 'Altura') {
+                                contentHtml += `<li><strong>Altura:</strong> ${value} cm</li>`;
+                            }
+                            else {
+                                const label = key.replace(/_/g, ' ');
+                                contentHtml += `<li><strong>${label}:</strong> ${value}</li>`;
+                            }
+                        }
+                        contentHtml += `</ul>`;
+
+                    } else if (estudio.LinkPDF) { // Lógica para estudios con un solo PDF (ej. Mamografía)
+                        contentHtml += `<p class="mt-2"><a href="${estudio.LinkPDF}" target="_blank" class="text-blue-600 hover:underline"><i class="fas fa-file-pdf mr-1"></i>Ver PDF</a></p>`;
+                    } else { // Lógica para el resto de los estudios (ej. Odontologia)
+                        contentHtml += `<p><strong>Resultado:</strong> ${estudio.Resultado || 'N/A'}</p>`;
+                        if (estudio.Observaciones) {
+                            contentHtml += `<p><strong>Observaciones:</strong> ${estudio.Observaciones}</p>`;
+                        }
+                    }
+
+                    estudioCard.innerHTML = contentHtml;
+                    estudiosModalContent.appendChild(estudioCard);
+                });
+            } else {
+                estudiosModalContent.innerHTML = `<p class="text-center text-gray-600">No se encontraron estudios de tipo "${studyType}" para este DNI.</p>`;
+            }
+        } else {
+            estudiosModalContent.innerHTML = `<p class="text-center text-gray-600">${data.message || 'No se encontraron estudios para este DNI.'}</p>`;
+        }
+    } catch (error) {
+        console.error('Error al obtener estudios para el modal:', error);
+        estudiosModalContent.innerHTML = `<p class="text-center text-red-600">Error al cargar los estudios. Intente nuevamente.</p>`;
+    }
+}
     // Eventos para cerrar el modal
     closeModalBtn.addEventListener('click', () => {
         estudiosModal.classList.add('hidden');
