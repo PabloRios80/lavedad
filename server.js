@@ -1,8 +1,10 @@
+// Aumentar el límite de memoria de Node.js
+const v8 = require('v8');
+v8.setFlagsFromString('--max-old-space-size=4096'); // 4GB
 const express = require('express');
 const path = require('path');
 const { GoogleSpreadsheet } = require('google-spreadsheet');
 const { google } = require('googleapis');
-const streamifier = require('streamifier'); // Necesario para la subida de archivos si lo usas
 const app = express();
 const PORT = process.env.PORT || 3000; // Usa el puerto que Render te asigne o el 3000 para local
 const SPREADSHEET_ID = '15YPfBG9PBfN3nBW5xXJYjIXEgYIS9z71pI0VpeCtAAU';
@@ -72,29 +74,32 @@ async function initializeGoogleSheet() {
 }
 
 
-// Función para obtener todos los datos de una hoja específica
-async function getDataFromSpecificSheet(sheetIdentifier) {
+// Función para obtener todos los datos de una hoja específica (por nombre o índice)
+// Usaremos esta función para ambas: la hoja principal y las hojas de estudios.
+async function getDataFromSpecificSheet(sheetIdentifier) { // sheetIdentifier puede ser el nombre o el índice
     if (!doc) {
         throw new Error('Google Sheet document not initialized. Call initializeGoogleSheet() first.');
     }
     try {
         let sheet;
         if (typeof sheetIdentifier === 'string') {
-            sheet = doc.sheetsByTitle[sheetIdentifier];
+            sheet = doc.sheetsByTitle[sheetIdentifier]; // Busca por nombre
         } else if (typeof sheetIdentifier === 'number') {
-            sheet = doc.sheetsByIndex[sheetIdentifier];
+            sheet = doc.sheetsByIndex[sheetIdentifier]; // Busca por índice
         }
 
         if (!sheet) {
             console.warn(`Hoja "${sheetIdentifier}" no encontrada en el documento.`);
-            return null; // Devuelve null en lugar de un array vacío para un mejor manejo de errores
+            return [];
         }
 
-        await sheet.loadHeaderRow();
-        const rows = await sheet.getRows();
+        await sheet.loadHeaderRow(); // Carga la fila de encabezados de esta hoja
+        const rows = await sheet.getRows(); // Obtiene todas las filas de datos
+
         const allData = rows.map(row => {
             const rowData = {};
             sheet.headerValues.forEach(header => {
+                // Maneja valores nulos o indefinidos, devolviendo una cadena vacía
                 rowData[header] = row[header] || '';
             });
             return rowData;
@@ -102,7 +107,7 @@ async function getDataFromSpecificSheet(sheetIdentifier) {
         return allData;
     } catch (error) {
         console.error(`Error al leer la hoja de cálculo "${sheetIdentifier}":`, error);
-        throw error;
+        throw error; // Re-lanza el error para que sea manejado por la ruta que la llamó
     }
 }
 
@@ -178,18 +183,13 @@ app.get('/obtener-opciones-campo/:campo', async (req, res) => {
     }
 });
 
-// Ruta para buscar un paciente por DNI
+// --- RUTA PRINCIPAL DE BÚSQUEDA - /buscar ---
 app.post('/buscar', async (req, res) => {
     try {
-        const { dni } = req.body;
-        const allData = await getDataFromSpecificSheet('Hoja 1');
-        if (!allData) {
-            return res.status(500).json({ error: 'La hoja principal de datos no fue encontrada.' });
-        }
-        
-        // El resto de tu lógica de búsqueda (la que tenías, es correcta)
-        const dniABuscar = String(dni).trim();
-        const NOMBRE_COLUMNA_FECHA = 'Fecha_cierre_DP'; 
+        const allData = await getDataFromSpecificSheet(0); // Suponiendo que los datos del Día Preventivo están en la hoja 0
+        const dniABuscar = String(req.body.dni).trim();
+
+        const NOMBRE_COLUMNA_FECHA = 'Fecha_cierre_DP'; // Asegúrate de que este es el nombre exacto de la columna de fecha
 
         const parseDateDDMMYYYY = (dateString) => {
             if (!dateString) return new Date(NaN);
@@ -204,14 +204,18 @@ app.post('/buscar', async (req, res) => {
             return new Date(NaN);
         };
 
+        // 1. Filtrar TODOS los registros para el DNI
         const resultadosParaDNI = allData.filter(patient =>
             String(patient['DNI'] || patient['Documento'] || '').trim() === dniABuscar
         );
 
         if (resultadosParaDNI.length === 0) {
+            console.log(`SERVER: DNI ${dniABuscar} no encontrado.`);
+            // Cuando no se encuentra, devolvemos un objeto con 'error'
             return res.json({ error: 'DNI no encontrado.' }); 
         }
 
+        // 2. Ordenar los resultados por fecha (más reciente primero)
         resultadosParaDNI.sort((a, b) => {
             const dateA = parseDateDDMMYYYY(a[NOMBRE_COLUMNA_FECHA]);
             const dateB = parseDateDDMMYYYY(b[NOMBRE_COLUMNA_FECHA]);
@@ -223,15 +227,24 @@ app.post('/buscar', async (req, res) => {
             return dateB.getTime() - dateA.getTime(); 
         });
 
+        // El primer elemento es el más reciente (el que se mostrará como principal)
         const pacientePrincipal = resultadosParaDNI[0];
+        
+        // Los estudios previos son todos los demás, si existen.
+        // Mapeamos solo la fecha para el cartel informativo.
         const estudiosPrevios = resultadosParaDNI.slice(1).map(estudio => ({
             fecha: estudio[NOMBRE_COLUMNA_FECHA] || 'Fecha desconocida'
         }));
 
+        console.log(`SERVER: DNI ${dniABuscar} encontrado. Enviando el más reciente y ${estudiosPrevios.length} estudios previos.`);
+
+        // 3. ¡LA CLAVE! Enviamos un objeto con dos propiedades claras.
+        // Esto evita que tu frontend se confunda sobre dónde están los datos principales.
         res.json({
             pacientePrincipal: pacientePrincipal,
             estudiosPrevios: estudiosPrevios
         });
+
     } catch (error) {
         console.error('Error en servidor al buscar paciente por DNI:', error);
         res.status(500).json({
@@ -240,7 +253,6 @@ app.post('/buscar', async (req, res) => {
         });
     }
 });
-
 
 // Ruta para consultas grupales (usada en estadisticas.html)
 app.post('/consultar-grupo', async (req, res) => {
@@ -646,7 +658,7 @@ app.post('/api/cierre/guardar', async (req, res) => {
 // El servidor no empezará a escuchar peticiones hasta que la conexión con la hoja esté lista.
 initializeGoogleSheet().then(() => {
     app.listen(PORT, () => {
-        console.log(`✅ Servidor funcionando en ${API_BASE_URL}`);
+        console.log(`✅ Servidor funcionando en http://localhost:${PORT}`);
     });
 }).catch(err => {
     console.error('❌ Fallo al iniciar el servidor debido a un error de inicialización de Google Sheet:', err);
