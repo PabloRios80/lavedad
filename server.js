@@ -1,7 +1,62 @@
-// Aumentar el límite de memoria de Node.js
+// ====================================================================
+// OPTIMIZACIÓN EXTREMA DE MEMORIA - AGREGAR AL PRINCIPIO
+// ====================================================================
 const v8 = require('v8');
-v8.setFlagsFromString('--max-old-space-size=4096'); // 4GB
+v8.setFlagsFromString('--max-old-space-size=8192'); // 8GB
 
+// Limitar el tamaño del heap de Node.js
+const heapSizeLimit = 8192 * 1024 * 1024; // 8GB en bytes
+if (process.memoryUsage().heapTotal > heapSizeLimit) {
+    console.warn('⚠️  Memoria cerca del límite, forzando garbage collection');
+    global.gc();
+}
+
+// Garbage collection automático cada 30 segundos
+setInterval(() => {
+    if (global.gc) {
+        global.gc();
+        console.log('🧹 Garbage collection ejecutado');
+    }
+}, 30000);
+
+// ====================================================================
+// FUNCIÓN HIPER-OPTIMIZADA PARA GOOGLE SHEETS
+// ====================================================================
+async function getUltraOptimizedSheetData(sheetIdentifier, filters = {}) {
+    if (!doc) throw new Error('Google Sheet not initialized');
+    
+    let sheet;
+    if (typeof sheetIdentifier === 'string') sheet = doc.sheetsByTitle[sheetIdentifier];
+    else if (typeof sheetIdentifier === 'number') sheet = doc.sheetsByIndex[sheetIdentifier];
+    
+    if (!sheet) {
+        console.warn(`Hoja "${sheetIdentifier}" no encontrada`);
+        return [];
+    }
+
+    // ✅ OPTIMIZACIÓN CRÍTICA: Cargar SOLO las columnas necesarias
+    await sheet.loadHeaderRow();
+    const rows = await sheet.getRows();
+    
+    // Filtrar MUY eficientemente
+    return rows
+        .filter(row => {
+            if (!filters.dni) return true;
+            const rowDni = String(row['DNI'] || row['Documento'] || '').trim();
+            return rowDni === String(filters.dni).trim();
+        })
+        .map(row => {
+            const rowData = {};
+            // ✅ Solo incluir campos esenciales
+            const essentialFields = ['DNI', 'Documento', 'Nombre', 'Apellido', 'Fecha', 'Prestador', 'Resultado'];
+            sheet.headerValues.forEach(header => {
+                if (essentialFields.includes(header) || header.includes('Link') || header.includes('PDF')) {
+                    rowData[header] = row[header] || '';
+                }
+            });
+            return rowData;
+        });
+}
 
 // Manejo de errores no capturados
 process.on('uncaughtException', (error) => {
