@@ -481,7 +481,8 @@ app.post('/obtener-estudios-paciente', async (req, res) => {
             'HPV GENOTIPO 18',
             'HPV GENOTIPO 16',
             'VDRL',
-            'PSA'
+            'PSA',
+            'Chagas'
         ];
 
         // Itera sobre cada hoja de estudio definida
