@@ -479,7 +479,9 @@ app.post('/obtener-estudios-paciente', async (req, res) => {
             'Hepatitis B AC anti core total',
             'HPV OTROS GENOTIPOS DE ALTO RIESGO',
             'HPV GENOTIPO 18',
-            'HPV GENOTIPO 16'
+            'HPV GENOTIPO 16',
+            'VDRL',
+            'PSA'
         ];
 
         // Itera sobre cada hoja de estudio definida
