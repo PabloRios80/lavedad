@@ -1,6 +1,4 @@
-// ====================================================================
-// OPTIMIZACIÓN EXTREMA DE MEMORIA - AGREGAR AL PRINCIPIO
-// ====================================================================
+require('dotenv').config();
 const v8 = require('v8');
 v8.setFlagsFromString('--max-old-space-size=8192'); // 8GB
 
@@ -67,17 +65,74 @@ process.on('unhandledRejection', (reason, promise) => {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
-
 const express = require('express');
 const path = require('path');
 const { GoogleSpreadsheet } = require('google-spreadsheet');
 const { google } = require('googleapis');
 const app = express();
-const PORT = process.env.PORT || 3000; // Usa el puerto que Render te asigne o el 3000 para local
+const PORT = process.env.PORT || 3000;
 const SPREADSHEET_ID = '15YPfBG9PBfN3nBW5xXJYjIXEgYIS9z71pI0VpeCtAAU';
-// Determina la URL base de la API
 const API_BASE_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
 
+// >>>>> AGREGAR TODO ESTO AQUÍ ABAJO <<<<<
+const session = require('express-session');
+const passport = require('passport');
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
+
+// --- CONFIGURACIÓN DE MIDDLEWARE PARA AUTENTICACIÓN ---
+app.use(session({
+    secret: 'tu-secreto-seguro', // Cambia esto por una cadena de caracteres única y segura
+    resave: false,
+    saveUninitialized: true
+}));
+app.use(passport.initialize());
+app.use(passport.session());
+
+// --- RUTAS DE AUTENTICACIÓN ---
+app.get('/auth/google',
+    passport.authenticate('google', { scope: ['profile', 'email'] })
+);
+
+app.get('/auth/google/callback',
+    passport.authenticate('google', { failureRedirect: '/login.html' }),
+    (req, res) => {
+    res.redirect('/cierre-formulario.html');
+    }
+);
+
+// --- ESTRATEGIA DE AUTENTICACIÓN DE GOOGLE ---
+passport.use(new GoogleStrategy({
+    clientID: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    callbackURL: process.env.GOOGLE_CALLBACK_URL
+}, (accessToken, refreshToken, profile, done) => {
+    // Aquí puedes procesar el perfil del usuario de Google
+    // Por ejemplo, puedes buscar si el correo del profesional existe en una lista de usuarios autorizados.
+    return done(null, profile);
+}));
+
+// Funciones para serializar y deserializar el usuario en la sesión
+passport.serializeUser((user, done) => {
+    done(null, user);
+});
+
+passport.deserializeUser((obj, done) => {
+    done(null, obj);
+});
+
+// Agrega esta nueva ruta en tu server.js, junto a tus otras rutas.
+// Asegúrate de que esta ruta esté antes de app.use(express.static('public')).
+
+// Ruta protegida para el formulario de cierre
+app.get('/cierre-formulario.html', (req, res) => {
+    // Si el usuario está autenticado, sirve el archivo HTML desde la carpeta privada
+    if (req.isAuthenticated()) {
+        res.sendFile(path.join(__dirname, 'private', 'cierre-formulario.html'));
+    } else {
+        // Si no está autenticado, lo redirige al login de Google
+        res.redirect('/auth/google');
+    }
+});
 
 // --- MIDDLEWARE ---
 app.use(express.json());
@@ -437,7 +492,23 @@ app.get('/obtener-resultados-variable/:variable', async (req, res) => {
     }
 });
 
-
+// Agrega esta nueva ruta GET en tu server.js, junto a tus otras rutas
+app.get('/api/user', (req, res) => {
+    // Si el usuario está autenticado, req.isAuthenticated() será verdadero
+    if (req.isAuthenticated()) {
+        res.json({
+            isLoggedIn: true,
+            user: {
+                name: req.user.displayName,
+                email: req.user.emails[0].value
+            }
+        });
+    } else {
+        res.json({
+            isLoggedIn: false
+        });
+    }
+});
 // ====================================================================
 // NUEVA RUTA - OBTENER ESTUDIOS COMPLEMENTARIOS POR DNI
 // ====================================================================
@@ -525,14 +596,14 @@ app.post('/obtener-estudios-paciente', async (req, res) => {
                     } else if (sheetName === 'Enfermeria') {
                         // Obtenemos los campos específicos de Enfermeria
                         const datosEnfermeria = {
-                            Altura: estudio['Altura (cm)'] || 'N/A',
-                            Peso: estudio['Peso (kg)'] || 'N/A',
-                            Circunferencia_cintura: estudio['Circunferencia de cintura (cm)'] || 'N/A',
-                            Presion_Arterial: estudio['Presion Arterial (mmhg)'] || 'N/A',
+                            Altura: estudio['Altura (cm)'] || 'N/A',
+                            Peso: estudio['Peso (kg)'] || 'N/A',
+                            Circunferencia_cintura: estudio['Circunferencia de cintura (cm)'] || 'N/A',
+                            Presion_Arterial: estudio['Presion Arterial (mmhg)'] || 'N/A',
                             Vacunas: estudio['Vacunas'] || 'N/A', // <-- ¡Agrega esta línea!
-                            Agudeza_Visual_PDF: estudio['Agudeza Visual (Enlace a PDF)'] || '',
-                            Espirometria_PDF: estudio['Espirometria (Enlace a PDF)'] || ''
-                        };
+                            Agudeza_Visual_PDF: estudio['Agudeza Visual (Enlace a PDF)'] || '',
+                            Espirometria_PDF: estudio['Espirometria (Enlace a PDF)'] || ''
+                        };
 
                         estudiosEncontrados.push({
                             TipoEstudio: sheetName,

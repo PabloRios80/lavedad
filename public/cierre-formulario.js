@@ -1,4 +1,42 @@
 document.addEventListener('DOMContentLoaded', () => {
+const unauthorizedMessage = document.getElementById('unauthorized-message');
+    const mainContent = document.getElementById('main-content');
+    
+    // Primero, verifica el estado de autenticación del usuario
+    checkAuthStatus();
+
+    async function checkAuthStatus() {
+        try {
+            const response = await fetch('/api/user');
+            const data = await response.json();
+
+            if (data.isLoggedIn) {
+                // El usuario está autenticado, podemos mostrar el formulario
+                mainContent.classList.remove('hidden');
+                unauthorizedMessage.classList.add('hidden');
+                console.log('Usuario autenticado:', data.user.name, data.user.email);
+                // Aquí, podrías llenar un campo oculto del formulario con el nombre del profesional
+                // Por ejemplo:
+                // const profesionalNameInput = document.createElement('input');
+                // profesionalNameInput.type = 'hidden';
+                // profesionalNameInput.name = 'Profesional_Nombre';
+                // profesionalNameInput.value = data.user.name;
+                // document.getElementById('cierre-form').appendChild(profesionalNameInput);
+
+                // Y en tu app.post('/api/cierre/guardar', ...) podrás obtenerlo con req.body.Profesional_Nombre
+            } else {
+                // No autenticado, mostramos el mensaje de error y ocultamos el formulario
+                mainContent.classList.add('hidden');
+                unauthorizedMessage.classList.remove('hidden');
+            }
+        } catch (error) {
+            console.error('Error al verificar autenticación:', error);
+            mainContent.classList.add('hidden');
+            unauthorizedMessage.classList.remove('hidden');
+        }
+    }
+
+
     const dniInput = document.getElementById('paciente-dni');
     const cargarDatosBtn = document.getElementById('cargar-datos-btn');
     const patientInfoDisplay = document.getElementById('patient-info-display'); // Nuevo contenedor para campos fijos
