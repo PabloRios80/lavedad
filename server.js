@@ -108,6 +108,8 @@ app.post('/api/enfermeria/guardar', async (req, res) => {
         }
 
         const newRow = req.body;
+        // >>>>> AGREGAR ESTA LÍNEA <<<<<
+        newRow['Fecha_cierre_Enf'] = new Date().toLocaleDateString('es-AR');
         await sheet.addRow(newRow);
 
         res.status(200).json({ message: 'Datos guardados correctamente.' });
@@ -706,6 +708,9 @@ app.post('/api/cierre/guardar', async (req, res) => {
         pacientesSheet.headerValues.forEach(header => {
             newRowData[header] = formData[header] !== undefined ? String(formData[header]) : '';
         });
+
+         // >>>>> AGREGAR ESTA LÍNEA <<<<<
+        newRowData['Fecha_cierre_DP'] = new Date().toLocaleDateString('es-AR');
 
         newRowData['DNI'] = dni;
         newRowData['Fecha_cierre_dp'] = fechaCierre;
