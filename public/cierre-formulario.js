@@ -124,6 +124,8 @@ const unauthorizedMessage = document.getElementById('unauthorized-message');
         { name: 'Observaciones_Colonoscopia', label: 'Obs. Colonoscopia', type: 'textarea', required: false, icon: 'fas fa-comment' },
         { name: 'Cancer_mama_Mamografia', label: 'Cáncer Mama (Mamografía)', type: 'select', options: ['Normal', 'Pendiente', 'No se realiza', 'Patologico'], hasStudyButton: true, studyType: 'Mamografia', required: true, icon: 'fas fa-x-ray' },
         { name: 'Observaciones_Mamografia', label: 'Obs. Mamografía', type: 'textarea', required: false, icon: 'fas fa-comment' },
+        { name: 'Cancer_mama_Eco_mamaria', label: 'Cáncer Mama (Eco mamaria)', type: 'select', options: ['Normal', 'Pendiente', 'No se realiza', 'Patologico'], hasStudyButton: true, studyType: 'Eco Mamaria', required: true, icon: 'fas fa-x-ray' },
+        { name: 'Observaciones_Eco_mamaria', label: 'Obs. Ecografía Mamaria', type: 'textarea', required: false, icon: 'fas fa-comment' },
         { name: 'ERC', label: 'ERC', type: 'select', options: ['Normal', 'Pendiente', 'No se realiza', 'Patologico'], hasStudyButton: true, studyType: 'Laboratorio', required: true, icon: 'fas fa-kidneys' },
         { name: 'Observaciones_ECG', label: 'Obs. ECG', type: 'textarea', required: false, icon: 'fas fa-comment' },
         { name: 'EPOC', label: 'EPOC', type: 'select', options: ['Se verifica', 'No se verifica', 'No se realiza'], hasStudyButton: true, studyType: 'Espirometria', required: true, icon: 'fas fa-lungs' },

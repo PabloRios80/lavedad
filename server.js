@@ -532,7 +532,8 @@ app.post('/obtener-estudios-paciente', async (req, res) => {
             'VCC',
             'Biopsia',
             'Odontologia',
-            'Enfermeria'
+            'Enfermeria',
+            'Eco mamaria'
         ];
 
         // >>>>>>>> NUEVO: Definición de campos específicos para la hoja de Laboratorio <<<<<<<<
@@ -747,11 +748,18 @@ app.post('/api/seguimiento/guardar', async (req, res) => {
     }
 }); // <--- ESTA ES LA LLAVE DE CIERRE CORRECTA PARA LA RUTA DE SEGUIMIENTO
 // *************************************************************************
-// ** LA RUTA /api/cierre/guardar DEBE IR DESPUÉS DE LA RUTA DE SEGUIMIENTO **
-// *************************************************************************
 app.post('/api/cierre/guardar', async (req, res) => {
-    const formData = req.body;
+    // AHORA VERIFICA SI EL USUARIO ESTÁ AUTENTICADO
+    if (!req.isAuthenticated()) {
+        console.error('SERVER ERROR: Intento de guardar formulario de cierre sin autenticación.');
+        return res.status(401).json({ success: false, error: 'Acceso no autorizado. Por favor, inicie sesión.' });
+    }
+    
+    // OBTENEMOS EL NOMBRE DEL PROFESIONAL AUTENTICADO
+    const profesionalName = req.user.displayName;
 
+    const formData = req.body;
+    
     const dni = String(formData['DNI']).trim();
     const fechaCierre = String(formData['Fecha_cierre_dp']).trim();
 
@@ -780,15 +788,20 @@ app.post('/api/cierre/guardar', async (req, res) => {
             newRowData[header] = formData[header] !== undefined ? String(formData[header]) : '';
         });
 
-         // >>>>> AGREGAR ESTA LÍNEA <<<<<
+        // ✅ AÑADIMOS EL NOMBRE DEL PROFESIONAL Y LA FECHA
+        newRowData['Profesional'] = profesionalName;
         newRowData['Fecha_cierre_DP'] = new Date().toLocaleDateString('es-AR');
+        
+        // ✅ AQUÍ AGREGAMOS LOS NUEVOS CAMPOS DEL FORMULARIO
+        newRowData['Cancer_mama_Eco_mamaria'] = formData['Cancer_mama_Eco_mamaria'];
+        newRowData['Observaciones_Eco_mamaria'] = formData['Observaciones_Eco_mamaria'];
 
         newRowData['DNI'] = dni;
         newRowData['Fecha_cierre_dp'] = fechaCierre;
 
         await pacientesSheet.addRow(newRowData);
 
-        console.log(`SERVER: Nuevo registro de cierre guardado para DNI: ${dni} en fecha: ${fechaCierre}`);
+        console.log(`SERVER: Nuevo registro de cierre guardado para DNI: ${dni} por ${profesionalName}`);
         return res.json({ success: true, message: 'Formulario de cierre guardado exitosamente como nuevo registro.' });
 
     } catch (error) {
