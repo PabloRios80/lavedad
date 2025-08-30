@@ -597,24 +597,29 @@ app.post('/obtener-estudios-paciente', async (req, res) => {
                     } else if (sheetName === 'Enfermeria') {
                         // Obtenemos los campos específicos de Enfermeria
                         const datosEnfermeria = {
-                            Altura: estudio['Altura (cm)'] || 'N/A',
-                            Peso: estudio['Peso (kg)'] || 'N/A',
-                            Circunferencia_cintura: estudio['Circunferencia de cintura (cm)'] || 'N/A',
-                            Presion_Arterial: estudio['Presion Arterial (mmhg)'] || 'N/A',
-                            Vacunas: estudio['Vacunas'] || 'N/A', // <-- ¡Agrega esta línea!
-                            Agudeza_Visual_PDF: estudio['Agudeza Visual (Enlace a PDF)'] || '',
-                            Espirometria_PDF: estudio['Espirometria (Enlace a PDF)'] || ''
+                         // Los nombres de la izquierda son los que el frontend espera (app.js)
+                        // Los nombres de la derecha son los nombres de las columnas en tu Google Sheet
+                            'Altura': estudio['Altura (cm)'] || 'N/A',
+                            'Peso': estudio['Peso (kg)'] || 'N/A',
+                            'Circunferencia_cintura': estudio['Circunferencia de cintura (cm)'] || 'N/A',
+                            'Presion_Arterial': estudio['Presion Arterial (mmhg)'] || 'N/A',
+                            'Vacunas': estudio['Vacunas'] || 'N/A',
+                            'Agudeza_Visual_PDF': estudio['Agudeza Visual (Enlace a PDF)'] || '',
+                            'Espirometria_PDF': estudio['Espirometria (Enlace a PDF)'] || '',
+                            'Fecha_cierre_Enf': estudio['Fecha_cierre_Enf'] || 'N/A'
                         };
 
+                         // Consolidamos toda la información en un solo objeto para el frontend
                         estudiosEncontrados.push({
                             TipoEstudio: sheetName,
                             DNI: estudio['DNI'] || 'N/A',
                             Nombre: estudio['Nombre'] || 'N/A',
                             Apellido: estudio['Apellido'] || 'N/A',
-                            // Agrega otros campos si son relevantes
                             Fecha: estudio['Fecha'] || 'N/A',
                             Prestador: estudio['Prestador'] || 'N/A',
-                            ResultadosEnfermeria: datosEnfermeria // Un objeto que contiene todos los resultados de enfermería
+                                // Ahora, 'ResultadosEnfermeria' contiene todos los campos necesarios.
+                                 // El frontend ya no necesita acceder al objeto 'estudio' original.
+                            ResultadosEnfermeria: datosEnfermeria
                         });
 
 

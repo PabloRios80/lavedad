@@ -36,8 +36,8 @@ async function fetchApiConfig() {
     }
 }
 
-
 document.addEventListener('DOMContentLoaded', () => {
+    // Definición de todas las constantes al inicio
     const consultarBtn = document.getElementById('consultar');
     const dniInput = document.getElementById('dni');
     const practicaSelect = document.getElementById('practica');
@@ -45,9 +45,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const resultDiv = document.getElementById('result');
     const riskAssessmentDiv = document.getElementById('risk-assessment');
     const afiliadoDetailsDiv = document.getElementById('afiliado-details');
-    const cancerPreventionDiv = document.getElementById('cancer-prevention'); 
-    const infectiousDiseasesDiv = document.getElementById('infectious-diseases'); 
-    const healthyHabitsDiv = document.getElementById('healthy-habits'); 
+    const cancerPreventionDiv = document.getElementById('cancer-prevention');
+    const infectiousDiseasesDiv = document.getElementById('infectious-diseases');
+    const healthyHabitsDiv = document.getElementById('healthy-habits');
     const dentalHealthDiv = document.getElementById('dental-health');
     const mentalHealthDiv = document.getElementById('mental-health');
     const renalHealthDiv = document.getElementById('renal-health');
@@ -56,25 +56,77 @@ document.addEventListener('DOMContentLoaded', () => {
     const aneurismaSectionDiv = document.getElementById('aneurisma-section');
     const osteoporosisSectionDiv = document.getElementById('osteoporosis-section');
     const aspirinaSectionDiv = document.getElementById('aspirina-section');
-     // >>>>>>>> ATENCIÓN <<<<<<<<
     const estudiosComplementariosSeccion = document.getElementById('estudios-complementarios-seccion');
     const verEstudiosBtn = document.getElementById('ver-estudios-btn');
     const resultadosEstudiosPacienteDiv = document.getElementById('resultados-estudios-paciente');
-    
-      // >>> NUEVOS ELEMENTOS PARA EL MODAL DE LABORATORIO <<<
+
     const labResultsModal = document.getElementById('lab-results-modal');
     const labResultsModalContent = document.getElementById('lab-results-modal-content');
     const closeLabResultsModal = document.getElementById('close-lab-results-modal');
     const generarInformeBtn = document.getElementById('generar-informe-btn');
 
-    let currentPatientData = null; // Para guardar todos los datos del paciente actual
-    let currentRedFlags = new Set(); // <-- NUEVO: Usa un Set para evitar duplicados de motivos
+    const enfermeriaResultsModal = document.getElementById('enfermeria-results-modal');
+    const enfermeriaResultsModalContent = document.getElementById('enfermeria-results-modal-content');
+    const closeEnfermeriaResultsModal = document.getElementById('close-enfermeria-results-modal');
 
-    let currentPatientDNI = null; // Asumiendo que esta variable ya existe y se actualiza en la función consultarDNI
+     // --- VERIFICACIÓN CRÍTICA: AÑADE ESTO JUSTO DESPUÉS DE DEFINIR LAS CONSTANTES ---
+    if (!enfermeriaResultsModal) {
+        console.error('ERROR: Modal de enfermería no encontrado en el DOM');
+        // Puedes deshabilitar funcionalidades relacionadas si quieres
+    }
+    if (!enfermeriaResultsModalContent) {
+        console.error('ERROR: Contenido del modal de enfermería no encontrado');
+    }
+    if (!closeEnfermeriaResultsModal) {
+        console.error('ERROR: Botón cerrar modal de enfermería no encontrado');
+    }
     
-    let allFetchedStudies = []; // Almacenará todos los estudios para poder accederlos por ID
+    // Variables globales para almacenar datos
+    let currentPatientData = null; 
+    let currentRedFlags = new Set();
+    let currentPatientDNI = null;
+    let allFetchedStudies = [];
 
-        
+    // --- CÓDIGO CLAVE CORREGIDO: DELEGACIÓN DE EVENTOS ---
+    // Este bloque se ejecuta una sola vez al cargar la página.
+    // Escucha clics en el contenedor principal y delega la acción al botón correcto.
+    resultadosEstudiosPacienteDiv.addEventListener('click', (event) => {
+        console.log('DEBUG: Click detectado en:', event.target);
+        const labBtn = event.target.closest('.ver-lab-results-btn');
+        const enfermeriaBtn = event.target.closest('.ver-enfermeria-results-btn');
+        console.log('DEBUG: labBtn encontrado:', labBtn);
+        console.log('DEBUG: enfermeriaBtn encontrado:', enfermeriaBtn);
+
+        if (labBtn) {
+            console.log('DEBUG: Click en botón Laboratorio, índice:', labBtn.dataset.index);
+            const index = parseInt(labBtn.dataset.index, 10);
+            if (!isNaN(index) && allFetchedStudies[index]) {
+                const labStudy = allFetchedStudies[index];
+                if (labStudy.ResultadosLaboratorio) {
+                    openLabResultsModal(labStudy.ResultadosLaboratorio);
+                } else {
+                    console.error('ERROR: El estudio de laboratorio no tiene la propiedad "ResultadosLaboratorio".');
+                }
+            } else {
+                console.error('ERROR: No se pudo obtener un índice válido para el estudio de laboratorio clicado.');
+            }
+        } else if (enfermeriaBtn) {
+            console.log('DEBUG: Click en botón Enfermería, índice:', enfermeriaBtn.dataset.index);
+            const index = parseInt(enfermeriaBtn.dataset.index, 10);
+            if (!isNaN(index) && allFetchedStudies[index]) {
+                const enfermeriaStudy = allFetchedStudies[index];
+                if (enfermeriaStudy.ResultadosEnfermeria) {
+                    openEnfermeriaResultsModal(enfermeriaStudy.ResultadosEnfermeria);
+                    console.log('DEBUG: Abriendo modal de Enfermería con datos:', enfermeriaStudy.ResultadosEnfermeria);
+                } else {
+                    console.error('ERROR: El estudio de enfermería no tiene la propiedad "ResultadosEnfermeria".');
+                }
+            } else {
+                console.error('ERROR: No se pudo obtener un índice válido para el estudio de enfermería clicado.');
+            }
+        }
+    });
+
     if (!estudiosComplementariosSeccion || !verEstudiosBtn || !resultadosEstudiosPacienteDiv) {
         console.warn('Algunos elementos DOM para estudios complementarios no se encontraron. Asegúrate de que index.html los tenga.');
     }
@@ -95,22 +147,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (currentPatientData) {
                     console.log('DEBUG: currentPatientData NO es nulo.', currentPatientData);
                     console.log('DEBUG: currentRedFlags antes de pasar:', [...currentRedFlags]);
-                        openSeguimientoForm(currentPatientData, [...currentRedFlags]);
+                    openSeguimientoForm(currentPatientData, [...currentRedFlags]);
                 } else {
                     console.log('DEBUG: currentPatientData ES nulo. Alerta mostrada.');
                     alert('Por favor, busca un paciente primero para generar un informe de seguimiento.');
                 }
             });
         }
-    } 
-    
-    // >>> FUNCIÓN PARA CERRAR EL MODAL <<<
+    }
+
+    // --- Función para cerrar el modal de laboratorio ---
     if (closeLabResultsModal) {
         closeLabResultsModal.addEventListener('click', () => {
-            labResultsModal.classList.add('hidden'); // Oculta el modal
+            labResultsModal.classList.add('hidden');
         });
     }
-    // Cierra el modal si se hace clic fuera del contenido
     if (labResultsModal) {
         labResultsModal.addEventListener('click', (e) => {
             if (e.target === labResultsModal) {
@@ -119,260 +170,236 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-function openSeguimientoForm(patientData, redFlags) { // redFlags ahora viene de la variable global
-    sessionStorage.setItem('currentPatientForSeguimiento', JSON.stringify(patientData));
-    sessionStorage.setItem('redFlagsForSeguimiento', JSON.stringify(redFlags)); // Pasa la lista global
-    window.open('/seguimiento-formulario.html', '_blank');
-}
-        // --- Función consultarDNI CON TODOS LOS CAMBIOS ---
-async function consultarDNI() {
-    const dni = dniInput.value.trim();
-
-    if (!dni) {
-        alert('Por favor ingrese un DNI');
-        return;
-    }
-
-    loadingDiv.classList.remove('hidden');
-    resultDiv.innerHTML = '<p class="text-center text-gray-500 py-8"><i class="fas fa-spinner fa-spin"></i> Buscando información...</p>';
-    resultDiv.classList.remove('hidden');
-    resultDiv.style.display = 'block';
-
-    // --- OCULTAR SECCIONES AL INICIO DE CADA BÚSQUEDA ---
-    const previousStudiesMessageDiv = document.getElementById('previous-studies-message');
-    if (previousStudiesMessageDiv) {
-        previousStudiesMessageDiv.classList.add('hidden');
-        previousStudiesMessageDiv.innerHTML = '';
-    }
-
-    // Asegurarse de limpiar el perfil de paciente antes de una nueva búsqueda
-    // Esta llamada ya oculta riskAssessmentDiv y limpia otras secciones.
-    resetProfile();
-
-    try {
-        console.log('Iniciando búsqueda para DNI:', dni);
-        const response = await fetch('/buscar', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ dni })
+    // --- Función para cerrar el modal de enfermería ---
+    if (closeEnfermeriaResultsModal) {
+        closeEnfermeriaResultsModal.addEventListener('click', () => {
+            enfermeriaResultsModal.classList.add('hidden');
         });
-
-        const data = await response.json();
-        console.log('DEBUG APP.JS: Datos recibidos del servidor:', data);
-
-        if (data.error) {
-            console.log('DEBUG APP.JS: Servidor reporta error:', data.error);
-            resultDiv.innerHTML = `<p class="text-center text-red-500 py-8">${data.error}</p>`;
-            resultDiv.classList.remove('hidden');
-            resultDiv.style.display = 'block';
-
-            // resetProfile ya se encarga de ocultar riskAssessmentDiv y limpiar otras cosas.
-            resetProfile(); // Aseguramos que todo esté oculto si hay un error.
-
-        } 
-        else if (data.pacientePrincipal && (data.pacientePrincipal.DNI || data.pacientePrincipal.Documento)) {
-            console.log('DEBUG APP.JS: Servidor devolvió datos de paciente principal.');
-            const pacientePrincipal = data.pacientePrincipal;
-            currentPatientDNI = pacientePrincipal.DNI || pacientePrincipal.Documento;
-            currentPatientData = data.pacientePrincipal; // Guarda los datos completos del paciente
-            currentRedFlags.clear(); // <-- MUY IMPORTANTE: Limpiar el Set al inicio de cada nueva consulta
-
-            if (resultDiv) {
-                resultDiv.classList.add('hidden');
-            }
-            // --- MOSTRAR SECCIONES DESPUÉS DE RECIBIR DATOS VÁLIDOS ---
-            // Solo muestra riskAssessmentDiv aquí, ya que resetProfile la ocultó.
-            if (riskAssessmentDiv) {
-                riskAssessmentDiv.style.display = 'block'; // ¡Muestra la sección de evaluación de riesgo AHORA!
-            }
-            if (cancerPreventionDiv) {
-                cancerPreventionDiv.style.display = 'block';
-            }
-            if (infectiousDiseasesDiv) {
-                infectiousDiseasesDiv.style.display = 'block';
-            }
-            if (healthyHabitsDiv) {
-                healthyHabitsDiv.style.display = 'block';
-            }
-            if (dentalHealthDiv) {dentalHealthDiv.style.display = 'block'; }
-            if (mentalHealthDiv) { mentalHealthDiv.style.display = 'block'; }
-            if (renalHealthDiv) { renalHealthDiv.style.display = 'block'; }
-            if (visualHealthDiv) { visualHealthDiv.style.display = 'block'; }
-            if (epocSectionDiv) { epocSectionDiv.style.display = 'block'; }
-            if (aneurismaSectionDiv) { aneurismaSectionDiv.style.display = 'block'; }
-            if (osteoporosisSectionDiv) { osteoporosisSectionDiv.style.display = 'block'; }
-            if (aspirinaSectionDiv) { aspirinaSectionDiv.style.display = 'block'; }
-
-            if (estudiosComplementariosSeccion) {
-                estudiosComplementariosSeccion.classList.remove('hidden');
-                resultadosEstudiosPacienteDiv.innerHTML = '<p class="text-gray-600">Haz clic en "Ver Estudios" para cargar los informes complementarios.</p>';
-                verEstudiosBtn.disabled = false;
-            }
-            // APLICAMOS UN PEQUEÑO RETARDO ANTES DE LLENAR LOS DATOS
-            // Esto permite que el DOM se "asiente" después de hacer visible la sección de riesgo.
-            setTimeout(() => {
-                updateProfile(pacientePrincipal);
-                showResults(pacientePrincipal);
-                evaluateCardiovascularRisk(pacientePrincipal);
-                evaluateCancerPrevention(pacientePrincipal);
-                evaluateInfectiousDiseases(pacientePrincipal);
-                evaluateHealthyHabits(pacientePrincipal);
-                evaluateDentalHealth(pacientePrincipal);
-                evaluateMentalHealth(pacientePrincipal);
-                evaluateRenalHealth(pacientePrincipal);
-                evaluateEPOC(pacientePrincipal);
-                evaluateAneurisma(pacientePrincipal);
-                evaluateOsteoporosis(pacientePrincipal);
-                evaluateAspirina(pacientePrincipal);
-                evaluateVisualHealth(pacientePrincipal);
-            }, 50); // 50 milisegundos de retardo
-
-            
-// Lógica para mostrar el cartel de estudios previos
-const estudiosPrevios = data.estudiosPrevios; 
-if (estudiosPrevios && estudiosPrevios.length > 0) {
-    console.log('DEBUG APP.JS: ¡Paciente con estudios previos encontrados!', estudiosPrevios);
-    
-    if (previousStudiesMessageDiv) {
-        // --- LA CORRECCIÓN CLAVE ESTÁ AQUÍ ---
-        // Antes usabas classList.remove('hidden');
-        // Ahora, como probablemente tienes display: none; en styles.css,
-        // necesitas usar style.display = 'block'; para mostrarlo.
-        previousStudiesMessageDiv.style.display = 'block'; // O 'flex' si tu HTML lo requiere para el layout
-
-        // Este es el HTML para la lista simple, si quieres mantenerla así por ahora.
-        // Si quieres la tabla con botones, deberías haber usado el HTML de la tabla
-        // que te di en una respuesta anterior. Para que vuelva a funcionar, usaremos
-        // la estructura de lista que tenías.
-        previousStudiesMessageDiv.innerHTML = `
-            <p class="text-yellow-700 font-semibold mb-2">
-                <i class="fas fa-exclamation-triangle mr-2"></i>Existen otros Día Preventivos registrados:
-            </p>
-            <ul class="list-disc list-inside ml-4">
-                ${estudiosPrevios.map(estudio => 
-                    `<li>${estudio.fecha}</li>`
-                ).join('')}
-            </ul>
-            <p class="text-sm text-gray-500 mt-2">
-                El estudio mostrado actualmente corresponde a la fecha más reciente.
-            </p>
-        `;
-    } else {
-        console.error("DEBUG APP.JS: Div 'previous-studies-message' no encontrado en el HTML.");
     }
-} else {
-    // Si NO hay estudios previos, asegurar que el cartel esté OCULTO
-    if (previousStudiesMessageDiv) {
-        // --- LA CORRECCIÓN CLAVE ESTÁ AQUÍ ---
-        // Antes usabas classList.add('hidden');
-        // Ahora necesitas usar style.display = 'none'; para ocultarlo.
-        previousStudiesMessageDiv.style.display = 'none'; 
-        previousStudiesMessageDiv.innerHTML = ''; // Limpia el contenido
+    if (enfermeriaResultsModal) {
+        enfermeriaResultsModal.addEventListener('click', (e) => {
+            if (e.target === enfermeriaResultsModal) {
+                enfermeriaResultsModal.classList.add('hidden');
+            }
+        });
     }
-}
 
-        } else {
-            console.error('DEBUG APP.JS: Respuesta inesperada del servidor (no es error ni datos de paciente válidos):', data);
-            resultDiv.innerHTML = '<p class="text-center text-red-500 py-8">Error: Formato de datos inesperado del servidor.</p>';
-            resultDiv.classList.remove('hidden');
-            resultDiv.style.display = 'block';
-            currentPatientData = null;
-            currentRedFlags.clear(); // <-- MUY IMPORTANTE: También limpiar en caso de error o no encontrado
+    function openSeguimientoForm(patientData, redFlags) {
+        sessionStorage.setItem('currentPatientForSeguimiento', JSON.stringify(patientData));
+        sessionStorage.setItem('redFlagsForSeguimiento', JSON.stringify(redFlags));
+        window.open('/seguimiento-formulario.html', '_blank');
+    }
 
-            resetProfile(); // Aseguramos que todo esté oculto si hay un error de formato.
+    // --- Función consultarDNI ---
+    async function consultarDNI() {
+        const dni = dniInput.value.trim();
+        if (!dni) {
+            alert('Por favor ingrese un DNI');
+            return;
         }
-    } catch (error) {
-        console.error('Error en la consulta:', error);
-        resultDiv.innerHTML = '<p class="text-center text-red-500 py-8">Error al conectar con el servidor</p>';
+
+        loadingDiv.classList.remove('hidden');
+        resultDiv.innerHTML = '<p class="text-center text-gray-500 py-8"><i class="fas fa-spinner fa-spin"></i> Buscando información...</p>';
         resultDiv.classList.remove('hidden');
         resultDiv.style.display = 'block';
 
-        resetProfile(); // Aseguramos que todo esté oculto si hay un error de conexión.
-    } finally {
-        loadingDiv.classList.add('hidden');
+        const previousStudiesMessageDiv = document.getElementById('previous-studies-message');
+        if (previousStudiesMessageDiv) {
+            previousStudiesMessageDiv.classList.add('hidden');
+            previousStudiesMessageDiv.innerHTML = '';
+        }
+        resetProfile();
+
+        try {
+            console.log('Iniciando búsqueda para DNI:', dni);
+            const response = await fetch('/buscar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ dni })
+            });
+            const data = await response.json();
+            console.log('DEBUG APP.JS: Datos recibidos del servidor:', data);
+
+            if (data.error) {
+                console.log('DEBUG APP.JS: Servidor reporta error:', data.error);
+                resultDiv.innerHTML = `<p class="text-center text-red-500 py-8">${data.error}</p>`;
+                resultDiv.classList.remove('hidden');
+                resultDiv.style.display = 'block';
+                resetProfile();
+            } else if (data.pacientePrincipal && (data.pacientePrincipal.DNI || data.pacientePrincipal.Documento)) {
+                console.log('DEBUG APP.JS: Servidor devolvió datos de paciente principal.');
+                const pacientePrincipal = data.pacientePrincipal;
+                currentPatientDNI = pacientePrincipal.DNI || pacientePrincipal.Documento;
+                currentPatientData = data.pacientePrincipal;
+                currentRedFlags.clear();
+
+                if (resultDiv) {
+                    resultDiv.classList.add('hidden');
+                }
+                if (riskAssessmentDiv) { riskAssessmentDiv.style.display = 'block'; }
+                if (cancerPreventionDiv) { cancerPreventionDiv.style.display = 'block'; }
+                if (infectiousDiseasesDiv) { infectiousDiseasesDiv.style.display = 'block'; }
+                if (healthyHabitsDiv) { healthyHabitsDiv.style.display = 'block'; }
+                if (dentalHealthDiv) { dentalHealthDiv.style.display = 'block'; }
+                if (mentalHealthDiv) { mentalHealthDiv.style.display = 'block'; }
+                if (renalHealthDiv) { renalHealthDiv.style.display = 'block'; }
+                if (visualHealthDiv) { visualHealthDiv.style.display = 'block'; }
+                if (epocSectionDiv) { epocSectionDiv.style.display = 'block'; }
+                if (aneurismaSectionDiv) { aneurismaSectionDiv.style.display = 'block'; }
+                if (osteoporosisSectionDiv) { osteoporosisSectionDiv.style.display = 'block'; }
+                if (aspirinaSectionDiv) { aspirinaSectionDiv.style.display = 'block'; }
+
+                if (estudiosComplementariosSeccion) {
+                    estudiosComplementariosSeccion.classList.remove('hidden');
+                    resultadosEstudiosPacienteDiv.innerHTML = '<p class="text-gray-600">Haz clic en "Ver Estudios" para cargar los informes complementarios.</p>';
+                    verEstudiosBtn.disabled = false;
+                }
+                setTimeout(() => {
+                    updateProfile(pacientePrincipal);
+                    showResults(pacientePrincipal);
+                    evaluateCardiovascularRisk(pacientePrincipal);
+                    evaluateCancerPrevention(pacientePrincipal);
+                    evaluateInfectiousDiseases(pacientePrincipal);
+                    evaluateHealthyHabits(pacientePrincipal);
+                    evaluateDentalHealth(pacientePrincipal);
+                    evaluateMentalHealth(pacientePrincipal);
+                    evaluateRenalHealth(pacientePrincipal);
+                    evaluateEPOC(pacientePrincipal);
+                    evaluateAneurisma(pacientePrincipal);
+                    evaluateOsteoporosis(pacientePrincipal);
+                    evaluateAspirina(pacientePrincipal);
+                    evaluateVisualHealth(pacientePrincipal);
+                }, 50);
+
+                const estudiosPrevios = data.estudiosPrevios;
+                if (estudiosPrevios && estudiosPrevios.length > 0) {
+                    console.log('DEBUG APP.JS: ¡Paciente con estudios previos encontrados!', estudiosPrevios);
+                    if (previousStudiesMessageDiv) {
+                        previousStudiesMessageDiv.style.display = 'block';
+                        previousStudiesMessageDiv.innerHTML = `
+                            <p class="text-yellow-700 font-semibold mb-2">
+                                <i class="fas fa-exclamation-triangle mr-2"></i>Existen otros Día Preventivos registrados:
+                            </p>
+                            <ul class="list-disc list-inside ml-4">
+                                ${estudiosPrevios.map(estudio => `<li>${estudio.fecha}</li>`).join('')}
+                            </ul>
+                            <p class="text-sm text-gray-500 mt-2">
+                                El estudio mostrado actualmente corresponde a la fecha más reciente.
+                            </p>
+                        `;
+                    } else {
+                        console.error("DEBUG APP.JS: Div 'previous-studies-message' no encontrado en el HTML.");
+                    }
+                } else {
+                    if (previousStudiesMessageDiv) {
+                        previousStudiesMessageDiv.style.display = 'none';
+                        previousStudiesMessageDiv.innerHTML = '';
+                    }
+                }
+            } else {
+                console.error('DEBUG APP.JS: Respuesta inesperada del servidor (no es error ni datos de paciente válidos):', data);
+                resultDiv.innerHTML = '<p class="text-center text-red-500 py-8">Error: Formato de datos inesperado del servidor.</p>';
+                resultDiv.classList.remove('hidden');
+                resultDiv.style.display = 'block';
+                currentPatientData = null;
+                currentRedFlags.clear();
+                resetProfile();
+            }
+        } catch (error) {
+            console.error('Error en la consulta:', error);
+            resultDiv.innerHTML = '<p class="text-center text-red-500 py-8">Error al conectar con el servidor</p>';
+            resultDiv.classList.remove('hidden');
+            resultDiv.style.display = 'block';
+            resetProfile();
+        } finally {
+            loadingDiv.classList.add('hidden');
+        }
     }
-}
-        // >>> NUEVA FUNCIÓN PARA ABRIR EL MODAL DE LABORATORIO <<<
+
+    // --- Función para abrir el modal de laboratorio ---
     function openLabResultsModal(results) {
-        currentLabResults = results; // Guarda los resultados para que el modal pueda usarlos
         let tableHtml = `<h3 class="text-lg font-semibold mb-4 text-gray-800">Resultados de Laboratorio</h3>`;
         tableHtml += `<table class="min-w-full bg-white border border-gray-300">
-                        <thead>
-                            <tr class="bg-gray-100">
-                                <th class="py-2 px-4 border-b">Campo</th>
-                                <th class="py-2 px-4 border-b">Resultado</th>
-                            </tr>
-                        </thead>
-                        <tbody>`;
-
+            <thead>
+                <tr class="bg-gray-100">
+                    <th class="py-2 px-4 border-b">Campo</th>
+                    <th class="py-2 px-4 border-b">Resultado</th>
+                </tr>
+            </thead>
+            <tbody>`;
         let hasResults = false;
-        for (const campo in currentLabResults) {
-            // Excluimos campos básicos si aparecen para no duplicar en el modal
-            if (campo === 'DNI' || campo === 'Nombre' || campo === 'Apellido' || campo === 'Fecha' || campo === 'Prestador' || campo === 'TipoEstudio') {
-                continue; 
-            }
-            const valor = currentLabResults[campo];
+        for (const campo in results) {
+            if (['DNI', 'Nombre', 'Apellido', 'Fecha', 'Prestador', 'TipoEstudio'].includes(campo)) continue;
+            const valor = results[campo];
             if (valor && String(valor).trim() !== '' && String(valor).trim().toLowerCase() !== 'n/a') {
                 const formattedCampoName = campo.replace(/([A-Z])/g, ' $1').trim();
                 tableHtml += `<tr>
-                                <td class="py-2 px-4 border-b text-gray-700">${formattedCampoName}</td>
-                                <td class="py-2 px-4 border-b text-gray-900 font-medium">${valor}</td>
-                            </tr>`;
+                    <td class="py-2 px-4 border-b text-gray-700">${formattedCampoName}</td>
+                    <td class="py-2 px-4 border-b text-gray-900 font-medium">${valor}</td>
+                </tr>`;
                 hasResults = true;
             }
         }
-
         if (!hasResults) {
             tableHtml += `<tr><td colspan="2" class="py-4 px-4 text-center text-gray-500">No hay resultados detallados de laboratorio para mostrar.</td></tr>`;
         }
-
         tableHtml += `</tbody></table>`;
         labResultsModalContent.innerHTML = tableHtml;
-        labResultsModal.classList.remove('hidden'); // Muestra el modal
+        labResultsModal.classList.remove('hidden');
     }
-// >>> NUEVA FUNCIÓN PARA ABRIR EL MODAL DE ENFERMERIA <<<
-// ¡INSERTA ESTA FUNCIÓN AQUÍ, JUSTO DESPUÉS DE LA LLAVE DE CIERRE DE LA FUNCIÓN DE LABORATORIO!
+
+    // --- Función para abrir el modal de enfermería ---
     function openEnfermeriaResultsModal(results) {
+        console.log('DEBUG: Abriendo modal de enfermería con datos:', results);
+        if (!enfermeriaResultsModal || !enfermeriaResultsModalContent) {
+        console.error('Modal de enfermería no disponible');
+        alert('Error: No se puede mostrar los resultados en este momento.');
+        return;
+    }
         let tableHtml = `<h3 class="text-lg font-semibold mb-4 text-gray-800">Resultados de Enfermería</h3>`;
         tableHtml += `<table class="min-w-full bg-white border border-gray-300">
-                    <thead>
-                        <tr class="bg-gray-100">
-                            <th class="py-2 px-4 border-b">Campo</th>
-                            <th class="py-2 px-4 border-b">Resultado</th>
-                        </tr>
-                    </thead>
-                    <tbody>`;
-
+            <thead>
+                <tr class="bg-gray-100">
+                    <th class="py-2 px-4 border-b">Campo</th>
+                    <th class="py-2 px-4 border-b">Resultado</th>
+                </tr>
+            </thead>
+            <tbody>`;
         const camposEnfermeria = {
             'Altura': results.Altura || 'N/A',
             'Peso': results.Peso || 'N/A',
             'Circunferencia cintura': results.Circunferencia_cintura || 'N/A',
             'Presión Arterial': results.Presion_Arterial || 'N/A',
-            'Vacunas': results.Vacunas || 'N/A'
+            'Vacunas': results.Vacunas || 'N/A',
+            'Fecha de Cierre': results.Fecha_cierre_Enf || 'N/A'
         };
-
         for (const campo in camposEnfermeria) {
             tableHtml += `<tr>
-                            <td class="py-2 px-4 border-b text-gray-700">${campo}</td>
-                            <td class="py-2 px-4 border-b text-gray-900 font-medium">${camposEnfermeria[campo]}</td>
-                        </tr>`;
+                <td class="py-2 px-4 border-b text-gray-700">${campo}</td>
+                <td class="py-2 px-4 border-b text-gray-900 font-medium">${camposEnfermeria[campo]}</td>
+            </tr>`;
         }
-
         tableHtml += `</tbody></table>`;
-    
-        // Asumiendo que usas el mismo modal, simplemente rellenamos su contenido y lo mostramos
-        const labResultsModalContent = document.getElementById('lab-results-modal-content');
-        const labResultsModal = document.getElementById('lab-results-modal');
-        labResultsModalContent.innerHTML = tableHtml;
-        labResultsModal.classList.remove('hidden');
+        let linksHtml = '';
+        if (results.Agudeza_Visual_PDF && results.Agudeza_Visual_PDF.trim() !== '') {
+            linksHtml += `<a href="${results.Agudeza_Visual_PDF}" target="_blank" class="block mt-4 text-blue-500 hover:underline">Ver Agudeza Visual (PDF)</a>`;
+        }
+        if (results.Espirometria_PDF && results.Espirometria_PDF.trim() !== '') {
+            linksHtml += `<a href="${results.Espirometria_PDF}" target="_blank" class="block mt-2 text-blue-500 hover:underline">Ver Espirometría (PDF)</a>`;
+        }
+        tableHtml += linksHtml;
+        enfermeriaResultsModalContent.innerHTML = tableHtml;
+        enfermeriaResultsModal.classList.remove('hidden');
+        enfermeriaResultsModal.classList.remove('flex'); 
     }
+    
+    // --- Lógica para el botón "Ver Estudios" ---
     if (verEstudiosBtn) {
         verEstudiosBtn.addEventListener('click', async () => {
             if (!currentPatientDNI) {
                 alert('No hay un DNI de paciente cargado para buscar estudios.');
                 return;
             }
-
             resultadosEstudiosPacienteDiv.innerHTML = '<p class="text-gray-600"><i class="fas fa-spinner fa-spin"></i> Cargando informes complementarios...</p>';
             verEstudiosBtn.disabled = true;
 
@@ -383,12 +410,9 @@ if (estudiosPrevios && estudiosPrevios.length > 0) {
                     body: JSON.stringify({ dni: currentPatientDNI })
                 });
                 const result = await response.json();
-
                 console.log('DEBUG (app.js - /obtener-estudios-paciente): Datos recibidos del Backend:', result);
-
                 if (result.success && result.estudios && result.estudios.length > 0) {
-                    allFetchedStudies = result.estudios; 
-
+                    allFetchedStudies = result.estudios;
                     let estudiosHtml = `<h4 class="text-lg font-semibold text-gray-700 mb-4">Estudios Encontrados para DNI: ${currentPatientDNI}</h4>`;
                     estudiosHtml += `<table class="resultados-table w-full border-collapse">`;
                     estudiosHtml += `
@@ -405,103 +429,30 @@ if (estudiosPrevios && estudiosPrevios.length > 0) {
                     `;
                     result.estudios.forEach((estudio, index) => {
                         console.log(`DEBUG (app.js - Procesando estudio ${index}):`, JSON.stringify(estudio, null, 2));
-
                         const tipoEstudio = estudio.TipoEstudio || 'Desconocido';
                         const fechaEstudio = estudio.Fecha || 'N/A';
                         const prestadorEstudio = estudio.Prestador || 'N/A';
-
                         let resultadoCeldaContent = '';
                         let informeCeldaContent = '';
-
                         if (tipoEstudio === 'Laboratorio' && estudio.ResultadosLaboratorio && typeof estudio.ResultadosLaboratorio === 'object') {
                             resultadoCeldaContent = '<p class="text-gray-600 text-sm">Ver detalles en tabla.</p>';
                             informeCeldaContent = `<button type="button" class="ver-lab-results-btn bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded text-sm" data-index="${index}">Ver Tabla Resultados</button>`;
                         } else if (tipoEstudio === 'Enfermeria' && estudio.ResultadosEnfermeria) {
-                           // Nueva lógica para estudios de Enfermería: creamos un botón para el modal
-                            resultadoCeldaContent = `<button type="button" class="ver-enfermeria-results-btn bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-3 rounded text-sm" data-index="${index}">Ver Resultados</button>`;
-        
-                            let linksHtml = [];
-                            const resultadosEnfermeria = estudio.ResultadosEnfermeria;
-                            if (resultadosEnfermeria.Agudeza_Visual_PDF) {
-                            linksHtml.push(`<a href="${resultadosEnfermeria.Agudeza_Visual_PDF}" target="_blank" class="text-blue-500 hover:underline">Ver Agudeza Visual</a>`);
-                            }
-                            if (resultadosEnfermeria.Espirometria_PDF) {
-                            linksHtml.push(`<a href="${resultadosEnfermeria.Espirometria_PDF}" target="_blank" class="text-blue-500 hover:underline">Ver Espirometria</a>`);
-                            }
-                            informeCeldaContent = linksHtml.length > 0 ? linksHtml.join('<br>') : '<span class="text-gray-500">No disponible</span>';
+                            // CORRECCIÓN: El botón debe estar en la columna de "Informe/PDF"
+                            resultadoCeldaContent = 'Ver resultados en modal'; // Texto simple aquí
+                            informeCeldaContent = `<button type="button" class="ver-enfermeria-results-btn bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-3 rounded text-sm" data-index="${index}">Ver Resultados</button>`;
                         } else {
-                         // Lógica para el resto de los estudios
                             resultadoCeldaContent = estudio.Resultado || 'N/A';
                             const linkPdf = estudio.LinkPDF && String(estudio.LinkPDF).trim() !== '' ? estudio.LinkPDF : null;
-                            informeCeldaContent = linkPdf ?
-                                `<a href="${linkPdf}" target="_blank" class="text-blue-500 hover:underline">Ver PDF <i class="fas fa-external-link-alt ml-1"></i></a>` :
-                                '<span class="text-gray-500">No disponible</span>';
+                            informeCeldaContent = linkPdf ? `<a href="${linkPdf}" target="_blank" class="text-blue-500 hover:underline">Ver PDF <i class="fas fa-external-link-alt ml-1"></i></a>` : '<span class="text-gray-500">No disponible</span>';
                         }
-    
-                        estudiosHtml += `
-                            <tr class="hover:bg-gray-50">
-                                <td class="px-4 py-2 border">${tipoEstudio}</td>
-                                <td class="px-4 py-2 border">${fechaEstudio}</td>
-                                <td class="px-4 py-2 border">${prestadorEstudio}</td>
-                                <td class="px-4 py-2 border">${resultadoCeldaContent}</td>
-                                <td class="px-4 py-2 border text-center">${informeCeldaContent}</td>
-                            </tr>
-                        `;
-});
-
+                        estudiosHtml += `<tr class="hover:bg-gray-50"><td class="px-4 py-2 border">${tipoEstudio}</td><td class="px-4 py-2 border">${fechaEstudio}</td><td class="px-4 py-2 border">${prestadorEstudio}</td><td class="px-4 py-2 border">${resultadoCeldaContent}</td><td class="px-4 py-2 border text-center">${informeCeldaContent}</td></tr>`;
+                    });
                     estudiosHtml += `</tbody></table>`;
                     resultadosEstudiosPacienteDiv.innerHTML = estudiosHtml;
-
-                    // DELEGACIÓN DE EVENTOS PARA BOTONES DE LABORATORIO y ENFERMERÍA
-                    // Adjuntamos un solo listener al contenedor principal de resultados
-                    resultadosEstudiosPacienteDiv.addEventListener('click', (event) => {
-                       // Verificamos si el clic fue en un botón de Laboratorio
-                        if (event.target.classList.contains('ver-lab-results-btn')) {
-                            const button = event.target;
-                            const index = parseInt(button.dataset.index, 10); 
-        
-                            console.log('DEBUG (app.js): Botón de Laboratorio clicado, index:', index);
-
-                            if (!isNaN(index) && allFetchedStudies[index]) {
-                                const labStudy = allFetchedStudies[index]; 
-                                console.log('DEBUG (app.js): Estudio de laboratorio encontrado por índice:', labStudy);
-
-                                if (labStudy.ResultadosLaboratorio) {
-                                    openLabResultsModal(labStudy.ResultadosLaboratorio);
-                                } else {
-                                    alert('El estudio de laboratorio encontrado no contiene la propiedad "ResultadosLaboratorio".');
-                                    console.error('ERROR: El estudio de laboratorio en el índice', index, 'no tiene ResultadosLaboratorio:', labStudy);
-                                }
-                        } else {
-                            alert('Error al identificar el estudio de laboratorio. Intente de nuevo.');
-                            console.error('ERROR: No se pudo obtener un índice válido para el estudio de laboratorio clicado. Index:', index);
-                        }
-                    } 
-    // Si el clic no fue en un botón de Laboratorio, verificamos si fue en uno de Enfermería
-                    else if (event.target.classList.contains('ver-enfermeria-results-btn')) {
-                        const button = event.target;
-                        const index = parseInt(button.dataset.index, 10);
-        
-                        if (!isNaN(index) && allFetchedStudies[index]) {
-                            const enfermeriaStudy = allFetchedStudies[index];
-                            if (enfermeriaStudy.ResultadosEnfermeria) {
-                // Llamamos a la nueva función del modal de enfermería
-                            openEnfermeriaResultsModal(enfermeriaStudy.ResultadosEnfermeria);
-                        } else {
-                            alert('El estudio de enfermería no contiene la propiedad "ResultadosEnfermeria".');
-                            console.error('ERROR: Estudio de enfermería sin ResultadosEnfermeria:', enfermeriaStudy);
-                        }
-                    } else {
-                        alert('Error al identificar el estudio de enfermería. Intente de nuevo.');
-                        console.error('ERROR: No se pudo obtener un índice válido para el estudio de enfermería clicado. Index:', index);
-                    }
-                }
-            });
-
                 } else {
                     resultadosEstudiosPacienteDiv.innerHTML = `<p class="text-gray-600">No se encontraron estudios complementarios para este paciente.</p>`;
                 }
-
             } catch (error) {
                 console.error('ERROR en frontend al buscar estudios (verEstudiosBtn):', error);
                 resultadosEstudiosPacienteDiv.innerHTML = '<p class="text-red-500">Error al buscar estudios. Intente de nuevo.</p>';
@@ -511,6 +462,7 @@ if (estudiosPrevios && estudiosPrevios.length > 0) {
         });
     }
 
+    
 function resetProfile() {
     // Limpiar los divs de resultados
     resultDiv.innerHTML = '';
