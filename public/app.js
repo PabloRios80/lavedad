@@ -333,6 +333,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Función para abrir el modal de laboratorio ---
     function openLabResultsModal(results) {
+        console.log('DEBUG: Abriendo modal laboratorio');
+        console.log('Modal element:', labResultsModal);
+        console.log('Modal display style:', labResultsModal.style.display);
+        console.log('Modal classList:', labResultsModal.classList);
+    
         let tableHtml = `<h3 class="text-lg font-semibold mb-4 text-gray-800">Resultados de Laboratorio</h3>`;
         tableHtml += `<table class="min-w-full bg-white border border-gray-300">
             <thead>
@@ -361,11 +366,15 @@ document.addEventListener('DOMContentLoaded', () => {
         tableHtml += `</tbody></table>`;
         labResultsModalContent.innerHTML = tableHtml;
         labResultsModal.classList.remove('hidden');
+        console.log('DESPUÉS de remover hidden - Modal classList:', labResultsModal.classList);
     }
 
     // --- Función para abrir el modal de enfermería ---
     function openEnfermeriaResultsModal(results) {
         console.log('DEBUG: Abriendo modal de enfermería con datos:', results);
+        console.log('Modal element:', enfermeriaResultsModal);
+        console.log('Modal display style:', enfermeriaResultsModal.style.display);
+        console.log('Modal classList:', enfermeriaResultsModal.classList);
         if (!enfermeriaResultsModal || !enfermeriaResultsModalContent) {
         console.error('Modal de enfermería no disponible');
         alert('Error: No se puede mostrar los resultados en este momento.');
@@ -405,6 +414,7 @@ document.addEventListener('DOMContentLoaded', () => {
         tableHtml += linksHtml;
         enfermeriaResultsModalContent.innerHTML = tableHtml;
         enfermeriaResultsModal.classList.remove('hidden');
+        console.log('DESPUÉS de remover hidden - Modal classList:', enfermeriaResultsModal.classList);
         enfermeriaResultsModal.classList.remove('flex'); 
     }
     
