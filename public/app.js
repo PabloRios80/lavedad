@@ -37,6 +37,21 @@ async function fetchApiConfig() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    // --- SOLUCIÓN MÍNIMA: Eliminar iframes de Firebase ---
+    const removeFirebaseOverlay = () => {
+        const iframes = document.querySelectorAll('iframe');
+        iframes.forEach(iframe => {
+            if (iframe.src && (iframe.src.includes('firebase') || iframe.src.includes('google'))) {
+                console.log('Eliminando iframe de Firebase:', iframe.src);
+                iframe.remove();
+            }
+        });
+    };
+    
+    // Ejecutar inmediatamente y cada 500ms por si vuelve a aparecer
+    removeFirebaseOverlay();
+    setInterval(removeFirebaseOverlay, 500);
+    
     // Definición de todas las constantes al inicio
     const consultarBtn = document.getElementById('consultar');
     const dniInput = document.getElementById('dni');
