@@ -319,3 +319,16 @@ body {
 #enfermeria-results-modal-content a:hover {
     color: #2563eb;
 }
+#lab-results-modal, #enfermeria-results-modal {
+    display: none; /* Por defecto oculto */
+}
+
+#lab-results-modal[style*="flex"], 
+#enfermeria-results-modal[style*="flex"] {
+    display: flex !important; /* Fuerza display flex cuando se abre */
+}
+/* Asegura que hidden funcione */
+#lab-results-modal.hidden,
+#enfermeria-results-modal.hidden {
+    display: none !important;
+}

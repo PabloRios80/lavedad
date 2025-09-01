@@ -176,12 +176,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Función para cerrar el modal de laboratorio ---
     if (closeLabResultsModal) {
         closeLabResultsModal.addEventListener('click', () => {
+            labResultsModal.classList.add('hidden'); 
            labResultsModal.style.display = 'none'; // ← CAMBIA a style.display
         });
     }
     if (labResultsModal) {
         labResultsModal.addEventListener('click', (e) => {
             if (e.target === labResultsModal) {
+                labResultsModal.classList.add('hidden');
                 labResultsModal.style.display = 'none'; // ← CAMBIA aquí también
             }
         });
@@ -190,6 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Función para cerrar el modal de enfermería ---
     if (closeEnfermeriaResultsModal) {
         closeEnfermeriaResultsModal.addEventListener('click', () => {
+            enfermeriaResultsModal.classList.add('hidden');
             enfermeriaResultsModal.style.display = 'none'; // ← CAMBIA a style.display
         });
     }
@@ -367,6 +370,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         tableHtml += `</tbody></table>`;
         labResultsModalContent.innerHTML = tableHtml;
+        labResultsModal.classList.remove('hidden'); 
         labResultsModal.style.display = 'flex'; // ← AGREGA esta línea
         console.log('DESPUÉS de cambiar display - Modal style:', labResultsModal.style.display);
     }
@@ -415,9 +419,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         tableHtml += linksHtml;
         enfermeriaResultsModalContent.innerHTML = tableHtml;
+        enfermeriaResultsModal.classList.remove('hidden'); 
         enfermeriaResultsModal.style.display = 'flex'; // ← AGREGA esta línea
         console.log('DESPUÉS de cambiar display - Modal style:', enfermeriaResultsModal.style.display);
-        enfermeriaResultsModal.classList.remove('flex'); 
     }
     
     // --- Lógica para el botón "Ver Estudios" ---
