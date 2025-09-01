@@ -174,13 +174,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Función para cerrar el modal de laboratorio ---
     if (closeLabResultsModal) {
         closeLabResultsModal.addEventListener('click', () => {
-            labResultsModal.classList.add('hidden');
+           labResultsModal.style.display = 'none'; // ← CAMBIA a style.display
         });
     }
     if (labResultsModal) {
         labResultsModal.addEventListener('click', (e) => {
             if (e.target === labResultsModal) {
-                labResultsModal.classList.add('hidden');
+                labResultsModal.style.display = 'none'; // ← CAMBIA aquí también
             }
         });
     }
@@ -188,13 +188,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Función para cerrar el modal de enfermería ---
     if (closeEnfermeriaResultsModal) {
         closeEnfermeriaResultsModal.addEventListener('click', () => {
-            enfermeriaResultsModal.classList.add('hidden');
+            enfermeriaResultsModal.style.display = 'none'; // ← CAMBIA a style.display
         });
     }
     if (enfermeriaResultsModal) {
         enfermeriaResultsModal.addEventListener('click', (e) => {
             if (e.target === enfermeriaResultsModal) {
-                enfermeriaResultsModal.classList.add('hidden');
+                enfermeriaResultsModal.style.display = 'none'; // ← CAMBIA aquí también
             }
         });
     }
@@ -365,8 +365,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         tableHtml += `</tbody></table>`;
         labResultsModalContent.innerHTML = tableHtml;
-        labResultsModal.classList.remove('hidden');
-        console.log('DESPUÉS de remover hidden - Modal classList:', labResultsModal.classList);
+        labResultsModal.style.display = 'flex'; // ← AGREGA esta línea
+        console.log('DESPUÉS de cambiar display - Modal style:', labResultsModal.style.display);
     }
 
     // --- Función para abrir el modal de enfermería ---
@@ -413,8 +413,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         tableHtml += linksHtml;
         enfermeriaResultsModalContent.innerHTML = tableHtml;
-        enfermeriaResultsModal.classList.remove('hidden');
-        console.log('DESPUÉS de remover hidden - Modal classList:', enfermeriaResultsModal.classList);
+        enfermeriaResultsModal.style.display = 'flex'; // ← AGREGA esta línea
+        console.log('DESPUÉS de cambiar display - Modal style:', enfermeriaResultsModal.style.display);
         enfermeriaResultsModal.classList.remove('flex'); 
     }
     
