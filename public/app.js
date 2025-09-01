@@ -113,6 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('DEBUG: enfermeriaBtn encontrado:', enfermeriaBtn);
 
         if (labBtn) {
+            event.stopPropagation(); // ← ¡SOLO AGREGA ESTA LÍNEA!
             console.log('DEBUG: Click en botón Laboratorio, índice:', labBtn.dataset.index);
             const index = parseInt(labBtn.dataset.index, 10);
             if (!isNaN(index) && allFetchedStudies[index]) {
@@ -126,6 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error('ERROR: No se pudo obtener un índice válido para el estudio de laboratorio clicado.');
             }
         } else if (enfermeriaBtn) {
+            event.stopPropagation(); // ← ¡SOLO AGREGA ESTA LÍNEA!
             console.log('DEBUG: Click en botón Enfermería, índice:', enfermeriaBtn.dataset.index);
             const index = parseInt(enfermeriaBtn.dataset.index, 10);
             if (!isNaN(index) && allFetchedStudies[index]) {
