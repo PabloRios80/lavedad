@@ -113,7 +113,6 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('DEBUG: enfermeriaBtn encontrado:', enfermeriaBtn);
 
         if (labBtn) {
-            event.stopPropagation(); // ← ¡SOLO AGREGA ESTA LÍNEA!
             console.log('DEBUG: Click en botón Laboratorio, índice:', labBtn.dataset.index);
             const index = parseInt(labBtn.dataset.index, 10);
             if (!isNaN(index) && allFetchedStudies[index]) {
@@ -127,7 +126,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error('ERROR: No se pudo obtener un índice válido para el estudio de laboratorio clicado.');
             }
         } else if (enfermeriaBtn) {
-            event.stopPropagation(); // ← ¡SOLO AGREGA ESTA LÍNEA!
             console.log('DEBUG: Click en botón Enfermería, índice:', enfermeriaBtn.dataset.index);
             const index = parseInt(enfermeriaBtn.dataset.index, 10);
             if (!isNaN(index) && allFetchedStudies[index]) {
@@ -176,15 +174,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Función para cerrar el modal de laboratorio ---
     if (closeLabResultsModal) {
         closeLabResultsModal.addEventListener('click', () => {
-            labResultsModal.classList.add('hidden'); 
-           labResultsModal.style.display = 'none'; // ← CAMBIA a style.display
+            labResultsModal.classList.add('hidden');
         });
     }
     if (labResultsModal) {
         labResultsModal.addEventListener('click', (e) => {
             if (e.target === labResultsModal) {
                 labResultsModal.classList.add('hidden');
-                labResultsModal.style.display = 'none'; // ← CAMBIA aquí también
             }
         });
     }
@@ -193,13 +189,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (closeEnfermeriaResultsModal) {
         closeEnfermeriaResultsModal.addEventListener('click', () => {
             enfermeriaResultsModal.classList.add('hidden');
-            enfermeriaResultsModal.style.display = 'none'; // ← CAMBIA a style.display
         });
     }
     if (enfermeriaResultsModal) {
         enfermeriaResultsModal.addEventListener('click', (e) => {
             if (e.target === enfermeriaResultsModal) {
-                enfermeriaResultsModal.style.display = 'none'; // ← CAMBIA aquí también
+                enfermeriaResultsModal.classList.add('hidden');
             }
         });
     }
@@ -370,17 +365,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         tableHtml += `</tbody></table>`;
         labResultsModalContent.innerHTML = tableHtml;
-        labResultsModal.classList.remove('hidden'); 
-        labResultsModal.style.display = 'flex'; // ← AGREGA esta línea
-        console.log('DESPUÉS de cambiar display - Modal style:', labResultsModal.style.display);
+        labResultsModal.classList.remove('hidden');
+        console.log('DESPUÉS de remover hidden - Modal classList:', labResultsModal.classList);
     }
 
     // --- Función para abrir el modal de enfermería ---
     function openEnfermeriaResultsModal(results) {
         console.log('DEBUG: Abriendo modal de enfermería con datos:', results);
-        console.log('Modal element:', enfermeriaResultsModal);
-        console.log('Modal display style:', enfermeriaResultsModal.style.display);
-        console.log('Modal classList:', enfermeriaResultsModal.classList);
         if (!enfermeriaResultsModal || !enfermeriaResultsModalContent) {
         console.error('Modal de enfermería no disponible');
         alert('Error: No se puede mostrar los resultados en este momento.');
@@ -419,9 +410,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         tableHtml += linksHtml;
         enfermeriaResultsModalContent.innerHTML = tableHtml;
-        enfermeriaResultsModal.classList.remove('hidden'); 
-        enfermeriaResultsModal.style.display = 'flex'; // ← AGREGA esta línea
-        console.log('DESPUÉS de cambiar display - Modal style:', enfermeriaResultsModal.style.display);
+        enfermeriaResultsModal.classList.remove('hidden');
+        enfermeriaResultsModal.classList.remove('flex'); 
     }
     
     // --- Lógica para el botón "Ver Estudios" ---

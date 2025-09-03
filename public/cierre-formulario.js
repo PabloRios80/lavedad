@@ -243,7 +243,7 @@ const unauthorizedMessage = document.getElementById('unauthorized-message');
                     } else {
                         alert('DNI del paciente no disponible para ver estudios.');
                     }
-                });
+                });  
 
                 inputGroup.appendChild(studyButton);
                 fieldContainer.appendChild(inputGroup);

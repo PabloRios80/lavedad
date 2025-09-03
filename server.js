@@ -90,13 +90,22 @@ app.use(passport.session());
 
 // --- RUTAS DE AUTENTICACIÓN ---
 app.get('/auth/google',
+    // Usa la opción 'state' para guardar la URL de la página actual
+    (req, res, next) => {
+        req.session.returnTo = req.query.returnTo || '/';
+        next();
+    },
     passport.authenticate('google', { scope: ['profile', 'email'] })
 );
+
 
 app.get('/auth/google/callback',
     passport.authenticate('google', { failureRedirect: '/login.html' }),
     (req, res) => {
-    res.redirect('/cierre-formulario.html');
+        // Redirige al usuario a la URL que intentaba acceder originalmente
+        const redirectUrl = req.session.returnTo || '/';
+        delete req.session.returnTo; // Limpia la variable de sesión
+        res.redirect(redirectUrl);
     }
 );
 
@@ -122,18 +131,25 @@ passport.deserializeUser((obj, done) => {
 
 // Agrega esta nueva ruta en tu server.js, junto a tus otras rutas.
 // Asegúrate de que esta ruta esté antes de app.use(express.static('public')).
-
-// Ruta protegida para el formulario de cierre
 app.get('/cierre-formulario.html', (req, res) => {
     // Si el usuario está autenticado, sirve el archivo HTML desde la carpeta privada
     if (req.isAuthenticated()) {
         res.sendFile(path.join(__dirname, 'private', 'cierre-formulario.html'));
     } else {
-        // Si no está autenticado, lo redirige al login de Google
-        res.redirect('/auth/google');
+        // Si no está autenticado, lo redirige al login de Google, pasando la URL actual
+        res.redirect('/auth/google?returnTo=/cierre-formulario.html');
     }
 });
 
+app.get('/consultas.html', (req, res) => {
+    // Verifica si el usuario está autenticado
+    if (req.isAuthenticated()) {
+        res.sendFile(path.join(__dirname, 'private', 'consultas.html'));
+    } else {
+        // Si no está autenticado, redirige a la página de inicio de sesión de Google, pasando la URL actual
+        res.redirect('/auth/google?returnTo=/consultas.html');
+    }
+});
 // --- MIDDLEWARE ---
 app.use(express.json());
 app.use(express.static('public')); // Sirve archivos estáticos desde la carpeta 'public'
@@ -814,7 +830,75 @@ app.post('/api/cierre/guardar', async (req, res) => {
         res.status(500).json({ success: false, error: 'Error interno del servidor al guardar el formulario de cierre.', details: error.message });
     }
 });
-        // ====================================================================
+app.post('/guardar-consulta', async (req, res) => {
+    console.log('Datos recibidos del cliente:', req.body);
+
+    if (!req.isAuthenticated()) {
+        console.error('SERVER ERROR: Intento de guardar consulta sin autenticación.');
+        return res.status(401).json({ success: false, message: 'Acceso no autorizado. Por favor, inicie sesión.' });
+    }
+
+    const profesionalNombre = req.user.displayName; 
+
+    console.log('Solicitud para guardar consulta recibida por el profesional:', profesionalNombre);
+
+    const { 
+        DNI, 
+        Nombre, 
+        Apellido, 
+        Edad, 
+        Sexo, 
+        'motivo de consulta': motivoConsulta, 
+        diagnostico, 
+        indicaciones, 
+        recordatorio 
+    } = req.body;
+
+    if (!DNI || !profesionalNombre) {
+        return res.status(400).json({ success: false, message: 'Faltan datos obligatorios (DNI o Profesional).' });
+    }
+
+    try {
+        // ✅ CLAVE: Usamos la variable 'doc' que ya está inicializada globalmente.
+        // Las siguientes dos líneas son ELIMINADAS porque son la causa del error.
+        // const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID, jwt);
+        // await doc.useServiceAccountAuth(jwt);
+
+        await doc.loadInfo();
+
+        const sheetTitle = 'Consultas';
+        let sheet = doc.sheetsByTitle[sheetTitle];
+
+        if (!sheet) {
+            console.log(`La hoja "${sheetTitle}" no existe. Creándola...`);
+            sheet = await doc.addSheet({
+                title: sheetTitle,
+                headerValues: ['DNI', 'Nombre', 'Apellido', 'Edad', 'Sexo', 'Motivo de consulta', 'Diagnóstico', 'Indicaciones', 'Recordatorio', 'Profesional', 'Fecha'],
+            });
+        }
+        
+        await sheet.addRow({
+            'DNI': DNI,
+            'Nombre': Nombre,
+            'Apellido': Apellido,
+            'Edad': Edad,
+            'Sexo': Sexo,
+            'Motivo de consulta': motivoConsulta,
+            'Diagnostico': diagnostico,
+            'Indicaciones': indicaciones,
+            'Recordatorio': recordatorio,
+            'Profesional': profesionalNombre,
+            'Fecha': new Date().toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' }),
+        });
+
+        console.log('Datos de consulta guardados con éxito.');
+        res.json({ success: true, message: 'Consulta guardada con éxito.' });
+    } catch (error) {
+        console.error('Error al guardar la consulta:', error);
+        res.status(500).json({ success: false, message: 'Error interno del servidor.' });
+    }
+});
+       // ====================================================================
 // INICIO DEL SERVIDOR
 // ====================================================================
 
