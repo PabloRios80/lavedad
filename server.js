@@ -572,7 +572,11 @@ app.post('/obtener-estudios-paciente', async (req, res) => {
             'HPV GENOTIPO 16',
             'VDRL',
             'PSA',
-            'Chagas'
+            'Chagas',
+            'Hemoglobina Glicosilada',
+            'Microalbuminuria',
+            'Proteinuria',
+            'clearance de depuracion Creatinina'
         ];
 
         // Itera sobre cada hoja de estudio definida
