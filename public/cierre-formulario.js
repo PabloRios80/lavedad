@@ -36,7 +36,7 @@ const unauthorizedMessage = document.getElementById('unauthorized-message');
         }
     }
 
-
+    const verEstudiosBtn = document.getElementById('ver-estudios-btn');
     const dniInput = document.getElementById('paciente-dni');
     const cargarDatosBtn = document.getElementById('cargar-datos-btn');
     const patientInfoDisplay = document.getElementById('patient-info-display'); // Nuevo contenedor para campos fijos
@@ -545,6 +545,9 @@ async function mostrarEstudiosModal(dni, studyType) {
             } else {
                 estudiosModalContent.innerHTML = `<p class="text-center text-gray-600">No se encontraron estudios de tipo "${studyType}" para este DNI.</p>`;
             }
+            estudiosModalContent.style.maxHeight = '60vh';
+            estudiosModalContent.style.overflowY = 'auto';
+
         } else {
             estudiosModalContent.innerHTML = `<p class="text-center text-gray-600">${data.message || 'No se encontraron estudios para este DNI.'}</p>`;
         }

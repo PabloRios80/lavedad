@@ -101,22 +101,21 @@
             </div>
         </div>
     </main>
-
     <div id="estudiosModal" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50 hidden">
-        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl">
             <div class="flex justify-between items-center border-b pb-3 mb-4">
                 <h3 class="text-xl font-bold text-blue-800">Estudios Complementarios - <span id="modalDNI"></span></h3>
                 <button id="closeModalBtn" class="text-gray-500 hover:text-gray-700 text-2xl font-bold">&times;</button>
             </div>
-            <div id="estudiosModalContent" class="space-y-4 text-gray-700">
-                </div>
-            <div class="mt-6 text-right">
-                <button id="modalCloseButtonBottom" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
-                    Cerrar
-                </button>
+        <div id="estudiosModalContent" class="space-y-4 text-gray-700 max-h-[60vh] overflow-y-auto">
             </div>
+        <div class="mt-6 text-right">
+            <button id="modalCloseButtonBottom" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                Cerrar
+            </button>
         </div>
     </div>
+</div>
 
     <div id="unauthorized-message" class="hidden text-center p-8">
         <h2 class="text-3xl font-bold text-red-600 mb-4">Acceso Denegado ✋</h2>
