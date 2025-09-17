@@ -572,7 +572,8 @@ app.post('/obtener-estudios-paciente', async (req, res) => {
             'HPV GENOTIPO 16',
             'VDRL',
             'PSA',
-            'Chagas',
+            'Chagas (HAI)',
+            'Chagas (ECLIA)',
             'Hemoglobina Glicosilada',
             'Microalbuminuria',
             'Proteinuria',
@@ -726,7 +727,7 @@ app.post('/api/seguimiento/guardar', async (req, res) => {
         };
 
         if (evaluaciones && evaluaciones.length > 0) {
-            evaluaciones.forEach(eval => {
+            evaluaciones.forEach(eva=> {
                 let motivoOriginal = eval.motivo;
                 let motivoParaColumna = motivoOriginal;
 
