@@ -36,7 +36,61 @@ async function fetchApiConfig() {
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Obtenemos una referencia a los elementos del menú
+    const enfermeriaLink = document.getElementById('enfermeria-link');
+    const estadisticasLink = document.getElementById('estadisticas-link');
+    const cierreLink = document.getElementById('cierre-link');
+    const consultasLink = document.getElementById('consultas-link');
+    const informeBtn = document.getElementById('generar-informe-btn');
+
+    // Función para ocultar todos los enlaces del menú
+    const hideAllProfessionalLinks = () => {
+        if (enfermeriaLink) enfermeriaLink.style.display = 'none';
+        if (estadisticasLink) estadisticasLink.style.display = 'none';
+        if (cierreLink) cierreLink.style.display = 'none';
+        if (consultasLink) consultasLink.style.display = 'none';
+        if (informeBtn) informeBtn.style.display = 'none';
+    };
+
+    // Ocultamos todos los enlaces por defecto
+    hideAllProfessionalLinks();
+
+    try {
+        // Hacemos una llamada a la nueva API para obtener el rol del usuario
+        const response = await fetch('/api/user/role');
+        if (response.status === 401) {
+            // Si el usuario no está autenticado, no hacemos nada más
+            return;
+        }
+        const data = await response.json();
+        const userRole = data.role;
+
+        // Mostramos los enlaces según el rol del usuario
+        switch (userRole) {
+            case 'medico':
+                // Los médicos ven todo excepto enfermería y estadísticas
+                if (cierreLink) cierreLink.style.display = 'flex';
+                if (consultasLink) consultasLink.style.display = 'flex';
+                if (informeBtn) informeBtn.style.display = 'block';
+                break;
+            case 'enfermera':
+                // Las enfermeras solo ven el formulario de enfermería
+                if (enfermeriaLink) enfermeriaLink.style.display = 'flex';
+                break;
+            case 'gestor':
+                // El gestor ve todo (debes agregar los enlaces)
+                // Mostrar todos los enlaces
+                break;
+            default:
+                // Afiliados (no ven nada de lo anterior, solo la búsqueda)
+                break;
+        }
+
+    } catch (error) {
+        console.error('Error al obtener el rol del usuario:', error);
+    }
+});
     // --- SOLUCIÓN MÍNIMA: Eliminar iframes de Firebase ---
     const removeFirebaseOverlay = () => {
         const iframes = document.querySelectorAll('iframe');
@@ -2182,4 +2236,3 @@ function exportarResultados() {
     XLSX.writeFile(wb, "datos_filtrados.xlsx");
 }
     }
-    });

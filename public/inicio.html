@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Día Preventivo IAPOS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="bg-gray-50">
+
+    <header class="bg-blue-600 text-white shadow-lg">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex items-center space-x-4">
+                <div class="bg-blue-500 rounded-full p-2"> 
+                    <img src="images/logo_iapos.png" alt="Logo IAPOS" class="h-20"> 
+                </div>
+                <h1 class="text-xl font-bold">Día Preventivo IAPOS</h1>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 py-8 text-center">
+        <h2 class="text-3xl font-bold text-blue-800 mb-4">Bienvenido al Portal del Día Preventivo IAPOS</h2>
+        <p class="text-gray-700 max-w-2xl mx-auto mb-8">
+            El programa "Día Preventivo IAPOS" es una iniciativa para cuidar la salud de nuestros afiliados. A través de este portal, los profesionales y los propios afiliados pueden acceder a herramientas, información y formularios específicos.
+        </p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 max-w-5xl mx-auto">
+            
+            <button id="medico-btn" class="portal-btn bg-blue-500 hover:bg-blue-600 text-white">
+                <i class="fas fa-user-md text-3xl mb-2"></i>
+                <span class="font-semibold">Portal de Médicos</span>
+            </button>
+
+            <button id="enfermera-btn" class="portal-btn bg-green-500 hover:bg-green-600 text-white">
+                <i class="fas fa-user-nurse text-3xl mb-2"></i>
+                <span class="font-semibold">Portal de Enfermería</span>
+            </button>
+
+            <button id="odontologo-btn" class="portal-btn bg-purple-500 hover:bg-purple-600 text-white">
+                <i class="fas fa-tooth text-3xl mb-2"></i>
+                <span class="font-semibold">Portal de Odontología</span>
+            </button>
+
+            <a href="index.html" class="portal-btn bg-gray-500 hover:bg-gray-600 text-white">
+                <i class="fas fa-users text-3xl mb-2"></i>
+                <span class="font-semibold">Consulta Afiliados</span>
+            </a>
+
+            <button id="gestor-btn" class="portal-btn bg-red-500 hover:bg-red-600 text-white">
+                <i class="fas fa-chart-bar text-3xl mb-2"></i>
+                <span class="font-semibold">Portal de Gestión</span>
+            </button>
+        </div>
+    </main>
+
+    <style>
+        .portal-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            border-radius: 1rem;
+            transition: transform 0.2s, box-shadow 0.2s;
+            min-height: 150px;
+        }
+        .portal-btn:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+    </style>
+    <script src="auth-redirect.js"></script>
+</body>
+</html>

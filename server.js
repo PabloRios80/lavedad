@@ -99,6 +99,15 @@ app.get('/auth/google',
 );
 
 
+// RUTA PARA EL PORTAL DE ACCESO
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'inicio.html'));
+});
+
+// --- MIDDLEWARE ---
+app.use(express.json());
+app.use(express.static('public')); // Sirve archivos estáticos desde la carpeta 'public'
+
 app.get('/auth/google/callback',
     passport.authenticate('google', { failureRedirect: '/login.html' }),
     (req, res) => {
@@ -115,8 +124,24 @@ passport.use(new GoogleStrategy({
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     callbackURL: process.env.GOOGLE_CALLBACK_URL
 }, (accessToken, refreshToken, profile, done) => {
-    // Aquí puedes procesar el perfil del usuario de Google
-    // Por ejemplo, puedes buscar si el correo del profesional existe en una lista de usuarios autorizados.
+
+    // Definimos el rol basado en alguna lógica (por ejemplo, el correo electrónico)
+    let userRole = 'afiliado';
+    const userEmail = profile.emails[0].value;
+
+    // Lógica para determinar el rol del usuario
+    // NOTA: Esta es una lógica de ejemplo. Debes usar tu propia base de datos o lista de correos.
+    if (userEmail.endsWith('@medico.com')) { // Ejemplo: si el correo termina en @medico.com
+        userRole = 'medico';
+    } else if (userEmail.endsWith('@enfermera.com')) { // Ejemplo: si el correo termina en @enfermera.com
+        userRole = 'enfermera';
+    } else if (userEmail.endsWith('@gestor.com')) { // Y así sucesivamente
+        userRole = 'gestor';
+    }
+
+    // Guardamos el rol en el objeto de perfil del usuario.
+    profile.role = userRole;
+    
     return done(null, profile);
 }));
 
@@ -525,6 +550,17 @@ app.get('/api/user', (req, res) => {
         });
     }
 });
+// En tu server.js, agrega esta ruta
+app.get('/api/user/role', (req, res) => {
+    // Si el usuario está autenticado, devuelve su rol
+    if (req.isAuthenticated()) {
+        res.json({ role: req.user.role });
+    } else {
+        // Si no está autenticado, devuelve un rol por defecto
+        res.status(401).json({ role: 'afiliado' });
+    }
+});
+
 // ====================================================================
 // NUEVA RUTA - OBTENER ESTUDIOS COMPLEMENTARIOS POR DNI
 // ====================================================================
