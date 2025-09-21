@@ -728,7 +728,7 @@ app.post('/api/seguimiento/guardar', async (req, res) => {
 
         if (evaluaciones && evaluaciones.length > 0) {
             evaluaciones.forEach(eva=> {
-                let motivoOriginal = eval.motivo;
+                let motivoOriginal = eva.motivo;
                 let motivoParaColumna = motivoOriginal;
 
                 motivoParaColumna = motivoParaColumna.replace(/\s*\([^)]*\)\s*/g, ' ');
