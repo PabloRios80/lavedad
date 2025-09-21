@@ -1,10 +1,11 @@
+// Abrimos tu archivo 'auth-redirect.js'
 document.addEventListener('DOMContentLoaded', () => {
     // Definimos los botones y sus destinos
     const portals = {
-        'medico-btn': 'portal-medicos.html',
-        'enfermera-btn': 'portal-enfermeria.html',
-        'odontologo-btn': 'portal-odontologia.html',
-        'gestor-btn': 'portal-gestor.html'
+        'medico-btn': 'index-medico.html', // Destino original
+        'enfermera-btn': 'formulario-enfermeria.html', // Destino correcto
+        'odontologo-btn': 'formulario-enfermeria.html', // Redirige a Enfermería
+        'gestor-btn': 'index-gestor.html',
     };
 
     // Agregamos un listener a cada botón de profesional
@@ -12,16 +13,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const button = document.getElementById(buttonId);
         if (button) {
             button.addEventListener('click', () => {
-                // Aquí va tu lógica para el inicio de sesión con Google.
-                // Esta es solo una simulación.
-                console.log(`Iniciando sesión con Google para el portal: ${buttonId}`);
-
-                // Después de un login exitoso, redirigimos al usuario.
-                // window.location.href = portals[buttonId];
-
                 // Simulación de login exitoso:
                 const isUserAuthenticated = true; 
                 if (isUserAuthenticated) {
+                    // Redirige al usuario al destino correcto
                     window.location.href = portals[buttonId];
                 } else {
                     alert('Acceso denegado. Por favor, inicie sesión.');
