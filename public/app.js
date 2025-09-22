@@ -377,8 +377,18 @@ document.addEventListener('DOMContentLoaded', () => {
         alert('Error: No se puede mostrar los resultados en este momento.');
         return;
     }
-        let tableHtml = `<h3 class="text-lg font-semibold mb-4 text-gray-800">Resultados de Enfermería</h3>`;
-        tableHtml += `<table class="min-w-full bg-white border border-gray-300">
+    // Accede correctamente al objeto de resultados anidados
+    const enfermeriaData = results.ResultadosEnfermeria;
+
+    if (!enfermeriaData) {
+        enfermeriaResultsModalContent.innerHTML = `<p class="text-red-500">No se encontraron datos de enfermería.</p>`;
+        enfermeriaResultsModal.classList.remove('hidden');
+        enfermeriaResultsModal.classList.add('flex');
+        return;
+    }
+
+    let tableHtml = `<h3 class="text-lg font-semibold mb-4 text-gray-800">Resultados de Enfermería</h3>`;
+    tableHtml += `<table class="min-w-full bg-white border border-gray-300">
             <thead>
                 <tr class="bg-gray-100">
                     <th class="py-2 px-4 border-b">Campo</th>
@@ -386,104 +396,138 @@ document.addEventListener('DOMContentLoaded', () => {
                 </tr>
             </thead>
             <tbody>`;
-        const camposEnfermeria = {
-            'Altura': results.Altura || 'N/A',
-            'Peso': results.Peso || 'N/A',
-            'Circunferencia cintura': results.Circunferencia_cintura || 'N/A',
-            'Presión Arterial': results.Presion_Arterial || 'N/A',
-            'Vacunas': results.Vacunas || 'N/A',
-            'Fecha de Cierre': results.Fecha_cierre_Enf || 'N/A'
-        };
-        for (const campo in camposEnfermeria) {
+
+    const camposEnfermeria = {
+        'Altura': enfermeriaData.Altura || 'N/A',
+        'Peso': enfermeriaData.Peso || 'N/A',
+        'Circunferencia cintura': enfermeriaData.Circunferencia_cintura || 'N/A',
+        'Presión Arterial': enfermeriaData.Presion_Arterial || 'N/A',
+        'Vacunas': enfermeriaData.Vacunas || 'N/A',
+        'Agudeza Visual': enfermeriaData.AgudezaVisual || 'N/A', // CLAVE: Acceder a través de `enfermeriaData`
+        'Fecha de Cierre': enfermeriaData.Fecha_cierre_Enf || 'N/A'
+    };
+    for (const campo in camposEnfermeria) {
             tableHtml += `<tr>
                 <td class="py-2 px-4 border-b text-gray-700">${campo}</td>
                 <td class="py-2 px-4 border-b text-gray-900 font-medium">${camposEnfermeria[campo]}</td>
             </tr>`;
-        }
-        tableHtml += `</tbody></table>`;
-        let linksHtml = '';
-        if (results.Agudeza_Visual_PDF && results.Agudeza_Visual_PDF.trim() !== '') {
-            linksHtml += `<a href="${results.Agudeza_Visual_PDF}" target="_blank" class="block mt-4 text-blue-500 hover:underline">Ver Agudeza Visual (PDF)</a>`;
-        }
-        if (results.Espirometria_PDF && results.Espirometria_PDF.trim() !== '') {
-            linksHtml += `<a href="${results.Espirometria_PDF}" target="_blank" class="block mt-2 text-blue-500 hover:underline">Ver Espirometría (PDF)</a>`;
-        }
-        tableHtml += linksHtml;
-        enfermeriaResultsModalContent.innerHTML = tableHtml;
-        enfermeriaResultsModal.classList.remove('hidden');
-        enfermeriaResultsModal.classList.remove('flex'); 
     }
+    tableHtml += `</tbody></table>`;
+    let linksHtml = '';
+    // La Espirometría también debe leerse desde `enfermeriaData`
+    if (enfermeriaData.Espirometria_PDF && enfermeriaData.Espirometria_PDF.trim() !== '') {
+        linksHtml += `<a href="${enfermeriaData.Espirometria_PDF}" target="_blank" class="block mt-2 text-blue-500 hover:underline">Ver Espirometría (PDF)</a>`;
+    }
+    
+    tableHtml += linksHtml;
+    
+    enfermeriaResultsModalContent.innerHTML = tableHtml;
+    enfermeriaResultsModal.classList.remove('hidden');
+    enfermeriaResultsModal.classList.remove('flex'); 
+}
     
     // --- Lógica para el botón "Ver Estudios" ---
-    if (verEstudiosBtn) {
-        verEstudiosBtn.addEventListener('click', async () => {
-            if (!currentPatientDNI) {
-                alert('No hay un DNI de paciente cargado para buscar estudios.');
-                return;
-            }
-            resultadosEstudiosPacienteDiv.innerHTML = '<p class="text-gray-600"><i class="fas fa-spinner fa-spin"></i> Cargando informes complementarios...</p>';
-            verEstudiosBtn.disabled = true;
+if (verEstudiosBtn) {
+    verEstudiosBtn.addEventListener('click', async () => {
+        if (!currentPatientDNI) {
+            alert('No hay un DNI de paciente cargado para buscar estudios.');
+            return;
+        }
+        resultadosEstudiosPacienteDiv.innerHTML = '<p class="text-gray-600"><i class="fas fa-spinner fa-spin"></i> Cargando informes complementarios...</p>';
+        verEstudiosBtn.disabled = true;
 
-            try {
-                const response = await fetch('/obtener-estudios-paciente', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ dni: currentPatientDNI })
+        try {
+            const response = await fetch('/obtener-estudios-paciente', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ dni: currentPatientDNI })
+            });
+            const result = await response.json();
+            console.log('DEBUG (app.js - /obtener-estudios-paciente): Datos recibidos del Backend:', result);
+            if (response.ok && result.estudios && result.estudios.length > 0) {
+                allFetchedStudies = result.estudios;
+                let estudiosHtml = `<h4 class="text-lg font-semibold text-gray-700 mb-4">Estudios Encontrados para DNI: ${currentPatientDNI}</h4>`;
+                estudiosHtml += `<table class="resultados-table w-full border-collapse">`;
+                estudiosHtml += `
+                    <thead>
+                        <tr class="bg-gray-200">
+                            <th class="px-4 py-2 border text-left">Tipo de Estudio</th>
+                            <th class="px-4 py-2 border text-left">Fecha</th>
+                            <th class="px-4 py-2 border text-left">Prestador</th>
+                            <th class="px-4 py-2 border text-left">Resultado/Detalle</th>
+                            <th class="px-4 py-2 border text-center">Informe/PDF</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                `;
+                result.estudios.forEach((estudio, index) => {
+                    const tipoEstudio = estudio.TipoEstudio || 'Desconocido';
+                    const fechaEstudio = estudio.Fecha || 'N/A';
+                    const prestadorEstudio = estudio.Prestador || 'N/A';
+                    let resultadoCeldaContent = '';
+                    let informeCeldaContent = '';
+
+                    if (tipoEstudio === 'Laboratorio' && estudio.ResultadosLaboratorio && typeof estudio.ResultadosLaboratorio === 'object') {
+                        resultadoCeldaContent = '<p class="text-gray-600 text-sm">Ver detalles en tabla.</p>';
+                        informeCeldaContent = `<button type="button" class="ver-lab-results-btn bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded text-sm" data-index="${index}">Ver Tabla Resultados</button>`;
+                    } else if (tipoEstudio === 'Enfermeria' && estudio.ResultadosEnfermeria) {
+                        resultadoCeldaContent = 'Ver resultados en modal';
+                        informeCeldaContent = `<button type="button" class="ver-enfermeria-results-btn bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-3 rounded text-sm" data-index="${index}">Ver Resultados</button>`;
+                    } 
+                    
+                    // --- Lógica para Espirometria ---
+                    // Se verifica si el tipo de estudio es Espirometria
+                    else if (tipoEstudio === 'Espirometria') {
+                        // Accede a los datos del campo directamente
+                        const resultado = estudio.Resultado || 'N/A';
+                        const link = estudio.LinkPDF;
+                        
+                        // Determina si el link debe ser un enlace o solo texto
+                        const esLink = link && String(link).trim() !== '' && link.startsWith('http');
+                        
+                        resultadoCeldaContent = resultado;
+                        informeCeldaContent = esLink ? `<a href="${link}" target="_blank" class="text-blue-500 hover:underline">Ver PDF <i class="fas fa-external-link-alt ml-1"></i></a>` : '<span>N/A</span>';
+                    }
+                    
+                    else {
+                        // Lógica para todos los demás estudios (Mamografia, Odontologia, etc.)
+                        resultadoCeldaContent = estudio.Resultado || 'N/A';
+                        const linkPdf = estudio.LinkPDF && String(estudio.LinkPDF).trim() !== '' ? estudio.LinkPDF : null;
+                        informeCeldaContent = linkPdf ? `<a href="${linkPdf}" target="_blank" class="text-blue-500 hover:underline">Ver PDF <i class="fas fa-external-link-alt ml-1"></i></a>` : '<span class="text-gray-500">No disponible</span>';
+                    }
+                    estudiosHtml += `<tr class="hover:bg-gray-50"><td class="px-4 py-2 border">${tipoEstudio}</td><td class="px-4 py-2 border">${fechaEstudio}</td><td class="px-4 py-2 border">${prestadorEstudio}</td><td class="px-4 py-2 border">${resultadoCeldaContent}</td><td class="px-4 py-2 border text-center">${informeCeldaContent}</td></tr>`;
                 });
-                const result = await response.json();
-                console.log('DEBUG (app.js - /obtener-estudios-paciente): Datos recibidos del Backend:', result);
-                if (result.success && result.estudios && result.estudios.length > 0) {
-                    allFetchedStudies = result.estudios;
-                    let estudiosHtml = `<h4 class="text-lg font-semibold text-gray-700 mb-4">Estudios Encontrados para DNI: ${currentPatientDNI}</h4>`;
-                    estudiosHtml += `<table class="resultados-table w-full border-collapse">`;
-                    estudiosHtml += `
-                        <thead>
-                            <tr class="bg-gray-200">
-                                <th class="px-4 py-2 border text-left">Tipo de Estudio</th>
-                                <th class="px-4 py-2 border text-left">Fecha</th>
-                                <th class="px-4 py-2 border text-left">Prestador</th>
-                                <th class="px-4 py-2 border text-left">Resultado/Detalle</th>
-                                <th class="px-4 py-2 border text-center">Informe/PDF</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                    `;
-                    result.estudios.forEach((estudio, index) => {
-                        console.log(`DEBUG (app.js - Procesando estudio ${index}):`, JSON.stringify(estudio, null, 2));
-                        const tipoEstudio = estudio.TipoEstudio || 'Desconocido';
-                        const fechaEstudio = estudio.Fecha || 'N/A';
-                        const prestadorEstudio = estudio.Prestador || 'N/A';
-                        let resultadoCeldaContent = '';
-                        let informeCeldaContent = '';
-                        if (tipoEstudio === 'Laboratorio' && estudio.ResultadosLaboratorio && typeof estudio.ResultadosLaboratorio === 'object') {
-                            resultadoCeldaContent = '<p class="text-gray-600 text-sm">Ver detalles en tabla.</p>';
-                            informeCeldaContent = `<button type="button" class="ver-lab-results-btn bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded text-sm" data-index="${index}">Ver Tabla Resultados</button>`;
-                        } else if (tipoEstudio === 'Enfermeria' && estudio.ResultadosEnfermeria) {
-                            // CORRECCIÓN: El botón debe estar en la columna de "Informe/PDF"
-                            resultadoCeldaContent = 'Ver resultados en modal'; // Texto simple aquí
-                            informeCeldaContent = `<button type="button" class="ver-enfermeria-results-btn bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-3 rounded text-sm" data-index="${index}">Ver Resultados</button>`;
-                        } else {
-                            resultadoCeldaContent = estudio.Resultado || 'N/A';
-                            const linkPdf = estudio.LinkPDF && String(estudio.LinkPDF).trim() !== '' ? estudio.LinkPDF : null;
-                            informeCeldaContent = linkPdf ? `<a href="${linkPdf}" target="_blank" class="text-blue-500 hover:underline">Ver PDF <i class="fas fa-external-link-alt ml-1"></i></a>` : '<span class="text-gray-500">No disponible</span>';
-                        }
-                        estudiosHtml += `<tr class="hover:bg-gray-50"><td class="px-4 py-2 border">${tipoEstudio}</td><td class="px-4 py-2 border">${fechaEstudio}</td><td class="px-4 py-2 border">${prestadorEstudio}</td><td class="px-4 py-2 border">${resultadoCeldaContent}</td><td class="px-4 py-2 border text-center">${informeCeldaContent}</td></tr>`;
-                    });
-                    estudiosHtml += `</tbody></table>`;
-                    resultadosEstudiosPacienteDiv.innerHTML = estudiosHtml;
-                } else {
-                    resultadosEstudiosPacienteDiv.innerHTML = `<p class="text-gray-600">No se encontraron estudios complementarios para este paciente.</p>`;
-                }
-            } catch (error) {
-                console.error('ERROR en frontend al buscar estudios (verEstudiosBtn):', error);
-                resultadosEstudiosPacienteDiv.innerHTML = '<p class="text-red-500">Error al buscar estudios. Intente de nuevo.</p>';
-            } finally {
-                verEstudiosBtn.disabled = false;
+                estudiosHtml += `</tbody></table>`;
+                resultadosEstudiosPacienteDiv.innerHTML = estudiosHtml;
+            } else {
+                resultadosEstudiosPacienteDiv.innerHTML = `<p class="text-gray-600">No se encontraron estudios complementarios para este paciente.</p>`;
             }
-        });
+        } catch (error) {
+            console.error('ERROR en frontend al buscar estudios (verEstudiosBtn):', error);
+            resultadosEstudiosPacienteDiv.innerHTML = '<p class="text-red-500">Error al buscar estudios. Intente de nuevo.</p>';
+        } finally {
+            verEstudiosBtn.disabled = false;
+        }
+    });
+}
+    // This block must be placed AFTER the main verEstudiosBtn.addEventListener block
+// to ensure the buttons exist on the page before the listener is added.
+document.addEventListener('click', function(event) {
+    if (event.target.classList.contains('ver-enfermeria-results-btn')) {
+        const index = event.target.getAttribute('data-index');
+        const estudio = allFetchedStudies[index];
+        
+        // Check if the study data and the nested Enfermeria results exist
+        if (estudio && estudio.ResultadosEnfermeria) {
+            // Pass the entire study object to the modal function
+            openEnfermeriaResultsModal(estudio); 
+        } else {
+            // If the data is missing, show an error
+            alert('Error: No se encontraron datos de enfermería para este estudio.');
+        }
     }
+});
 
-    
 function resetProfile() {
     // Limpiar los divs de resultados
     resultDiv.innerHTML = '';

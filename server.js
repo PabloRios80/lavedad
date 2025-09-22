@@ -625,7 +625,7 @@ app.post('/obtener-estudios-paciente', async (req, res) => {
                             'Circunferencia_cintura': estudio['Circunferencia de cintura (cm)'] || 'N/A',
                             'Presion_Arterial': estudio['Presion Arterial (mmhg)'] || 'N/A',
                             'Vacunas': estudio['Vacunas'] || 'N/A',
-                            'Agudeza_Visual_PDF': estudio['Agudeza Visual (Enlace a PDF)'] || '',
+                            'AgudezaVisual': estudio['Agudeza Visual'] || estudio['Agudeza Visual (Enlace a PDF)'] || 'N/A',
                             'Espirometria_PDF': estudio['Espirometria (Enlace a PDF)'] || '',
                             'Fecha_cierre_Enf': estudio['Fecha_cierre_Enf'] || 'N/A'
                         };
