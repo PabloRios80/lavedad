@@ -602,7 +602,7 @@ app.post('/obtener-estudios-paciente', async (req, res) => {
                             // Si el campo existe en la fila de Google Sheets, úsalo; de lo contrario, 'N/A'
                             labResultados[campo] = estudio[campo] !== undefined ? estudio[campo] : 'N/A';
                         });
-
+                        
                         estudiosEncontrados.push({
                             TipoEstudio: sheetName, // Será 'Laboratorio'
                             DNI: estudio['DNI'] || 'N/A',
@@ -610,6 +610,7 @@ app.post('/obtener-estudios-paciente', async (req, res) => {
                             Apellido: estudio['Apellido'] || 'N/A',
                             Fecha: estudio['Fecha'] || 'N/A',
                             Prestador: estudio['Prestador'] || 'N/A',
+                            LinkPDF: estudio['LinkPDF'] || '' ,
                             // >>>>>>>> IMPORTANTE: Para Laboratorio, enviamos los resultados específicos <<<<<<<<
                             ResultadosLaboratorio: labResultados // Objeto con todos los resultados de laboratorio
                         });

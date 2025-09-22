@@ -508,6 +508,7 @@ async function mostrarEstudiosModal(dni, studyType) {
                                 const label = key.replace(/_/g, ' ').replace('PDF', '').trim();
                                 contentHtml += `<li><strong>${label}:</strong> <a href="${value}" target="_blank" class="text-blue-600 hover:underline"><i class="fas fa-file-pdf mr-1"></i>Ver Informe</a></li>`;
                             } 
+                            
                             // Manejo especial para IMC (cálculo)
                             else if (key === 'Peso') {
                                 const alturaCm = parseFloat(resultados.Altura);
@@ -529,6 +530,12 @@ async function mostrarEstudiosModal(dni, studyType) {
                             }
                         }
                         contentHtml += `</ul>`;
+
+                        // Maneja el LinkPDF del estudio, que ahora está en el objeto 'estudio'
+                    if (estudio.LinkPDF && estudio.LinkPDF.trim() !== '') {
+                        contentHtml += `<p class="mt-2"><a href="${estudio.LinkPDF}" target="_blank" class="bg-green-400 hover:bg-green-500 text-gray-900 font-bold py-1 px-2 rounded inline-block"><i class="fas fa-file-pdf mr-1"></i> Ver PDF</a></p>`;
+                    }
+
 
                     } else if (estudio.LinkPDF) { // Lógica para estudios con un solo PDF (ej. Mamografía)
                         contentHtml += `<p class="mt-2"><a href="${estudio.LinkPDF}" target="_blank" class="text-blue-600 hover:underline"><i class="fas fa-file-pdf mr-1"></i>Ver PDF</a></p>`;

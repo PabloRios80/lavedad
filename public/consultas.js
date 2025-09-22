@@ -167,6 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                     estudiosHtml += `</tbody></table>`;
                     if (estudiosContainer) estudiosContainer.innerHTML = estudiosHtml;
+                    
                 } else {
                     if (estudiosContainer) estudiosContainer.innerHTML = `<p class="text-gray-600">No se encontraron estudios para este paciente.</p>`;
                 }
@@ -211,6 +212,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
 
                     if (estudiosModalContent) estudiosModalContent.innerHTML = modalHtml;
+
+                        estudiosModalContent.style.maxHeight = '60vh';
+                        estudiosModalContent.style.overflowY = 'auto';
+                        
                     if (estudiosModal) estudiosModal.classList.remove('hidden');
                     if (modalDniSpan && currentPatientDNI) modalDniSpan.textContent = currentPatientDNI;
                 }
