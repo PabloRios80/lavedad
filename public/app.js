@@ -95,7 +95,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!closeEnfermeriaResultsModal) {
         console.error('ERROR: Botón cerrar modal de enfermería no encontrado');
     }
-    
+     // --- Definir la URL de la API dinámicamente ---
+    let apiBaseUrl = window.location.origin; // Usa el origen actual (incluye el protocolo y el dominio)
+
     // Variables globales para almacenar datos
     let currentPatientData = null; 
     let currentRedFlags = new Set();
