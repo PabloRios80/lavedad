@@ -510,19 +510,29 @@ if (verEstudiosBtn) {
         }
     });
 }
-    // This block must be placed AFTER the main verEstudiosBtn.addEventListener block
-// to ensure the buttons exist on the page before the listener is added.
+// Este bloque debe existir en tu app.js y estar fuera del addEventListener de verEstudiosBtn
+
 document.addEventListener('click', function(event) {
+    // Listener para el modal de Laboratorio
+    if (event.target.classList.contains('ver-lab-results-btn')) {
+        const index = event.target.getAttribute('data-index');
+        const estudio = allFetchedStudies[index];
+        if (estudio && estudio.ResultadosLaboratorio) {
+            // Llamada a la función del modal de laboratorio
+            openLaboratorioResultsModal(estudio.ResultadosLaboratorio); 
+        } else {
+            alert('Error: No se encontraron datos de laboratorio para este estudio.');
+        }
+    }
+    
+    // Listener para el modal de Enfermería
     if (event.target.classList.contains('ver-enfermeria-results-btn')) {
         const index = event.target.getAttribute('data-index');
         const estudio = allFetchedStudies[index];
-        
-        // Check if the study data and the nested Enfermeria results exist
         if (estudio && estudio.ResultadosEnfermeria) {
-            // Pass the entire study object to the modal function
+            // Llamada a la función del modal de enfermería
             openEnfermeriaResultsModal(estudio); 
         } else {
-            // If the data is missing, show an error
             alert('Error: No se encontraron datos de enfermería para este estudio.');
         }
     }
