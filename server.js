@@ -549,7 +549,8 @@ app.post('/obtener-estudios-paciente', async (req, res) => {
             'Biopsia',
             'Odontologia',
             'Enfermeria',
-            'Eco mamaria'
+            'Eco mamaria',
+            'Oftalmologia'
         ];
 
         // >>>>>>>> NUEVO: Definición de campos específicos para la hoja de Laboratorio <<<<<<<<
