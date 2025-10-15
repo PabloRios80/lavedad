@@ -82,7 +82,7 @@ const unauthorizedMessage = document.getElementById('unauthorized-message');
         { name: 'Observaciones_IMC', label: 'Obs. IMC', type: 'textarea', required: false, icon: 'fas fa-comment' },
         { name: 'Agudeza_visual', label: 'Agudeza Visual', type: 'select', options: ['Alterada', 'Control Normal', 'No se realiza'], hasStudyButton: true, studyType: 'Enfermeria', required: true, icon: 'fas fa-eye' },
         { name: 'Observaciones_Agudeza_visual', label: 'Obs. Agudeza Visual', type: 'textarea', required: false, icon: 'fas fa-comment' },
-        { name: 'Control_odontologico', label: 'Control Odontológico', type: 'select', options: ['Control Normal', 'No se realiza', 'Riesgo'], hasStudyButton: true, studyType: 'Odontologia', required: true, icon: 'fas fa-tooth' },
+        { name: 'Control_odontologico', label: 'Control Odontológico', type: 'select', options: ['Control Normal', 'No se realiza', 'Riesgo bajo', 'Riesgo medio', 'Riesgo alto'], hasStudyButton: true, studyType: 'Odontologia', required: true, icon: 'fas fa-tooth' },
         { name: 'Observaciones_Control_odontologico', label: 'Obs. Control Odontológico', type: 'textarea', required: false, icon: 'fas fa-comment' },
         { name: 'Alimentacion_saludable', label: 'Alimentación Saludable', type: 'select', options: ['Sí', 'No'], required: true, icon: 'fas fa-apple-alt' },
         { name: 'Observaciones_Alimentacion_saludable', label: 'Obs. Alimentación Saludable', type: 'textarea', required: false, icon: 'fas fa-comment' },
