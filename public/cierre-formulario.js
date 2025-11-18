@@ -146,7 +146,7 @@ const unauthorizedMessage = document.getElementById('unauthorized-message');
         { name: 'Observaciones_PSA', label: 'Obs. PSA', type: 'textarea', required: false, icon: 'fas fa-comment' },
         { name: 'Chagas', label: 'Chagas', type: 'select', options: ['Negativo', 'Positivo', 'No aplica', 'Pendiente'], hasStudyButton: true, studyType: 'Laboratorio', required: true, icon: 'fas fa-bug' }, // Icono simbólico
         { name: 'Observaciones_Chagas', label: 'Obs. Chagas', type: 'textarea', required: false, icon: 'fas fa-comment' },
-        { name: 'Fecha_cierre_DP', label: 'Fecha Cierre DP', type: 'date', required: true, icon: 'fas fa-calendar-alt' } // Único campo de fecha
+        { name: 'Fecha_cierre_DP', label: 'Fecha Cierre DP', type: 'date', required: true, icon: 'fas fa-calendar-alt' } 
     ];
 
     // Función para generar los pasos del formulario

@@ -7,7 +7,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const guardarSeguimientoBtn = document.getElementById('guardar-seguimiento-btn');
     const cancelarSeguimientoBtn = document.getElementById('cancelar-seguimiento-btn');
     const observacionProfesionalTextarea = document.getElementById('observacion-profesional');
-    const pdfLinksTextarea = document.getElementById('pdf-links');
     const seguimientoFechaInput = document.getElementById('seguimiento-fecha');
     
     let currentPatientData = null; // Variable para almacenar los datos completos del paciente
@@ -134,7 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
             },
             evaluaciones: [],
             observacionProfesional: observacionProfesionalTextarea.value.trim(),
-            pdfLinks: pdfLinksTextarea.value.split('\n').map(link => link.trim()).filter(link => link !== '')
+        
         };
 
         redFlagsData.forEach(motivo => { // Aquí 'motivo' sigue siendo 'IMC', 'Hipertension', etc.
