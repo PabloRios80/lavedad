@@ -98,12 +98,14 @@ app.get('/auth/google',
     passport.authenticate('google', { scope: ['profile', 'email'] })
 );
 
-
 app.get('/auth/google/callback',
     passport.authenticate('google', { failureRedirect: '/login.html' }),
     (req, res) => {
-        // Redirige al usuario a la URL que intentaba acceder originalmente
-        const redirectUrl = req.session.returnTo || '/';
+        // --- CAMBIO AQUÍ ---
+        // Si existe 'returnTo' (porque intentó entrar a una url protegida), úsalo.
+        // SI NO (porque entró desde el botón "Ingresar" de la portada), ve directo al MENÚ MÉDICO.
+        const redirectUrl = req.session.returnTo || '/index-medico.html';
+        
         delete req.session.returnTo; // Limpia la variable de sesión
         res.redirect(redirectUrl);
     }
