@@ -9,6 +9,10 @@ if (process.memoryUsage().heapTotal > heapSizeLimit) {
     global.gc();
 }
 
+// 1. Agregamos un pequeño caché al inicio del archivo server.js
+const cachePacientes = new Map();
+const CACHE_EXPIRATION = 1000 * 60 * 10; // 10 minutos
+
 // Garbage collection automático cada 30 segundos
 setInterval(() => {
     if (global.gc) {
