@@ -116,7 +116,7 @@ const unauthorizedMessage = document.getElementById('unauthorized-message');
         { name: 'Observaciones_Diabetes', label: 'Obs. Diabetes', type: 'textarea', required: false, icon: 'fas fa-comment' },
         { name: 'Cancer_cervico_uterino_HPV', label: 'Cáncer Cérvico Uterino (HPV)', type: 'select', options: ['Normal', 'Pendiente', 'No se realiza', 'Patologico'], hasStudyButton: true, studyType: 'Laboratorio', required: true, icon: 'fas fa-dna' },
         { name: 'Observaciones_Cancer_cervico_uterino_HPV', label: 'Obs. Cáncer Cérvico Uterino (HPV)', type: 'textarea', required: false, icon: 'fas fa-comment' },
-        { name: 'Cancer_cervico_uterino_PAP', label: 'Cáncer Cérvico Uterino (PAP)', type: 'select', options: ['Normal', 'Pendiente', 'No se realiza', 'Patologico'], hasStudyButton: true, studyType: 'Biopsia', required: true, icon: 'fas fa-flask' },
+        { name: 'Cancer_cervico_uterino_PAP', label: 'Cáncer Cérvico Uterino (PAP)', type: 'select', options: ['Normal', 'Pendiente', 'No se realiza', 'Patologico'], hasStudyButton: true, studyType: 'Papanicolau', required: true, icon: 'fas fa-flask' },
         { name: 'Observaciones_PAP', label: 'Obs. PAP', type: 'textarea', required: false, icon: 'fas fa-comment' },
         { name: 'Cancer_colon_SOMF', label: 'Cáncer Colon (SOMF)', type: 'select', options: ['Normal', 'Pendiente', 'No se realiza', 'Patologico'], hasStudyButton: true, studyType: 'Laboratorio', required: true, icon: 'fas fa-poop' }, // Icono simbólico
         { name: 'Observaciones_Cancer_colon_SOMF', label: 'Obs. Cáncer Colon (SOMF)', type: 'textarea', required: false, icon: 'fas fa-comment' },

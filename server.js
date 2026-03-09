@@ -547,7 +547,8 @@ app.post('/obtener-estudios-paciente', async (req, res) => {
         // con los nombres de las pestañas (hojas) en tu archivo de Google Sheets
         const hojasDeEstudios = [
             'Mamografia',
-            'Laboratorio', // ¡Aquí está tu hoja de laboratorio!
+            'Laboratorio',
+            'Papanicolau', 
             'Ecografia',
             'Espirometria',
             'Densitometria',
