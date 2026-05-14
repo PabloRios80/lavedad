@@ -847,6 +847,100 @@ app.post('/api/cierre/guardar', async (req, res) => {
 
         await pacientesSheet.addRow(newRowData);
 
+        // Guardar también en Supabase
+try {
+    const supabaseData = {
+        dni: dni,
+        apellido_y_nombre: `${formData['Apellido'] || ''} ${formData['Nombre'] || ''}`.trim(),
+        fechax: formData['Fecha_cierre_DP'] || new Date().toISOString().split('T')[0],
+        edad: formData['Edad'] || null,
+        sexo: formData['Sexo'] || null,
+        efector: 'IAPOS ESP PREST',
+        tipo: 'Adultos',
+        profesional: profesionalName,
+        marca_temporal: new Date().toISOString(),
+        // Campos clínicos
+        presion_arterial: formData['Presion_Arterial'] || null,
+        obs_presion_arterial: formData['Observaciones_Presion_Arterial'] || null,
+        imc: formData['IMC'] || null,
+        obs_imc: formData['Observaciones_IMC'] || null,
+        agudeza_visual: formData['Agudeza_visual'] || null,
+        obs_agudeza_visual: formData['Observaciones_Agudeza_visual'] || null,
+        control_odontologico_adultos: formData['Control_odontologico'] || null,
+        obs_control_odontologico: formData['Observaciones_Control_odontologico'] || null,
+        alimentacion_saludable: formData['Alimentacion_saludable'] || null,
+        obs_alimentacion: formData['Observaciones_Alimentacion_saludable'] || null,
+        actividad_fisica: formData['Actividad_fisica'] || null,
+        obs_actividad_fisica: formData['Observaciones_Actividad_fisica'] || null,
+        seguridad_vial: formData['Seguridad_vial'] || null,
+        obs_seguridad_vial: formData['Observaciones_Seguridad_vial'] || null,
+        abuso_alcohol: formData['Abuso_alcohol'] || null,
+        obs_abuso_alcohol: formData['Observaciones_Abuso_alcohol'] || null,
+        tabaco: formData['Tabaco'] || null,
+        obs_tabaco: formData['Observaciones_Tabaco'] || null,
+        violencia: formData['Violencia'] || null,
+        obs_violencia: formData['Observaciones_Violencia'] || null,
+        depresion: formData['Depresion'] || null,
+        obs_depresion: formData['Observaciones_Depresion'] || null,
+        its: formData['ITS'] || null,
+        obs_its: formData['Observaciones_ITS'] || null,
+        hepatitis_b: formData['Hepatitis_B'] || null,
+        obs_hepatitis_b: formData['Observaciones_Hepatitis_B'] || null,
+        hepatitis_c: formData['Hepatitis_C'] || null,
+        obs_hepatitis_c: formData['Observaciones_Hepatitis_C'] || null,
+        vih: formData['VIH'] || null,
+        obs_vih: formData['Observaciones_VIH'] || null,
+        dislipemias: formData['Dislipemias'] || null,
+        obs_dislipemias: formData['Observaciones_Dislipemias'] || null,
+        diabetes: formData['Diabetes'] || null,
+        obs_diabetes: formData['Observaciones_Diabetes'] || null,
+        cancer_cervico_hpv: formData['Cancer_cervico_uterino_HPV'] || null,
+        obs_hpv: formData['Observaciones_Cancer_cervico_uterino_HPV'] || null,
+        cancer_cervico_pap: formData['Cancer_cervico_uterino_PAP'] || null,
+        obs_pap: formData['Observaciones_PAP'] || null,
+        somf: formData['Cancer_colon_SOMF'] || null,
+        obs_somf: formData['Observaciones_Cancer_colon_SOMF'] || null,
+        cancer_colon_colonoscopia: formData['Cancer_colon_Colonoscopia'] || null,
+        obs_colonoscopia: formData['Observaciones_Colonoscopia'] || null,
+        cancer_mama_mamografia: formData['Cancer_mama_Mamografia'] || null,
+        obs_mamografia: formData['Observaciones_Mamografia'] || null,
+        cancer_mama_eco_mamaria: formData['Cancer_mama_Eco_mamaria'] || null,
+        obs_eco_mamaria: formData['Observaciones_Eco_mamaria'] || null,
+        erc: formData['ERC'] || null,
+        obs_erc: formData['Observaciones_ECG'] || null,
+        epoc: formData['EPOC'] || null,
+        obs_epoc: formData['Observaciones_EPOC'] || null,
+        aneurisma_aorta: formData['Aneurisma_aorta'] || null,
+        obs_aneurisma_aorta: formData['Observaciones_Aneurisma_aorta'] || null,
+        osteoporosis: formData['Osteoporosis'] || null,
+        obs_osteoporosis: formData['Observaciones_Osteoporosis'] || null,
+        estratificacion_riesgo_cv: formData['Estratificacion_riesgo_CV'] || null,
+        obs_riesgo_cv: formData['Observaciones_Riesgo_CV'] || null,
+        aspirina: formData['Aspirina'] || null,
+        obs_aspirina: formData['Observaciones_Aspirina'] || null,
+        inmunizaciones: formData['Inmunizaciones'] || null,
+        obs_inmunizaciones: formData['Observaciones_Inmunizaciones'] || null,
+        vdrl: formData['VDRL'] || null,
+        obs_vdrl: formData['Observaciones_VDRL'] || null,
+        prostata_psa: formData['Prostata_PSA'] || null,
+        obs_psa: formData['Observaciones_PSA'] || null,
+        chagas: formData['Chagas'] || null,
+        obs_chagas: formData['Observaciones_Chagas'] || null
+    };
+
+    const { error: supabaseError } = await supabase
+        .from('historial_dia_preventivo')
+        .insert(supabaseData);
+
+    if (supabaseError) {
+        console.error('Error al guardar en Supabase:', supabaseError);
+    } else {
+        console.log('✅ Cierre guardado en Supabase para DNI:', dni);
+    }
+} catch (supabaseErr) {
+    console.error('Error Supabase cierre:', supabaseErr.message);
+}
+
         console.log(`SERVER: Nuevo registro de cierre guardado para DNI: ${dni} por ${profesionalName}`);
         return res.json({ success: true, message: 'Formulario de cierre guardado exitosamente como nuevo registro.' });
 
