@@ -14,6 +14,7 @@ const unauthorizedMessage = document.getElementById('unauthorized-message');
                 // El usuario está autenticado, podemos mostrar el formulario
                 mainContent.classList.remove('hidden');
                 unauthorizedMessage.classList.add('hidden');
+                cargarDatosBtn.disabled = false;
                 console.log('Usuario autenticado:', data.user.name, data.user.email);
                 // Aquí, podrías llenar un campo oculto del formulario con el nombre del profesional
                 // Por ejemplo:
@@ -35,25 +36,21 @@ const unauthorizedMessage = document.getElementById('unauthorized-message');
             unauthorizedMessage.classList.remove('hidden');
         }
     }
-
     const verEstudiosBtn = document.getElementById('ver-estudios-btn');
     const dniInput = document.getElementById('paciente-dni');
     const cargarDatosBtn = document.getElementById('cargar-datos-btn');
-    const patientInfoDisplay = document.getElementById('patient-info-display'); // Nuevo contenedor para campos fijos
+    const patientInfoDisplay = document.getElementById('patient-info-display');
     const pacienteApellidoInput = document.getElementById('paciente-apellido');
     const pacienteNombreInput = document.getElementById('paciente-nombre');
     const pacienteEdadInput = document.getElementById('paciente-edad');
-    const pacienteSexoSelect = document.getElementById('paciente-sexo');
-    
-    const cierreForm = document.getElementById('cierre-form'); // El formulario completo, incluyendo pasos
+    const sexoSelect = document.getElementById('paciente-sexo');
+    const cierreForm = document.getElementById('cierre-form');
     const formStepsContainer = document.getElementById('form-steps-container');
     const progressBar = document.getElementById('progress-bar');
     const prevStepBtn = document.getElementById('prev-step-btn');
     const nextStepBtn = document.getElementById('next-step-btn');
     const guardarCierreBtn = document.getElementById('guardar-cierre-btn');
     const cancelarCierreBtn = document.getElementById('cancelar-cierre-btn');
-
-      // Elementos del Modal
     const estudiosModal = document.getElementById('estudiosModal');
     const closeModalBtn = document.getElementById('closeModalBtn');
     const modalCloseButtonBottom = document.getElementById('modalCloseButtonBottom');
@@ -61,10 +58,9 @@ const unauthorizedMessage = document.getElementById('unauthorized-message');
     const estudiosModalContent = document.getElementById('estudiosModalContent');
 
     let currentPatientData = null;
-    let currentStep = 0; // Para el formulario multi-paso
-    let formSteps = []; // Almacenará los divs de cada paso
+    let currentStep = 0;
+    let formSteps = [];
 
-    // Deshabilitar el botón de cargar datos al inicio si el DNI está vacío
     if (!dniInput.value.trim()) {
         cargarDatosBtn.disabled = true;
     }
@@ -297,10 +293,19 @@ const unauthorizedMessage = document.getElementById('unauthorized-message');
     // Función para limpiar el formulario y resetear el estado
     function resetForm() {
         dniInput.value = '';
-        pacienteApellidoInput.value = '';
-        pacienteNombreInput.value = '';
-        pacienteEdadInput.value = '';
-        pacienteSexoSelect.value = '';
+        // Asignar DNI a currentPatientData para el botón "Ver Estudio"
+        currentPatientData = { DNI: dni };
+
+        // Mostrar formulario de cierre
+        cierreForm.classList.remove('hidden');
+        // Habilitar edición de campos fijos
+        pacienteApellidoInput.removeAttribute('readonly');
+        pacienteNombreInput.removeAttribute('readonly');
+        pacienteEdadInput.removeAttribute('readonly');
+        sexoSelect.removeAttribute('disabled');
+
+        // Generar y mostrar el primer paso del formulario dinámico
+        generateFormSteps();
 
         patientInfoDisplay.classList.add('hidden');
         cierreForm.classList.add('hidden');
@@ -311,9 +316,11 @@ const unauthorizedMessage = document.getElementById('unauthorized-message');
         
         // Restablecer el estado inicial de los campos fijos
         pacienteApellidoInput.setAttribute('readonly', true);
+        console.log('pacienteApellidoInput:', pacienteApellidoInput);
+        console.log('pacienteNombreInput:', pacienteNombreInput);
         pacienteNombreInput.setAttribute('readonly', true);
         pacienteEdadInput.setAttribute('readonly', true);
-        pacienteSexoSelect.setAttribute('disabled', true);
+        sexoSelect.setAttribute('disabled', true);
 
         cargarDatosBtn.disabled = true; // Deshabilitar botón de carga hasta que se ingrese DNI
     }
@@ -329,14 +336,83 @@ const unauthorizedMessage = document.getElementById('unauthorized-message');
             resetForm(); // Resetear el formulario si el DNI se borra
         }
     });
+    cargarDatosBtn.addEventListener('click', async () => {
+    console.log('Click en cargar datos - DNI:', dniInput.value);
+    const dni = dniInput.value.trim();
+    if (!dni) {
+        alert('Por favor, ingrese un DNI para cargar los datos.');
+        return;
+    }
 
-    // Event Listener para el botón "Cargar Datos"
-    cargarDatosBtn.addEventListener('click', () => {
-        const dni = dniInput.value.trim();
-        if (!dni) {
-            alert('Por favor, ingrese un DNI para cargar los datos.');
+    cargarDatosBtn.disabled = true;
+    cargarDatosBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando...';
+
+    try {
+        console.log('Llamando a /cargar-datos-paciente...');
+        const response = await fetch('/cargar-datos-paciente', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dni })
+        });
+        console.log('Response status:', response.status);
+        const data = await response.json();
+        console.log('iapos esActivo:', data.iapos?.esActivo);
+        console.log('iapos nombre:', data.iapos?.nombre);
+        console.log('Data recibida:', data);
+        if (!data.success) {
+            alert('Error al cargar datos.');
             return;
         }
+
+        // Autocompletar desde IAPOS
+        if (data.iapos?.esActivo) {
+            const nombreCompleto = data.iapos.nombre || '';
+            const partes = nombreCompleto.split(',');
+            pacienteApellidoInput.value = partes[0]?.trim() || '';
+            console.log('pacienteApellidoInput:', pacienteApellidoInput);
+            console.log('pacienteNombreInput:', pacienteNombreInput);
+            pacienteNombreInput.value = partes[1]?.trim() || '';
+            pacienteEdadInput.value = data.iapos.edad || '';
+            if (sexoSelect) sexoSelect.value = data.iapos.sexo === '2' ? 'F' : 'M';
+            patientInfoDisplay.classList.remove('hidden');
+        } else {
+            alert('⚠️ El afiliado no está activo en IAPOS. Verificar antes de continuar.');
+        }
+
+        // Mostrar alertas clínicas
+        if (data.alertas?.length > 0) {
+            let alertasHTML = '<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:12px;margin:10px 0;">';
+            alertasHTML += '<p style="font-weight:bold;margin-bottom:8px;">⚠️ Alertas Clínicas:</p>';
+            data.alertas.forEach(a => {
+                const color = a.tipo === 'URGENTE' ? '#dc3545' : '#856404';
+                alertasHTML += `<p style="color:${color};margin:4px 0;">${a.mensaje}</p>`;
+            });
+            alertasHTML += '</div>';
+
+            // Insertamos las alertas antes del formulario
+            const formContainer = document.querySelector('.form-container') || document.querySelector('form') || document.body;
+            const alertasDiv = document.createElement('div');
+            alertasDiv.id = 'alertas-clinicas';
+            alertasDiv.innerHTML = alertasHTML;
+            
+            // Evitar duplicados
+            const existente = document.getElementById('alertas-clinicas');
+            if (existente) existente.remove();
+            
+            dniInput.closest('div')?.after(alertasDiv) || formContainer.prepend(alertasDiv);
+        }
+
+        // Guardar datos para uso posterior
+        window._datosPaciente = data;
+
+    } catch (e) {
+        console.error('Error:', e);
+        alert('Error de conexión al cargar datos.');
+    } finally {
+        cargarDatosBtn.disabled = false;
+        cargarDatosBtn.innerHTML = '<i class="fas fa-search"></i> Cargar Datos';
+    }
+
         
         // Asignar DNI a currentPatientData para el botón "Ver Estudio"
         currentPatientData = { DNI: dni };
@@ -347,16 +423,12 @@ const unauthorizedMessage = document.getElementById('unauthorized-message');
 
         // Habilitar edición de campos fijos
         pacienteApellidoInput.removeAttribute('readonly');
+        console.log('pacienteApellidoInput:', pacienteApellidoInput);
+        console.log('pacienteNombreInput:', pacienteNombreInput);
         pacienteNombreInput.removeAttribute('readonly');
         pacienteEdadInput.removeAttribute('readonly');
-        pacienteSexoSelect.removeAttribute('disabled');
+        sexoSelect.removeAttribute('disabled');
         
-        // Limpiar campos fijos al cargar para que el usuario los complete si son nuevos
-        pacienteApellidoInput.value = '';
-        pacienteNombreInput.value = '';
-        pacienteEdadInput.value = '';
-        pacienteSexoSelect.value = '';
-
         // Generar y mostrar el primer paso del formulario dinámico
         generateFormSteps();
     });
@@ -405,7 +477,7 @@ const unauthorizedMessage = document.getElementById('unauthorized-message');
         formData['Apellido'] = pacienteApellidoInput.value.trim();
         formData['Nombre'] = pacienteNombreInput.value.trim();
         formData['Edad'] = pacienteEdadInput.value.trim();
-        formData['Sexo'] = pacienteSexoSelect.value.trim();
+        formData['Sexo'] = sexoSelect.value.trim();
 
         // Recolectar datos de campos dinámicos y validar
         allFormInputs.forEach(input => {

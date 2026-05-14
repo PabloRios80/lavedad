@@ -2,6 +2,14 @@ require('dotenv').config();
 const v8 = require('v8');
 v8.setFlagsFromString('--max-old-space-size=8192'); // 8GB
 
+const { createClient } = require('@supabase/supabase-js');
+const axios = require('axios');
+
+const supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_KEY
+);
+
 // Limitar el tamaño del heap de Node.js
 const heapSizeLimit = 8192 * 1024 * 1024; // 8GB en bytes
 if (process.memoryUsage().heapTotal > heapSizeLimit) {
@@ -145,6 +153,9 @@ app.get('/cierre-formulario.html', (req, res) => {
         // Si no está autenticado, lo redirige al login de Google, pasando la URL actual
         res.redirect('/auth/google?returnTo=/cierre-formulario.html');
     }
+});
+app.get('/cierre-formulario.js', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'cierre-formulario.js'));
 });
 
 app.get('/consultas.html', (req, res) => {
@@ -926,3 +937,155 @@ initializeGoogleSheet().then(() => {
     console.error('❌ Fallo al iniciar el servidor debido a un error de inicialización de Google Sheet:', err);
     process.exit(1); // Sale si no se puede iniciar el servidor
 });
+
+// Cargar datos del paciente desde IAPOS + Supabase
+app.post('/cargar-datos-paciente', async (req, res) => {
+    const { dni } = req.body;
+    if (!dni) return res.status(400).json({ error: 'DNI requerido.' });
+
+    const hoy = new Date().toISOString().split('T')[0];
+
+    // 1. Consultar IAPOS
+    const soapBody = `<?xml version="1.0" encoding="utf-8"?>
+    <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+        <soap:Body>
+            <BEWsValidaAfi.Execute xmlns="IAPOS_WS">
+                <Usuario>CONSULTAPDP</Usuario>
+                <Passwd>1Qaz</Passwd>
+                <Nafiliado>${dni}</Nafiliado>
+                <Badocnumdo>${dni}</Badocnumdo>
+                <Tidocodigo_de_documento>96</Tidocodigo_de_documento>
+                <Ogorcodigo>1</Ogorcodigo>
+                <Fechpresta>${hoy}</Fechpresta>
+            </BEWsValidaAfi.Execute>
+        </soap:Body>
+    </soap:Envelope>`;
+
+    let datosIAPOS = null;
+    try {
+        const iaposRes = await axios.post(
+            'https://aswe.santafe.gov.ar/iapos-sw-srvt/servlet/abewsvalidaafi',
+            soapBody,
+            { headers: { 'Content-Type': 'text/xml; charset=utf-8', 'SOAPAction': 'IAPOS_WSaction/ABEWSVALIDAAFI.Execute' }, timeout: 10000 }
+        );
+        const xml = iaposRes.data;
+        const getValor = (tag) => {
+            const match = xml.match(new RegExp(`<${tag}[^>]*>([^<]+)<\/${tag}>`));
+            return match ? match[1].trim() : null;
+        };
+        datosIAPOS = {
+            estado: getValor('Estado'),
+            esActivo: getValor('Estado') === 'A',
+            nombre: getValor('Apenom'),
+            edad: getValor('Edad'),
+            sexo: getValor('Sexo'), // 1=M, 2=F
+            localidad: getValor('Localidad'),
+            fechaNac: getValor('Fechanac')
+        };
+    } catch (e) {
+        console.error('Error IAPOS:', e.message);
+    }
+
+    // 2. Buscar hoja de vida en Supabase
+    const { data: afiliado } = await supabase
+        .from('afiliados')
+        .select('*')
+        .eq('dni', dni)
+        .single();
+
+    // 3. Buscar último DP
+    const { data: ultimoDP } = await supabase
+        .from('historial_dia_preventivo')
+        .select('fechax, efector, cancer_cervico_hpv, somf, dislipemias, diabetes, presion_arterial')
+        .eq('dni', dni)
+        .order('fechax', { ascending: false })
+        .limit(1)
+        .single();
+
+    // 4. Buscar prácticas realizadas
+    const { data: practicas } = await supabase
+        .from('practicas_autorizadas')
+        .select('*')
+        .eq('dni', dni)
+        .eq('estado', 'REALIZADA');
+
+    // 5. Generar alertas clínicas
+    const alertas = [];
+    if (afiliado?.cancer_de_colon === 'si') alertas.push({ tipo: 'RIESGO', mensaje: '⚠️ Antecedente familiar de cáncer de colon — indicar VCC' });
+    if (afiliado?.cancer_de_mama === 'si') alertas.push({ tipo: 'RIESGO', mensaje: '⚠️ Antecedente familiar de cáncer de mama' });
+    if (afiliado?.diabetes === 'si') alertas.push({ tipo: 'RIESGO', mensaje: '⚠️ Diabetes — verificar HbA1c y fondo de ojo' });
+    if (afiliado?.hipertension === 'si') alertas.push({ tipo: 'RIESGO', mensaje: '⚠️ Hipertensión — verificar fondo de ojo' });
+    if (ultimoDP?.cancer_cervico_hpv === 'Patologico') alertas.push({ tipo: 'URGENTE', mensaje: '🔴 HPV Patológico en DP anterior — verificar PAP' });
+    if (ultimoDP?.somf === 'Patologico') alertas.push({ tipo: 'URGENTE', mensaje: '🔴 SOMF Patológico en DP anterior — indicar VCC urgente' });
+
+    res.json({
+        success: true,
+        iapos: datosIAPOS,
+        afiliado: afiliado || null,
+        ultimoDP: ultimoDP || null,
+        practicasRealizadas: practicas || [],
+        alertas
+    });
+});
+
+// Obtener estudios del paciente desde Supabase
+app.post('/obtener-estudios-paciente', async (req, res) => {
+    const { dni } = req.body;
+    if (!dni) return res.status(400).json({ error: 'DNI requerido.' });
+
+    try {
+        const { data: practicas, error } = await supabase
+            .from('practicas_autorizadas')
+            .select('*')
+            .eq('dni', dni)
+            .eq('estado', 'REALIZADA');
+
+        if (error) throw error;
+
+        // Convertimos al formato que espera el frontend
+        const estudiosEncontrados = (practicas || []).map(p => {
+            const tipo = mapearTipoEstudio(p.descripcion_practica);
+            return {
+                TipoEstudio: tipo,
+                DNI: p.dni,
+                Nombre: p.nombre_completo?.split(' ')[1] || '',
+                Apellido: p.nombre_completo?.split(' ')[0] || '',
+                Fecha: p.fecha_carga,
+                Prestador: p.nombre_prestador || '',
+                Resultado: p.resultado_texto || '',
+                LinkPDF: p.enlace_pdf || '',
+                ResultadosLaboratorio: tipo === 'Laboratorio' ? parsearResultadosLab(p) : null
+            };
+        });
+
+        res.json({ success: true, estudios: estudiosEncontrados });
+    } catch (e) {
+        console.error('Error:', e.message);
+        res.status(500).json({ error: 'Error al obtener estudios.' });
+    }
+});
+
+function mapearTipoEstudio(descripcion) {
+    if (!descripcion) return 'Otro';
+    const d = descripcion.toLowerCase();
+    if (d.includes('mamog')) return 'Mamografia';
+    if (d.includes('ecograf') && d.includes('mam')) return 'Eco mamaria';
+    if (d.includes('ecograf')) return 'Ecografia';
+    if (d.includes('densito')) return 'Densitometria';
+    if (d.includes('colonos') || d.includes('vcc')) return 'VCC';
+    if (d.includes('pap')) return 'Papanicolau';
+    if (d.includes('espiro')) return 'Espirometria';
+    if (d.includes('biopsia')) return 'Biopsia';
+    if (d.includes('glucemia') || d.includes('colesterol') || d.includes('hepatitis') || 
+        d.includes('vih') || d.includes('chagas') || d.includes('vdrl')) return 'Laboratorio';
+    if (d.includes('odonto')) return 'Odontologia';
+    if (d.includes('vision') || d.includes('visual')) return 'Oftalmologia';
+    return 'Otro';
+}
+
+function parsearResultadosLab(practica) {
+    return {
+        'Glucemia': practica.resultado_texto || 'N/A',
+        'Colesterol Total': practica.resultado_texto || 'N/A'
+    };
+}
