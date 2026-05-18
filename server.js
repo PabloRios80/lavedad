@@ -184,21 +184,38 @@ let credentials;
 app.listen(PORT, () => {
     console.log(`Servidor escuchando en ${API_BASE_URL}`);
 });
-
 app.post('/api/enfermeria/guardar', async (req, res) => {
     try {
-        // La conexión ya está inicializada al arrancar el servidor
-        // No necesitas la línea "if (!doc) { await initializeGoogleSheet(); }"
-        
+        const newRow = req.body;
+        newRow['Fecha_cierre_Enf'] = new Date().toLocaleDateString('es-AR');
+
+        // 1. Guardar en Google Sheets
         const sheet = doc.sheetsByTitle["Enfermeria"];
         if (!sheet) {
-            return res.status(500).json({ message: 'Hoja de cálculo "Enfermeria" no encontrada.' });
+            return res.status(500).json({ message: 'Hoja "Enfermeria" no encontrada.' });
         }
-
-        const newRow = req.body;
-        // >>>>> AGREGAR ESTA LÍNEA <<<<<
-        newRow['Fecha_cierre_Enf'] = new Date().toLocaleDateString('es-AR');
         await sheet.addRow(newRow);
+
+        // 2. Guardar en Supabase
+        const { error } = await supabase
+            .from('enfermeria_consultas')
+            .insert({
+                dni: newRow['DNI'],
+                nombre: newRow['Nombre'],
+                apellido: newRow['Apellido'],
+                altura_cm: newRow['Altura (cm)'],
+                peso_kg: newRow['Peso (kg)'],
+                circunferencia_cintura_cm: newRow['Circunferencia de cintura (cm)'],
+                presion_arterial: newRow['Presion Arterial (mmhg)'],
+                vacunas: newRow['Vacunas'],
+                agudeza_visual: newRow['Agudeza Visual'],
+                espirometria_pdf: newRow['Espirometria (Enlace a PDF)'],
+                fecha_cierre_enf: newRow['Fecha_cierre_Enf'],
+                nombre_enfermera: newRow['Nombre Enfermera']
+            });
+
+        if (error) console.error('Error Supabase enfermería:', error);
+        else console.log('✅ Enfermería guardada en Supabase para DNI:', newRow['DNI']);
 
         res.status(200).json({ message: 'Datos guardados correctamente.' });
     } catch (error) {
