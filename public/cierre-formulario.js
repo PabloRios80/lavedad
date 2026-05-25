@@ -222,6 +222,30 @@ const unauthorizedMessage = document.getElementById('unauthorized-message');
 
             fieldContainer.appendChild(label);
 
+// Alertas contextuales por campo
+            const alertasDelCampo = (window._datosPaciente?.alertas || []).filter(a => a.campo === field.name);
+            if (alertasDelCampo.length > 0) {
+                const alertaBox = document.createElement('div');
+                alertaBox.style.cssText = 'margin-bottom:6px; border-radius:6px; overflow:hidden;';
+                alertasDelCampo.forEach(a => {
+                    const linea = document.createElement('div');
+                    const esUrgente = a.tipo === 'URGENTE';
+                    const esRiesgo = a.tipo === 'RIESGO';
+                    linea.style.cssText = `
+                        padding: 6px 10px;
+                        font-size: 12px;
+                        font-weight: 500;
+                        border-left: 3px solid ${esUrgente ? '#dc2626' : esRiesgo ? '#d97706' : '#0448a2'};
+                        background: ${esUrgente ? '#fef2f2' : esRiesgo ? '#fffbeb' : '#eff6ff'};
+                        color: ${esUrgente ? '#991b1b' : esRiesgo ? '#92400e' : '#1e40af'};
+                        margin-bottom: 2px;
+                    `;
+                    linea.textContent = a.mensaje;
+                    alertaBox.appendChild(linea);
+                });
+                fieldContainer.appendChild(alertaBox);
+            }
+
             if (field.hasStudyButton) {
                 const inputGroup = document.createElement('div');
                 inputGroup.className = 'flex items-center';
@@ -294,7 +318,7 @@ const unauthorizedMessage = document.getElementById('unauthorized-message');
     function resetForm() {
         dniInput.value = '';
         // Asignar DNI a currentPatientData para el botón "Ver Estudio"
-        currentPatientData = { DNI: dni };
+        currentPatientData = null;
 
         // Mostrar formulario de cierre
         cierreForm.classList.remove('hidden');

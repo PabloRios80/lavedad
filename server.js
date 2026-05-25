@@ -1120,15 +1120,80 @@ app.post('/cargar-datos-paciente', async (req, res) => {
         .eq('dni', dni)
         .eq('estado', 'REALIZADA');
 
-    // 5. Generar alertas clínicas
-    const alertas = [];
-    if (afiliado?.cancer_de_colon === 'si') alertas.push({ tipo: 'RIESGO', mensaje: '⚠️ Antecedente familiar de cáncer de colon — indicar VCC' });
-    if (afiliado?.cancer_de_mama === 'si') alertas.push({ tipo: 'RIESGO', mensaje: '⚠️ Antecedente familiar de cáncer de mama' });
-    if (afiliado?.diabetes === 'si') alertas.push({ tipo: 'RIESGO', mensaje: '⚠️ Diabetes — verificar HbA1c y fondo de ojo' });
-    if (afiliado?.hipertension === 'si') alertas.push({ tipo: 'RIESGO', mensaje: '⚠️ Hipertensión — verificar fondo de ojo' });
-    if (ultimoDP?.cancer_cervico_hpv === 'Patologico') alertas.push({ tipo: 'URGENTE', mensaje: '🔴 HPV Patológico en DP anterior — verificar PAP' });
-    if (ultimoDP?.somf === 'Patologico') alertas.push({ tipo: 'URGENTE', mensaje: '🔴 SOMF Patológico en DP anterior — indicar VCC urgente' });
+    // 5. Buscar datos de enfermería
+const { data: enfermeria } = await supabase
+    .from('enfermeria_consultas')
+    .select('presion_arterial, peso_kg, altura_cm')
+    .eq('dni', dni)
+    .order('fecha_cierre_enf', { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
+// 6. Generar alertas clínicas con campo asociado
+const alertas = [];
+
+// ── HOJA DE VIDA ──
+if (afiliado?.hipertension === 'si')
+    alertas.push({ tipo: 'RIESGO', campo: 'Presion_Arterial', mensaje: '⚠️ Declara hipertensión en hoja de vida' });
+if (afiliado?.hipertension_familiar === 'si')
+    alertas.push({ tipo: 'INFO', campo: 'Presion_Arterial', mensaje: 'ℹ️ Antecedente familiar de hipertensión' });
+if (afiliado?.diabetes === 'si')
+    alertas.push({ tipo: 'RIESGO', campo: 'Diabetes', mensaje: '⚠️ Declara diabetes en hoja de vida' });
+if (afiliado?.diabetes_familiar === 'si')
+    alertas.push({ tipo: 'INFO', campo: 'Diabetes', mensaje: 'ℹ️ Antecedente familiar de diabetes' });
+if (afiliado?.colesterol === 'si')
+    alertas.push({ tipo: 'RIESGO', campo: 'Dislipemias', mensaje: '⚠️ Declara colesterol alto en hoja de vida' });
+if (afiliado?.depresion === 'si')
+    alertas.push({ tipo: 'RIESGO', campo: 'Depresion', mensaje: '⚠️ Depresión diagnosticada declarada en hoja de vida' });
+if (afiliado?.abuso_alcohol_drogas === 'si')
+    alertas.push({ tipo: 'RIESGO', campo: 'Abuso_alcohol', mensaje: '⚠️ Declara problemas con alcohol/drogas en hoja de vida' });
+if (afiliado?.fuma && afiliado.fuma !== 'nunca')
+    alertas.push({ tipo: 'INFO', campo: 'Tabaco', mensaje: `ℹ️ Fumador declarado: ${afiliado.fuma}` });
+if (afiliado?.fuma && afiliado.fuma !== 'nunca')
+    alertas.push({ tipo: 'INFO', campo: 'EPOC', mensaje: '⚠️ Fumador — evaluar espirometría' });
+if (afiliado?.cancer_de_colon === 'si')
+    alertas.push({ tipo: 'RIESGO', campo: 'Cancer_colon_SOMF', mensaje: '⚠️ Antecedente familiar de cáncer de colon — indicar VCC' });
+if (afiliado?.cancer_de_mama === 'si')
+    alertas.push({ tipo: 'RIESGO', campo: 'Cancer_mama_Mamografia', mensaje: '⚠️ Antecedente familiar de cáncer de mama' });
+if (afiliado?.cancer_de_prostata === 'si')
+    alertas.push({ tipo: 'RIESGO', campo: 'Prostata_PSA', mensaje: '⚠️ Antecedente familiar de cáncer de próstata' });
+if (afiliado?.cancer_cuello_utero === 'si')
+    alertas.push({ tipo: 'RIESGO', campo: 'Cancer_cervico_uterino_HPV', mensaje: '⚠️ Antecedente familiar de cáncer de cuello uterino' });
+if (afiliado?.stress === 'si')
+    alertas.push({ tipo: 'INFO', campo: 'Depresion', mensaje: 'ℹ️ Declara estrés/ansiedad excesiva en hoja de vida' });
+
+// ── ENFERMERÍA ──
+if (enfermeria?.presion_arterial) {
+    const ta = enfermeria.presion_arterial;
+    const partes = ta.split('/');
+    if (partes.length === 2) {
+        const sist = parseInt(partes[0]);
+        const diast = parseInt(partes[1]);
+        if (sist >= 140 || diast >= 90)
+            alertas.push({ tipo: 'URGENTE', campo: 'Presion_Arterial', mensaje: `🔴 Enfermería registró TA elevada: ${ta} mmHg` });
+        else if (sist >= 130 || diast >= 85)
+            alertas.push({ tipo: 'RIESGO', campo: 'Presion_Arterial', mensaje: `⚠️ Enfermería registró TA en límite: ${ta} mmHg` });
+    }
+}
+if (enfermeria?.peso_kg && enfermeria?.altura_cm) {
+    const imc = parseFloat(enfermeria.peso_kg) / Math.pow(parseFloat(enfermeria.altura_cm) / 100, 2);
+    if (imc >= 30)
+        alertas.push({ tipo: 'RIESGO', campo: 'IMC', mensaje: `⚠️ Enfermería registró IMC: ${imc.toFixed(1)} — obesidad` });
+    else if (imc >= 25)
+        alertas.push({ tipo: 'INFO', campo: 'IMC', mensaje: `ℹ️ Enfermería registró IMC: ${imc.toFixed(1)} — sobrepeso` });
+}
+
+// ── HISTORIAL DP ANTERIOR ──
+if (ultimoDP?.cancer_cervico_hpv === 'Patologico')
+    alertas.push({ tipo: 'URGENTE', campo: 'Cancer_cervico_uterino_HPV', mensaje: '🔴 HPV Patológico en DP anterior — verificar PAP' });
+if (ultimoDP?.somf === 'Patologico')
+    alertas.push({ tipo: 'URGENTE', campo: 'Cancer_colon_SOMF', mensaje: '🔴 SOMF Patológico en DP anterior — indicar VCC urgente' });
+if (ultimoDP?.dislipemias === 'Presenta')
+    alertas.push({ tipo: 'RIESGO', campo: 'Dislipemias', mensaje: '⚠️ Dislipemias presentes en DP anterior' });
+if (ultimoDP?.diabetes === 'Presenta')
+    alertas.push({ tipo: 'RIESGO', campo: 'Diabetes', mensaje: '⚠️ Diabetes presente en DP anterior' });
+if (ultimoDP?.presion_arterial === 'Hipertensión')
+    alertas.push({ tipo: 'RIESGO', campo: 'Presion_Arterial', mensaje: '⚠️ Hipertensión registrada en DP anterior' });
     res.json({
         success: true,
         iapos: datosIAPOS,
