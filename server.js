@@ -180,10 +180,6 @@ app.get('/api/config', (req, res) => {
 let doc;
 let credentials;
 
-// Iniciar el servidor
-app.listen(PORT, () => {
-    console.log(`Servidor escuchando en ${API_BASE_URL}`);
-});
 app.post('/api/enfermeria/guardar', async (req, res) => {
     try {
         const newRow = req.body;
@@ -1038,17 +1034,6 @@ app.post('/guardar-consulta', async (req, res) => {
 // INICIO DEL SERVIDOR
 // ====================================================================
 
-// Llama a la función de inicialización de Google Sheet una vez que el servidor arranca.
-// El servidor no empezará a escuchar peticiones hasta que la conexión con la hoja esté lista.
-initializeGoogleSheet().then(() => {
-    app.listen(PORT, () => {
-        console.log(`✅ Servidor funcionando en http://localhost:${PORT}`);
-    });
-}).catch(err => {
-    console.error('❌ Fallo al iniciar el servidor debido a un error de inicialización de Google Sheet:', err);
-    process.exit(1); // Sale si no se puede iniciar el servidor
-});
-
 // Cargar datos del paciente desde IAPOS + Supabase
 app.post('/cargar-datos-paciente', async (req, res) => {
     const { dni } = req.body;
@@ -1265,3 +1250,59 @@ function parsearResultadosLab(practica) {
         'Colesterol Total': practica.resultado_texto || 'N/A'
     };
 }
+
+// ── VERIFICAR AFILIADO IAPOS ──
+app.get('/verificar-afiliado/:dni', async (req, res) => {
+    const dni = req.params.dni;
+    const hoy = new Date().toISOString().split('T')[0];
+
+    const soapBody = `<?xml version="1.0" encoding="utf-8"?>
+    <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+        <soap:Body>
+            <BEWsValidaAfi.Execute xmlns="IAPOS_WS">
+                <Usuario>CONSULTAPDP</Usuario>
+                <Passwd>1Qaz</Passwd>
+                <Nafiliado>${dni}</Nafiliado>
+                <Badocnumdo>${dni}</Badocnumdo>
+                <Tidocodigo_de_documento>96</Tidocodigo_de_documento>
+                <Ogorcodigo>1</Ogorcodigo>
+                <Fechpresta>${hoy}</Fechpresta>
+            </BEWsValidaAfi.Execute>
+        </soap:Body>
+    </soap:Envelope>`;
+
+    try {
+        const iaposRes = await axios.post(
+            'https://aswe.santafe.gov.ar/iapos-sw-srvt/servlet/abewsvalidaafi',
+            soapBody,
+            { headers: { 'Content-Type': 'text/xml; charset=utf-8', 'SOAPAction': 'IAPOS_WSaction/ABEWSVALIDAAFI.Execute' }, timeout: 10000 }
+        );
+        const xml = iaposRes.data;
+        const getValor = (tag) => {
+            const match = xml.match(new RegExp(`<${tag}[^>]*>([^<]+)<\/${tag}>`));
+            return match ? match[1].trim() : null;
+        };
+        res.json({
+            esActivo: getValor('Estado') === 'A',
+            nombre: getValor('Apenom'),
+            edad: getValor('Edad'),
+            sexo: getValor('Sexo'),
+            localidad: getValor('Localidad'),
+            fechaNac: getValor('Fechanac')
+        });
+    } catch(e) {
+        console.error('Error IAPOS:', e.message);
+        res.json({ esActivo: false, nombre: null });
+    }
+});
+
+// Llama a la función de inicialización de Google Sheet una vez que el servidor arranca.
+// El servidor no empezará a escuchar peticiones hasta que la conexión con la hoja esté lista.
+initializeGoogleSheet().then(() => {
+    app.listen(PORT, () => {
+        console.log(`✅ Servidor funcionando en http://localhost:${PORT}`);
+    });
+}).catch(err => {
+    console.error('❌ Fallo al iniciar el servidor debido a un error de inicialización de Google Sheet:', err);
+    process.exit(1); // Sale si no se puede iniciar el servidor
+});
