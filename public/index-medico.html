@@ -97,7 +97,7 @@
 
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-8 max-w-7xl mx-auto w-full">
 
-            <a href="https://cierre-pediatria.diapreventivoiapos.com/" target="_blank" 
+            <a onclick="irA('https://cierre-pediatria.diapreventivoiapos.com/cierre_pediatria.html')" ...></a>
                 class="group relative bg-slate-50 hover:bg-white rounded-2xl transition-all duration-300 
                         border-2 border-red-200 hover:border-red-500 shadow-lg hover:shadow-2xl hover:-translate-y-2 overflow-hidden flex flex-col h-full">
                 
@@ -117,7 +117,7 @@
                 </div>
             </a>
 
-            <a href="cierre-formulario.html" 
+            <a onclick="irA('cierre-formulario.html')" ...></a>
                 class="group relative bg-slate-50 hover:bg-white rounded-2xl transition-all duration-300 
                         border-2 border-green-200 hover:border-green-500 shadow-lg hover:shadow-2xl hover:-translate-y-2 overflow-hidden flex flex-col h-full">
                 
@@ -135,7 +135,7 @@
                 </div>
             </a>
 
-            <a href="https://seguimiento.diapreventivoiapos.com" target="_blank" 
+            <a onclick="irA('https://seguimiento.diapreventivoiapos.com')" ...></a>
                 class="group relative bg-slate-50 hover:bg-white rounded-2xl transition-all duration-300 
                         border-2 border-blue-200 hover:border-blue-500 shadow-lg hover:shadow-2xl hover:-translate-y-2 overflow-hidden flex flex-col h-full">
                 
@@ -152,7 +152,7 @@
                     </span>
                 </div>
             </a>
-            <a href="https://consultas.diapreventivoiapos.com" 
+            <a onclick="irA('https://consultas.diapreventivoiapos.com')" ...></a> 
                 class="group relative bg-slate-50 hover:bg-white rounded-2xl transition-all duration-300 
                         border-2 border-purple-200 hover:border-purple-500 shadow-lg hover:shadow-2xl hover:-translate-y-2 overflow-hidden flex flex-col h-full">
     
@@ -186,6 +186,12 @@
             </p>
         </div>
     </footer>
+    <script>
+    function irA(url) {
+        const token = localStorage.getItem('dpToken');
+        window.location.href = token ? url + '?token=' + token : 'https://acceso.diapreventivoiapos.com/login.html';
+    }
+    </script>
 
     <script src="app.js?v=2.0"></script>
 </body>
