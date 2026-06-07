@@ -86,86 +86,14 @@ const PORT = process.env.PORT || 3000;
 const SPREADSHEET_ID = '15YPfBG9PBfN3nBW5xXJYjIXEgYIS9z71pI0VpeCtAAU';
 const API_BASE_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
 
-// >>>>> AGREGAR TODO ESTO AQUÍ ABAJO <<<<<
-const session = require('express-session');
-const passport = require('passport');
-const GoogleStrategy = require('passport-google-oauth20').Strategy;
-
-// --- CONFIGURACIÓN DE MIDDLEWARE PARA AUTENTICACIÓN ---
-app.use(session({
-    secret: 'tu-secreto-seguro', // Cambia esto por una cadena de caracteres única y segura
-    resave: false,
-    saveUninitialized: true
-}));
-app.use(passport.initialize());
-app.use(passport.session());
-
-// --- RUTAS DE AUTENTICACIÓN ---
-app.get('/auth/google',
-    // Usa la opción 'state' para guardar la URL de la página actual
-    (req, res, next) => {
-        req.session.returnTo = req.query.returnTo || '/';
-        next();
-    },
-    passport.authenticate('google', { scope: ['profile', 'email'] })
-);
-
-app.get('/auth/google/callback',
-    passport.authenticate('google', { failureRedirect: '/login.html' }),
-    (req, res) => {
-        // --- CAMBIO AQUÍ ---
-        // Si existe 'returnTo' (porque intentó entrar a una url protegida), úsalo.
-        // SI NO (porque entró desde el botón "Ingresar" de la portada), ve directo al MENÚ MÉDICO.
-        const redirectUrl = req.session.returnTo || '/index-medico.html';
-        
-        delete req.session.returnTo; // Limpia la variable de sesión
-        res.redirect(redirectUrl);
-    }
-);
-
-// --- ESTRATEGIA DE AUTENTICACIÓN DE GOOGLE ---
-passport.use(new GoogleStrategy({
-    clientID: process.env.GOOGLE_CLIENT_ID,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: process.env.GOOGLE_CALLBACK_URL
-}, (accessToken, refreshToken, profile, done) => {
-    // Aquí puedes procesar el perfil del usuario de Google
-    // Por ejemplo, puedes buscar si el correo del profesional existe en una lista de usuarios autorizados.
-    return done(null, profile);
-}));
-
-// Funciones para serializar y deserializar el usuario en la sesión
-passport.serializeUser((user, done) => {
-    done(null, user);
-});
-
-passport.deserializeUser((obj, done) => {
-    done(null, obj);
-});
-
-// Agrega esta nueva ruta en tu server.js, junto a tus otras rutas.
-// Asegúrate de que esta ruta esté antes de app.use(express.static('public')).
 app.get('/cierre-formulario.html', (req, res) => {
-    // Si el usuario está autenticado, sirve el archivo HTML desde la carpeta privada
-    if (req.isAuthenticated()) {
-        res.sendFile(path.join(__dirname, 'private', 'cierre-formulario.html'));
-    } else {
-        // Si no está autenticado, lo redirige al login de Google, pasando la URL actual
-        res.redirect('/auth/google?returnTo=/cierre-formulario.html');
-    }
+    res.sendFile(path.join(__dirname, 'private', 'cierre-formulario.html'));
 });
 app.get('/cierre-formulario.js', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'cierre-formulario.js'));
 });
-
 app.get('/consultas.html', (req, res) => {
-    // Verifica si el usuario está autenticado
-    if (req.isAuthenticated()) {
-        res.sendFile(path.join(__dirname, 'private', 'consultas.html'));
-    } else {
-        // Si no está autenticado, redirige a la página de inicio de sesión de Google, pasando la URL actual
-        res.redirect('/auth/google?returnTo=/consultas.html');
-    }
+    res.sendFile(path.join(__dirname, 'private', 'consultas.html'));
 });
 // --- MIDDLEWARE ---
 app.use(express.json());
@@ -809,14 +737,7 @@ app.post('/api/seguimiento/guardar', async (req, res) => {
 // *************************************************************************
 app.post('/api/cierre/guardar', async (req, res) => {
     // AHORA VERIFICA SI EL USUARIO ESTÁ AUTENTICADO
-    if (!req.isAuthenticated()) {
-        console.error('SERVER ERROR: Intento de guardar formulario de cierre sin autenticación.');
-        return res.status(401).json({ success: false, error: 'Acceso no autorizado. Por favor, inicie sesión.' });
-    }
-    
-    // OBTENEMOS EL NOMBRE DEL PROFESIONAL AUTENTICADO
-    const profesionalName = req.user.displayName;
-
+    const profesionalName = req.body['Profesional'] || 'Desconocido';
     const formData = req.body;
     
     const dni = String(formData['DNI']).trim();
@@ -964,14 +885,7 @@ try {
 });
 app.post('/guardar-consulta', async (req, res) => {
     console.log('Datos recibidos del cliente:', req.body);
-
-    if (!req.isAuthenticated()) {
-        console.error('SERVER ERROR: Intento de guardar consulta sin autenticación.');
-        return res.status(401).json({ success: false, message: 'Acceso no autorizado. Por favor, inicie sesión.' });
-    }
-
-    const profesionalNombre = req.user.displayName; 
-
+    const profesionalName = req.body['Profesional'] || 'Desconocido';
     console.log('Solicitud para guardar consulta recibida por el profesional:', profesionalNombre);
 
     const { 
