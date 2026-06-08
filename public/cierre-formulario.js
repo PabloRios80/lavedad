@@ -480,6 +480,8 @@ const unauthorizedMessage = document.getElementById('unauthorized-message');
         // Recolectar datos de campos fijos de paciente
         formData['DNI'] = dniInput.value.trim();
         formData['Apellido'] = pacienteApellidoInput.value.trim();
+        const prof = window.dpProfesional;
+        formData['Profesional'] = prof ? `${prof.nombre} ${prof.apellido}` : 'Desconocido';
         formData['Nombre'] = pacienteNombreInput.value.trim();
         formData['Edad'] = pacienteEdadInput.value.trim();
         formData['Sexo'] = sexoSelect.value.trim();
