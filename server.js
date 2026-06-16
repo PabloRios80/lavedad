@@ -1020,6 +1020,7 @@ app.get('/verificar-afiliado/:dni', async (req, res) => {
 
 // Llama a la función de inicialización de Google Sheet una vez que el servidor arranca.
 // El servidor no empezará a escuchar peticiones hasta que la conexión con la hoja esté lista.
+registrarEndpointObtenerEstudios(app, supabase);
 initializeGoogleSheet().then(() => {
     app.listen(PORT, () => {
         console.log(`✅ Servidor funcionando en http://localhost:${PORT}`);
