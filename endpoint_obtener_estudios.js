@@ -167,6 +167,45 @@ function registrarEndpointObtenerEstudios(app, supabase) {
                 });
             });
 
+            // ── 5. PRÁCTICAS INDIVIDUALES desde practicas_autorizadas ──
+            // Para prácticas cargadas individualmente desde Prestadores que aún
+            // no tienen flujo nuevo (VCC, mamografía, ecografía, densitometría, etc.)
+            // Excluimos laboratorio porque ya está cubierto por practicas_historicas
+            const DESCRIPCIONES_LABORATORIO = [
+                'glucemia', 'colesterol', 'creatinina', 'filtrado', 'trigliceridos',
+                'anti_vih', 'hepatitis', 'chagas', 'vdrl', 'psa', 'hpv',
+                'hemoglobina', 'microalbuminuria', 'proteinuria', 'clearence', 'somf',
+                'anticuerpos anti_v', 'laboratorio'
+            ];
+
+            const { data: practicasInd } = await supabase
+                .from('practicas_autorizadas')
+                .select('*')
+                .eq('dni', dni)
+                .eq('estado', 'REALIZADA')
+                .order('fecha_carga', { ascending: false });
+
+            (practicasInd || []).forEach(p => {
+                const desc = (p.descripcion_practica || '').toLowerCase();
+
+                // Saltar si es de laboratorio (ya cubierto)
+                if (DESCRIPCIONES_LABORATORIO.some(lab => desc.includes(lab))) return;
+
+                const tipo = mapearTipoPractica(desc);
+
+                estudiosEncontrados.push({
+                    TipoEstudio: tipo,
+                    DNI: p.dni,
+                    Nombre: p.nombre_completo?.split(' ').slice(1).join(' ') || '',
+                    Apellido: p.nombre_completo?.split(' ')[0] || '',
+                    Fecha: p.fecha_carga ? new Date(p.fecha_carga).toISOString().split('T')[0] : '',
+                    Prestador: p.nombre_prestador || '',
+                    Resultado: p.resultado_texto || '',
+                    LinkPDF: p.enlace_pdf || '',
+                    LinksPDF: p.enlace_pdf ? [p.enlace_pdf] : []
+                });
+            });
+
             res.json({ success: true, estudios: estudiosEncontrados });
 
         } catch (e) {
@@ -174,6 +213,20 @@ function registrarEndpointObtenerEstudios(app, supabase) {
             res.status(500).json({ error: 'Error al obtener estudios.' });
         }
     });
+}
+
+function mapearTipoPractica(desc) {
+    if (desc.includes('mamog')) return 'Mamografia';
+    if (desc.includes('eco') && desc.includes('mam')) return 'Eco mamaria';
+    if (desc.includes('ecograf')) return 'Ecografia';
+    if (desc.includes('densito')) return 'Densitometria';
+    if (desc.includes('colon') || desc.includes('vcc')) return 'VCC';
+    if (desc.includes('pap')) return 'Papanicolau';
+    if (desc.includes('espiro')) return 'Espirometria';
+    if (desc.includes('biopsia')) return 'Biopsia';
+    if (desc.includes('oftalm') || desc.includes('visual') || desc.includes('vision')) return 'Oftalmologia';
+    if (desc.includes('odonto')) return 'Odontologia';
+    return 'Otro';
 }
 
 module.exports = { registrarEndpointObtenerEstudios };
