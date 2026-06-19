@@ -657,6 +657,12 @@ async function mostrarEstudiosModal(dni, studyType) {
             estudiosModal.classList.add('hidden');
         }
     });
+    function cerrarSesionGlobal() {
+        if (!confirm('¿Cerrar sesión?')) return;
+        localStorage.removeItem('dpToken');
+        localStorage.removeItem('dpProfesional');
+        window.location.href = 'https://acceso.diapreventivoiapos.com'; 
+    }
 
     // Asegurarse de que la función mostrarEstudiosModal esté disponible globalmente (opcional si ya está ahí)
     // window.mostrarEstudiosModal = mostrarEstudiosModal; // Descomentar si realmente necesitas que sea global para otras partes del código
