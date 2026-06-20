@@ -1017,15 +1017,31 @@ app.get('/verificar-afiliado/:dni', async (req, res) => {
         res.json({ esActivo: false, nombre: null });
     }
 });
-
-// Llama a la función de inicialización de Google Sheet una vez que el servidor arranca.
-// El servidor no empezará a escuchar peticiones hasta que la conexión con la hoja esté lista.
 registrarEndpointObtenerEstudios(app, supabase);
-initializeGoogleSheet().then(() => {
+
+async function iniciarApp() {
+    const maxIntentos = 5;
+    let retraso = 1000;
+    for (let intento = 1; intento <= maxIntentos; intento++) {
+        try {
+            console.log(`⏳ Cargando Google Sheet (Intento ${intento}/${maxIntentos})...`);
+            await initializeGoogleSheet();
+            console.log('✅ Google Sheets conectado.');
+            break;
+        } catch (error) {
+            console.error(`⚠️ Intento ${intento} fallido:`, error.message);
+            if (intento === maxIntentos) {
+                console.error('⚠️ Google Sheets no disponible al arrancar — el servidor sigue funcionando sin Sheets.');
+            } else {
+                console.log(`🔄 Reintentando en ${retraso / 1000}s...`);
+                await new Promise(resolve => setTimeout(resolve, retraso));
+                retraso *= 2;
+            }
+        }
+    }
     app.listen(PORT, () => {
         console.log(`✅ Servidor funcionando en http://localhost:${PORT}`);
     });
-}).catch(err => {
-    console.error('❌ Fallo al iniciar el servidor debido a un error de inicialización de Google Sheet:', err);
-    process.exit(1); // Sale si no se puede iniciar el servidor
-});
+}
+
+iniciarApp();
