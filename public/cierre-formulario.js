@@ -1156,10 +1156,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
               for (const key in resultados) {
                 let value = resultados[key];
-                // Si es individual, omitir los campos sin valor
                 if (!value || String(value).trim() === "") {
-                  if (esIndividual) continue; // saltar N/A en individuales
-                  value = "N/A";
+                  continue;
                 }
 
                 // Manejo de enlaces PDF dentro de los resultados detallados
