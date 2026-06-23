@@ -1124,7 +1124,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (data.success && data.estudios.length > 0) {
         const filteredStudies = data.estudios.filter(
-          (s) => s.TipoEstudio === studyType,
+          (s) =>
+            s.TipoEstudio === studyType ||
+            (studyType === "Laboratorio" &&
+              s.TipoEstudio === "LaboratorioIndividual"),
         );
 
         if (filteredStudies.length > 0) {
