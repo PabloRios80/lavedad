@@ -88,41 +88,14 @@
           <i class="fas fa-tooth text-3xl mb-2"></i>
           <span class="font-semibold">Portal Odontologia Preventivista</span>
         </a>
-
-        <a
-          id="preventivista-info-btn"
-          href="#"
-          onclick="
-            mostrarOpcionesPreventivista();
-            return false;
-          "
-          class="portal-btn bg-yellow-500 hover:bg-yellow-600 text-gray-900 flex-1 min-w-[200px]"
-        >
-          <i class="fas fa-info-circle text-3xl mb-2"></i>
-          <span class="font-semibold">Portal del Preventivista</span>
-        </a>
-      </div>
-
-      <div
-        id="opcionesPreventivista"
-        class="hidden mt-6 flex flex-row flex-wrap justify-center w-full max-w-4xl mx-auto gap-4"
+        href="https://acceso.diapreventivoiapos.com/login.html"
+        class="portal-btn bg-yellow-500 hover:bg-yellow-600 text-gray-900 flex-1 min-w-[200px]"
       >
-        <a
-          href="https://acceso.diapreventivoiapos.com/login.html?redirect=prestadores"
-          class="portal-btn bg-purple-600 hover:bg-purple-700 text-white flex-1 min-w-[200px]"
-        >
-          <i class="fas fa-flask text-3xl mb-2"></i>
-          <span class="font-semibold">Cargar Prácticas (como Prestador)</span>
-        </a>
-        <a
-          href="https://ppdt-preventivistas.onrender.com"
-          class="portal-btn bg-yellow-500 hover:bg-yellow-600 text-gray-900 flex-1 min-w-[200px]"
-        >
-          <i class="fas fa-calendar-alt text-3xl mb-2"></i>
-          <span class="font-semibold">Agenda / Turnos / Derivaciones</span>
-        </a>
-      </div>
-    </main>
+        <i class="fas fa-info-circle text-3xl mb-2"></i>
+        <span class="font-semibold">Portal del Preventivista</span>
+      </a>
+
+      </main>
     <style>
       .portal-btn {
         display: flex;
@@ -159,11 +132,7 @@
     </style>
     <script src="app.js?v=2.0"></script>
     <script>
-      function mostrarOpcionesPreventivista() {
-        document
-          .getElementById("opcionesPreventivista")
-          .classList.toggle("hidden");
-      }
+      
     </script>
   </body>
 </html>
