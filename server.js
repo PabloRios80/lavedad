@@ -311,12 +311,10 @@ app.get("/obtener-opciones-campo/:campo", async (req, res) => {
       `Error al obtener las opciones para el campo ${campo}:`,
       error,
     );
-    res
-      .status(500)
-      .json({
-        error: `Error al obtener las opciones para el campo ${campo}`,
-        details: error.message,
-      });
+    res.status(500).json({
+      error: `Error al obtener las opciones para el campo ${campo}`,
+      details: error.message,
+    });
   }
 });
 
@@ -576,11 +574,9 @@ app.post("/api/seguimiento/guardar", async (req, res) => {
 
   if (!doc) {
     console.error("SERVER ERROR: Google Sheet document not initialized.");
-    return res
-      .status(500)
-      .json({
-        error: "Error interno del servidor: Base de datos no disponible.",
-      });
+    return res.status(500).json({
+      error: "Error interno del servidor: Base de datos no disponible.",
+    });
   }
 
   try {
@@ -688,14 +684,11 @@ app.post("/api/seguimiento/guardar", async (req, res) => {
       "SERVER ERROR: Fallo al guardar informe de seguimiento:",
       error,
     );
-    res
-      .status(500)
-      .json({
-        success: false,
-        error:
-          "Error interno del servidor al guardar el informe de seguimiento.",
-        details: error.message,
-      });
+    res.status(500).json({
+      success: false,
+      error: "Error interno del servidor al guardar el informe de seguimiento.",
+      details: error.message,
+    });
   }
 }); // <--- ESTA ES LA LLAVE DE CIERRE CORRECTA PARA LA RUTA DE SEGUIMIENTO
 // *************************************************************************
@@ -709,21 +702,17 @@ app.post("/api/cierre/guardar", async (req, res) => {
 
   if (!doc) {
     console.error("SERVER ERROR: Google Sheet document not initialized.");
-    return res
-      .status(500)
-      .json({
-        error: "Error interno del servidor: Base de datos no disponible.",
-      });
+    return res.status(500).json({
+      error: "Error interno del servidor: Base de datos no disponible.",
+    });
   }
 
   if (!dni || !fechaCierre) {
-    return res
-      .status(400)
-      .json({
-        success: false,
-        error:
-          "DNI del paciente y Fecha de Cierre son requeridos para guardar el cierre.",
-      });
+    return res.status(400).json({
+      success: false,
+      error:
+        "DNI del paciente y Fecha de Cierre son requeridos para guardar el cierre.",
+    });
   }
 
   try {
@@ -734,13 +723,11 @@ app.post("/api/cierre/guardar", async (req, res) => {
       console.error(
         'SERVER ERROR: Hoja "Hoja 1" no encontrada. Por favor, asegúrese de que la hoja exista y se llame "Hoja 1".',
       );
-      return res
-        .status(500)
-        .json({
-          success: false,
-          error:
-            'Error interno del servidor: La hoja de pacientes ("Hoja 1") no fue encontrada.',
-        });
+      return res.status(500).json({
+        success: false,
+        error:
+          'Error interno del servidor: La hoja de pacientes ("Hoja 1") no fue encontrada.',
+      });
     }
 
     await pacientesSheet.loadHeaderRow();
@@ -904,13 +891,11 @@ app.post("/api/cierre/guardar", async (req, res) => {
       "SERVER ERROR: Fallo al guardar el formulario de cierre:",
       error,
     );
-    res
-      .status(500)
-      .json({
-        success: false,
-        error: "Error interno del servidor al guardar el formulario de cierre.",
-        details: error.message,
-      });
+    res.status(500).json({
+      success: false,
+      error: "Error interno del servidor al guardar el formulario de cierre.",
+      details: error.message,
+    });
   }
 });
 app.post("/guardar-consulta", async (req, res) => {
@@ -934,12 +919,10 @@ app.post("/guardar-consulta", async (req, res) => {
   } = req.body;
 
   if (!DNI || !profesionalNombre) {
-    return res
-      .status(400)
-      .json({
-        success: false,
-        message: "Faltan datos obligatorios (DNI o Profesional).",
-      });
+    return res.status(400).json({
+      success: false,
+      message: "Faltan datos obligatorios (DNI o Profesional).",
+    });
   }
 
   try {
@@ -1055,13 +1038,24 @@ app.post("/cargar-datos-paciente", async (req, res) => {
   } catch (e) {
     console.error("Error IAPOS:", e.message);
   }
-
   // 2. Buscar hoja de vida en Supabase
   const { data: afiliado } = await supabase
     .from("afiliados")
     .select("*")
     .eq("dni", dni)
     .single();
+
+  let menor = null;
+  if (!afiliado) {
+    const { data: afiliadoMenor } = await supabase
+      .from("afiliados_menores")
+      .select("*")
+      .eq("dni", dni)
+      .order("fecha_carga", { ascending: false })
+      .limit(1)
+      .single();
+    menor = afiliadoMenor || null;
+  }
 
   // 3. Buscar último DP
   const { data: ultimoDP } = await supabase
@@ -1073,14 +1067,12 @@ app.post("/cargar-datos-paciente", async (req, res) => {
     .order("fechax", { ascending: false })
     .limit(1)
     .single();
-
   // 4. Buscar prácticas realizadas
   const { data: practicas } = await supabase
     .from("practicas_autorizadas")
     .select("*")
     .eq("dni", dni)
     .eq("estado", "REALIZADA");
-
   // 5. Buscar datos de enfermería
   const { data: enfermeria } = await supabase
     .from("enfermeria_consultas")
@@ -1089,95 +1081,189 @@ app.post("/cargar-datos-paciente", async (req, res) => {
     .order("fecha_cierre_enf", { ascending: false })
     .limit(1)
     .maybeSingle();
-
   // 6. Generar alertas clínicas con campo asociado
   const alertas = [];
 
-  // ── HOJA DE VIDA ──
-  if (afiliado?.hipertension === "si")
-    alertas.push({
-      tipo: "RIESGO",
-      campo: "Presion_Arterial",
-      mensaje: "⚠️ Declara hipertensión en hoja de vida",
-    });
-  if (afiliado?.hipertension_familiar === "si")
-    alertas.push({
-      tipo: "INFO",
-      campo: "Presion_Arterial",
-      mensaje: "ℹ️ Antecedente familiar de hipertensión",
-    });
-  if (afiliado?.diabetes === "si")
-    alertas.push({
-      tipo: "RIESGO",
-      campo: "Diabetes",
-      mensaje: "⚠️ Declara diabetes en hoja de vida",
-    });
-  if (afiliado?.diabetes_familiar === "si")
-    alertas.push({
-      tipo: "INFO",
-      campo: "Diabetes",
-      mensaje: "ℹ️ Antecedente familiar de diabetes",
-    });
-  if (afiliado?.colesterol === "si")
-    alertas.push({
-      tipo: "RIESGO",
-      campo: "Dislipemias",
-      mensaje: "⚠️ Declara colesterol alto en hoja de vida",
-    });
-  if (afiliado?.depresion === "si")
-    alertas.push({
-      tipo: "RIESGO",
-      campo: "Depresion",
-      mensaje: "⚠️ Depresión diagnosticada declarada en hoja de vida",
-    });
-  if (afiliado?.abuso_alcohol_drogas === "si")
-    alertas.push({
-      tipo: "RIESGO",
-      campo: "Abuso_alcohol",
-      mensaje: "⚠️ Declara problemas con alcohol/drogas en hoja de vida",
-    });
-  if (afiliado?.fuma && afiliado.fuma !== "nunca")
-    alertas.push({
-      tipo: "INFO",
-      campo: "Tabaco",
-      mensaje: `ℹ️ Fumador declarado: ${afiliado.fuma}`,
-    });
-  if (afiliado?.fuma && afiliado.fuma !== "nunca")
-    alertas.push({
-      tipo: "INFO",
-      campo: "EPOC",
-      mensaje: "⚠️ Fumador — evaluar espirometría",
-    });
-  if (afiliado?.cancer_de_colon === "si")
-    alertas.push({
-      tipo: "RIESGO",
-      campo: "Cancer_colon_SOMF",
-      mensaje: "⚠️ Antecedente familiar de cáncer de colon — indicar VCC",
-    });
-  if (afiliado?.cancer_de_mama === "si")
-    alertas.push({
-      tipo: "RIESGO",
-      campo: "Cancer_mama_Mamografia",
-      mensaje: "⚠️ Antecedente familiar de cáncer de mama",
-    });
-  if (afiliado?.cancer_de_prostata === "si")
-    alertas.push({
-      tipo: "RIESGO",
-      campo: "Prostata_PSA",
-      mensaje: "⚠️ Antecedente familiar de cáncer de próstata",
-    });
-  if (afiliado?.cancer_cuello_utero === "si")
-    alertas.push({
-      tipo: "RIESGO",
-      campo: "Cancer_cervico_uterino_HPV",
-      mensaje: "⚠️ Antecedente familiar de cáncer de cuello uterino",
-    });
-  if (afiliado?.stress === "si")
-    alertas.push({
-      tipo: "INFO",
-      campo: "Depresion",
-      mensaje: "ℹ️ Declara estrés/ansiedad excesiva en hoja de vida",
-    });
+  if (afiliado) {
+    // ── HOJA DE VIDA (adulto) ──
+    if (afiliado?.hipertension === "si")
+      alertas.push({
+        tipo: "RIESGO",
+        campo: "Presion_Arterial",
+        mensaje: "⚠️ Declara hipertensión en hoja de vida",
+      });
+    if (afiliado?.hipertension_familiar === "si")
+      alertas.push({
+        tipo: "INFO",
+        campo: "Presion_Arterial",
+        mensaje: "ℹ️ Antecedente familiar de hipertensión",
+      });
+    if (afiliado?.diabetes === "si")
+      alertas.push({
+        tipo: "RIESGO",
+        campo: "Diabetes",
+        mensaje: "⚠️ Declara diabetes en hoja de vida",
+      });
+    if (afiliado?.diabetes_familiar === "si")
+      alertas.push({
+        tipo: "INFO",
+        campo: "Diabetes",
+        mensaje: "ℹ️ Antecedente familiar de diabetes",
+      });
+    if (afiliado?.colesterol === "si")
+      alertas.push({
+        tipo: "RIESGO",
+        campo: "Dislipemias",
+        mensaje: "⚠️ Declara colesterol alto en hoja de vida",
+      });
+    if (afiliado?.depresion === "si")
+      alertas.push({
+        tipo: "RIESGO",
+        campo: "Depresion",
+        mensaje: "⚠️ Depresión diagnosticada declarada en hoja de vida",
+      });
+    if (afiliado?.abuso_alcohol_drogas === "si")
+      alertas.push({
+        tipo: "RIESGO",
+        campo: "Abuso_alcohol",
+        mensaje: "⚠️ Declara problemas con alcohol/drogas en hoja de vida",
+      });
+    if (afiliado?.fuma && afiliado.fuma !== "nunca")
+      alertas.push({
+        tipo: "INFO",
+        campo: "Tabaco",
+        mensaje: `ℹ️ Fumador declarado: ${afiliado.fuma}`,
+      });
+    if (afiliado?.fuma && afiliado.fuma !== "nunca")
+      alertas.push({
+        tipo: "INFO",
+        campo: "EPOC",
+        mensaje: "⚠️ Fumador — evaluar espirometría",
+      });
+    if (afiliado?.cancer_de_colon === "si")
+      alertas.push({
+        tipo: "RIESGO",
+        campo: "Cancer_colon_SOMF",
+        mensaje: "⚠️ Antecedente familiar de cáncer de colon — indicar VCC",
+      });
+    if (afiliado?.cancer_de_mama === "si")
+      alertas.push({
+        tipo: "RIESGO",
+        campo: "Cancer_mama_Mamografia",
+        mensaje: "⚠️ Antecedente familiar de cáncer de mama",
+      });
+    if (afiliado?.cancer_de_prostata === "si")
+      alertas.push({
+        tipo: "RIESGO",
+        campo: "Prostata_PSA",
+        mensaje: "⚠️ Antecedente familiar de cáncer de próstata",
+      });
+    if (afiliado?.cancer_cuello_utero === "si")
+      alertas.push({
+        tipo: "RIESGO",
+        campo: "Cancer_cervico_uterino_HPV",
+        mensaje: "⚠️ Antecedente familiar de cáncer de cuello uterino",
+      });
+    if (afiliado?.stress === "si")
+      alertas.push({
+        tipo: "INFO",
+        campo: "Depresion",
+        mensaje: "ℹ️ Declara estrés/ansiedad excesiva en hoja de vida",
+      });
+  } else if (menor) {
+    // ── HOJA DE VIDA (menor) ──
+    if (menor.fam_hipertension === "si")
+      alertas.push({
+        tipo: "INFO",
+        campo: "Presion_Arterial",
+        mensaje: "ℹ️ Antecedente familiar de hipertensión",
+      });
+    if (menor.fam_diabetes === "si")
+      alertas.push({
+        tipo: "INFO",
+        campo: "Diabetes",
+        mensaje: "ℹ️ Antecedente familiar de diabetes",
+      });
+    if (menor.fam_obesidad === "si")
+      alertas.push({
+        tipo: "INFO",
+        campo: "IMC",
+        mensaje: "ℹ️ Antecedente familiar de obesidad",
+      });
+    if (menor.fam_cardio === "si")
+      alertas.push({
+        tipo: "INFO",
+        campo: "Presion_Arterial",
+        mensaje:
+          "ℹ️ Antecedente familiar cardiovascular (o ACV antes de los 55)",
+      });
+    if (menor.fam_mental === "si")
+      alertas.push({
+        tipo: "INFO",
+        campo: "Depresion",
+        mensaje: "ℹ️ Antecedente familiar de salud mental",
+      });
+    if (menor.fam_adicciones === "si")
+      alertas.push({
+        tipo: "INFO",
+        campo: "Abuso_alcohol",
+        mensaje: "ℹ️ Antecedente familiar de adicciones",
+      });
+    if (menor.fam_cancer === "si")
+      alertas.push({
+        tipo: "INFO",
+        campo: "Otros",
+        mensaje: "ℹ️ Antecedente familiar de cáncer",
+      });
+    if (menor.tabaco === "si")
+      alertas.push({
+        tipo: "RIESGO",
+        campo: "Tabaco",
+        mensaje: "⚠️ Consume o ha consumido tabaco",
+      });
+    if (menor.alcohol === "si")
+      alertas.push({
+        tipo: "RIESGO",
+        campo: "Abuso_alcohol",
+        mensaje: "⚠️ Consume o ha consumido alcohol",
+      });
+    if (menor.sustancias === "si")
+      alertas.push({
+        tipo: "URGENTE",
+        campo: "Abuso_alcohol",
+        mensaje: "🔴 Consume o ha consumido otras sustancias",
+      });
+    if (menor.violencia === "si")
+      alertas.push({
+        tipo: "URGENTE",
+        campo: "Depresion",
+        mensaje: "🔴 Refiere situaciones de violencia o abuso",
+      });
+    if (menor.tristeza === "si")
+      alertas.push({
+        tipo: "RIESGO",
+        campo: "Depresion",
+        mensaje: "⚠️ Episodios de tristeza/aislamiento prolongados",
+      });
+    if (menor.alim_trastorno === "si")
+      alertas.push({
+        tipo: "RIESGO",
+        campo: "IMC",
+        mensaje: "⚠️ Preocupación por peso/alimentación (posible trastorno)",
+      });
+    if (menor.vacunas === "no")
+      alertas.push({
+        tipo: "RIESGO",
+        campo: "Otros",
+        mensaje: "⚠️ Vacunas del calendario no están al día",
+      });
+    if (menor.condicion_salud === "si")
+      alertas.push({
+        tipo: "URGENTE",
+        campo: "Otros",
+        mensaje: `🔴 Condición de salud diagnosticada${menor.condicion_detalle ? ": " + menor.condicion_detalle : ""}`,
+      });
+  }
 
   // ── ENFERMERÍA ──
   if (enfermeria?.presion_arterial) {
@@ -1249,16 +1335,16 @@ app.post("/cargar-datos-paciente", async (req, res) => {
       campo: "Presion_Arterial",
       mensaje: "⚠️ Hipertensión registrada en DP anterior",
     });
+
   res.json({
     success: true,
     iapos: datosIAPOS,
-    afiliado: afiliado || null,
+    afiliado: afiliado || menor || null,
     ultimoDP: ultimoDP || null,
     practicasRealizadas: practicas || [],
     alertas,
   });
 });
-
 function mapearTipoEstudio(descripcion) {
   if (!descripcion) return "Otro";
   const d = descripcion.toLowerCase();
