@@ -298,7 +298,7 @@
 
       // Ocultar "Seguimiento/Informes" para profesionales de sedes externas (ej. ATEM)
       document.addEventListener("DOMContentLoaded", () => {
-        const SEDES_SIN_SEGUIMIENTO = [2]; // ATEM = id_sede_dp 2
+        const SEDES_SIN_SEGUIMIENTO = [2, 4, 6];
         const payload = window.dpProfesional;
         if (payload && SEDES_SIN_SEGUIMIENTO.includes(payload.id_sede_dp)) {
           const tarjetaSeguimiento = document.querySelector(
