@@ -873,14 +873,32 @@ app.post("/api/cierre/guardar", async (req, res) => {
             ? parseInt(formData["id_sede_dp"])
             : null;
           if (idSedeDp) {
-            const { data: prestadorCoord } = await supabase
+            const { data: prestadoresCoordSede } = await supabase
               .from("prestador_sedes")
-              .select(
-                "id_prestador, prestadores_institucionales(nombre_institucion)",
-              )
-              .eq("id_sede_dp", idSedeDp)
-              .eq("prestadores_institucionales.especialidad", "coordinacion_dp")
-              .maybeSingle();
+              .select("id_prestador")
+              .eq("id_sede_dp", idSedeDp);
+
+            let prestadorCoord = null;
+            if (prestadoresCoordSede && prestadoresCoordSede.length > 0) {
+              const idsPrestadores = prestadoresCoordSede.map(
+                (r) => r.id_prestador,
+              );
+              const { data: institucionCoord } = await supabase
+                .from("prestadores_institucionales")
+                .select("id, nombre_institucion")
+                .in("id", idsPrestadores)
+                .eq("especialidad", "coordinacion_dp")
+                .maybeSingle();
+
+              if (institucionCoord) {
+                prestadorCoord = {
+                  id_prestador: institucionCoord.id,
+                  prestadores_institucionales: {
+                    nombre_institucion: institucionCoord.nombre_institucion,
+                  },
+                };
+              }
+            }
 
             if (prestadorCoord) {
               await supabase.from("practicas_autorizadas").insert({
