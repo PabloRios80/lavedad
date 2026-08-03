@@ -1039,6 +1039,7 @@ document.addEventListener("DOMContentLoaded", () => {
     formData["Profesional"] = prof
       ? `${prof.nombre} ${prof.apellido}`
       : "Desconocido";
+    formData["id_sede_dp"] = prof?.id_sede_dp || null;
     formData["Nombre"] = pacienteNombreInput.value.trim();
     formData["Edad"] = pacienteEdadInput.value.trim();
     formData["Sexo"] = sexoSelect.value.trim();

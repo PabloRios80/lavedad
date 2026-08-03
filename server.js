@@ -867,9 +867,49 @@ app.post("/api/cierre/guardar", async (req, res) => {
             "✅ Consulta médica registrada como REALIZADA para DNI:",
             dni,
           );
+
+          // Disparar Módulo Día Preventivo (339159) al prestador de Coordinación DP de la sede
+          const idSedeDp = formData["id_sede_dp"]
+            ? parseInt(formData["id_sede_dp"])
+            : null;
+          if (idSedeDp) {
+            const { data: prestadorCoord } = await supabase
+              .from("prestador_sedes")
+              .select(
+                "id_prestador, prestadores_institucionales(nombre_institucion)",
+              )
+              .eq("id_sede_dp", idSedeDp)
+              .eq("prestadores_institucionales.especialidad", "coordinacion_dp")
+              .maybeSingle();
+
+            if (prestadorCoord) {
+              await supabase.from("practicas_autorizadas").insert({
+                dni: dni,
+                nombre_completo:
+                  `${formData["Apellido"] || ""} ${formData["Nombre"] || ""}`.trim(),
+                descripcion_practica: "Módulo Día Preventivo",
+                estado: "REALIZADA",
+                fecha_autorizacion: hoy,
+                fecha_carga: hoy,
+                id_prestador: prestadorCoord.id_prestador,
+                nombre_prestador:
+                  prestadorCoord.prestadores_institucionales
+                    ?.nombre_institucion,
+              });
+              console.log("✅ Módulo DP (339159) registrado para DNI:", dni);
+            } else {
+              console.warn(
+                `No hay prestador de Coordinación DP configurado para sede ${idSedeDp}`,
+              );
+            }
+          } else {
+            console.warn(
+              "No se recibió id_sede_dp, no se pudo asignar Módulo DP a ningún prestador.",
+            );
+          }
         } catch (medErr) {
           console.error(
-            "Error al registrar consulta médica en practicas_autorizadas:",
+            "Error al registrar consulta médica/módulo en practicas_autorizadas:",
             medErr.message,
           );
         }
