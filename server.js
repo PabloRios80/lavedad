@@ -1487,6 +1487,27 @@ app.get("/verificar-afiliado/:dni", async (req, res) => {
 });
 registrarEndpointObtenerEstudios(app, supabase);
 
+// ── Resultado de SOMF (fuente: Supabase, no Google Sheets) ──
+app.post("/obtener-estudio-somf", async (req, res) => {
+  const { dni } = req.body;
+  try {
+    const { data, error } = await supabase
+      .from("practicas_autorizadas")
+      .select(
+        "descripcion_practica, resultado_texto, enlace_pdf, fecha_carga, nombre_prestador",
+      )
+      .eq("dni", dni)
+      .ilike("descripcion_practica", "%somf%")
+      .eq("estado", "REALIZADA")
+      .order("fecha_carga", { ascending: false });
+    if (error) throw error;
+    res.json({ success: true, estudios: data || [] });
+  } catch (e) {
+    console.error("Error en /obtener-estudio-somf:", e.message);
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 async function iniciarApp() {
   const maxIntentos = 5;
   let retraso = 1000;

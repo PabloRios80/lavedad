@@ -416,7 +416,7 @@ document.addEventListener("DOMContentLoaded", () => {
       type: "select",
       options: ["Normal", "Pendiente", "No se realiza", "Patologico"],
       hasStudyButton: true,
-      studyType: "Laboratorio",
+      studyType: "SOMF",
       required: true,
       icon: "fas fa-poop",
     }, // Icono simbólico
@@ -1112,6 +1112,47 @@ document.addEventListener("DOMContentLoaded", () => {
     estudiosModalContent.innerHTML =
       '<p class="text-center text-gray-500">Cargando estudios...</p>';
     estudiosModal.classList.remove("hidden"); // Mostrar el modal
+
+    // SOMF tiene su propia fuente (Supabase), separada del resto de Laboratorio (Sheets)
+    if (studyType === "SOMF") {
+      try {
+        const respSomf = await fetch("/obtener-estudio-somf", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dni }),
+        });
+        const dataSomf = await respSomf.json();
+        estudiosModalContent.innerHTML = "";
+
+        if (dataSomf.success && dataSomf.estudios.length > 0) {
+          dataSomf.estudios.forEach((e) => {
+            const card = document.createElement("div");
+            card.className =
+              "bg-blue-50 p-4 rounded-lg shadow-sm border border-blue-200 mb-4";
+            const fecha = e.fecha_carga
+              ? new Date(e.fecha_carga).toLocaleDateString("es-AR")
+              : "N/A";
+            let html = `<h4 class="font-bold text-blue-700 mb-2">SOMF - Fecha: ${fecha}</h4>`;
+            html += `<p><strong>Prestador:</strong> ${e.nombre_prestador || "N/A"}</p>`;
+            if (e.resultado_texto) {
+              html += `<p><strong>Resultado:</strong> ${e.resultado_texto}</p>`;
+            }
+            if (e.enlace_pdf) {
+              html += `<p class="mt-2"><a href="${e.enlace_pdf}" target="_blank" class="bg-green-400 hover:bg-green-500 text-gray-900 font-bold py-1 px-2 rounded inline-block"><i class="fas fa-file-pdf mr-1"></i> Ver PDF</a></p>`;
+            }
+            card.innerHTML = html;
+            estudiosModalContent.appendChild(card);
+          });
+        } else {
+          estudiosModalContent.innerHTML =
+            '<p class="text-center text-gray-500">No se encontraron resultados de SOMF para este paciente.</p>';
+        }
+      } catch (e) {
+        estudiosModalContent.innerHTML =
+          '<p class="text-center text-red-500">Error al cargar el resultado de SOMF.</p>';
+      }
+      return;
+    }
 
     try {
       const response = await fetch("/obtener-estudios-paciente", {
