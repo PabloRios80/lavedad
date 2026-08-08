@@ -70,6 +70,35 @@ function registrarEndpointObtenerEstudios(app, supabase) {
                         'Microalbuminuria':                  lab.microalbuminuria || '',
                         'Proteinuria':                       lab.proteinuria || '',
                         'Clearence Creatinina':              lab.clearence_creatinina || ''
+                    },
+                    // Mismo contenido que arriba, pero con las claves reales de la
+                    // base (no los nombres "bonitos") — para que el frontend pueda
+                    // filtrar con precisión qué columnas corresponden a cada campo
+                    // del formulario, sin confundir HPV con Glucemia, por ejemplo.
+                    ResultadosPorColumna: {
+                        glucemia: lab.glucemia || '',
+                        creatinina: lab.creatinina || '',
+                        indice_filtrado_glomerular: lab.indice_filtrado_glomerular || '',
+                        colesterol_total: lab.colesterol_total || '',
+                        colesterol_hdl: lab.colesterol_hdl || '',
+                        colesterol_ldl: lab.colesterol_ldl || '',
+                        trigliceridos: lab.trigliceridos || '',
+                        hiv: lab.hiv || '',
+                        somf: lab.somf || '',
+                        hepatitis_b_antigeno: lab.hepatitis_b_antigeno || '',
+                        hepatitis_c: lab.hepatitis_c || '',
+                        hepatitis_b_anti_core: lab.hepatitis_b_anti_core || '',
+                        hpv_genotipo_16: lab.hpv_genotipo_16 || '',
+                        hpv_genotipo_18: lab.hpv_genotipo_18 || '',
+                        hpv_otros: lab.hpv_otros || '',
+                        vdrl: lab.vdrl || '',
+                        psa: lab.psa || '',
+                        chagas_hai: lab.chagas_hai || '',
+                        chagas_eclia: lab.chagas_eclia || '',
+                        hemoglobina_glicosilada: lab.hemoglobina_glicosilada || '',
+                        microalbuminuria: lab.microalbuminuria || '',
+                        proteinuria: lab.proteinuria || '',
+                        clearence_creatinina: lab.clearence_creatinina || '',
                     }
                 });
             });

@@ -707,29 +707,30 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const columnas = CAMPO_A_COLUMNAS_LAB[fieldName] || [];
       const linksIndividuales = [];
-      let tieneResultado = false;
+      let tieneResultadoEspecifico = false;
 
       registrosLab.forEach((reg) => {
         const mapaIndividual = reg.LinkPdfPorPractica || {};
+        const valoresPorColumna = reg.ResultadosPorColumna || {};
+
         columnas.forEach((col) => {
           if (mapaIndividual[col]) linksIndividuales.push(mapaIndividual[col]);
+          // Solo cuenta si la columna PROPIA de este campo tiene valor —
+          // no alcanza con que la fila tenga otros estudios cargados.
+          if (valoresPorColumna[col]) tieneResultadoEspecifico = true;
         });
-        const valoresCampo = reg.ResultadosLaboratorio || {};
-        // Si cualquiera de los valores de este grupo tiene contenido real, cuenta
-        if (Object.values(valoresCampo).some((v) => v && v !== "")) {
-          tieneResultado = true;
-        }
       });
 
       if (linksIndividuales.length > 0) {
         return { tieneAlgo: true, links: linksIndividuales };
       }
-      // Sin PDF individual: usar el PDF general si existe
-      const linkGeneral = registrosLab[0]?.LinksPDF || [];
-      return {
-        tieneAlgo: tieneResultado || linkGeneral.length > 0,
-        links: linkGeneral,
-      };
+      // Sin PDF individual: si este campo específico tiene resultado
+      // (cargado en la carga masiva general), usar el PDF general.
+      if (tieneResultadoEspecifico) {
+        const linkGeneral = registrosLab[0]?.LinksPDF || [];
+        return { tieneAlgo: true, links: linkGeneral };
+      }
+      return { tieneAlgo: false, links: [] };
     }
 
     // Resto de categorías (Mamografia, Odontologia, VCC, etc.)
@@ -1274,11 +1275,43 @@ document.addEventListener("DOMContentLoaded", () => {
         const columnas = CAMPO_A_COLUMNAS_LAB[fieldName] || [];
         if (columnas.length > 0) {
           html += `<p class="mt-2"><strong>Resultados relacionados:</strong></p><ul class="list-disc list-inside">`;
-          Object.entries(reg.ResultadosLaboratorio || {}).forEach(
-            ([label, valor]) => {
-              if (valor) html += `<li>${label}: ${valor}</li>`;
-            },
-          );
+          const valoresPorColumna = reg.ResultadosPorColumna || {};
+          const labelsPorColumna = {
+            glucemia: "Glucemia",
+            creatinina: "Creatinina",
+            indice_filtrado_glomerular: "Índice Filtrado Glomerular",
+            colesterol_total: "Colesterol Total",
+            colesterol_hdl: "Colesterol HDL",
+            colesterol_ldl: "Colesterol LDL",
+            trigliceridos: "Triglicéridos",
+            hiv: "HIV",
+            somf: "SOMF",
+            hepatitis_b_antigeno: "Hepatitis B Antígeno Superficie",
+            hepatitis_c: "Hepatitis C",
+            hepatitis_b_anti_core: "Hepatitis B Anti Core",
+            hpv_genotipo_16: "HPV Genotipo 16",
+            hpv_genotipo_18: "HPV Genotipo 18",
+            hpv_otros: "HPV Otros Genotipos Alto Riesgo",
+            vdrl: "VDRL",
+            psa: "PSA",
+            chagas_hai: "Chagas HAI",
+            chagas_eclia: "Chagas ECLIA",
+            hemoglobina_glicosilada: "Hemoglobina Glicosilada",
+            microalbuminuria: "Microalbuminuria",
+            proteinuria: "Proteinuria",
+            clearence_creatinina: "Clearence Creatinina",
+          };
+          let algunResultado = false;
+          columnas.forEach((col) => {
+            const valor = valoresPorColumna[col];
+            if (valor) {
+              algunResultado = true;
+              html += `<li>${labelsPorColumna[col] || col}: ${valor}</li>`;
+            }
+          });
+          if (!algunResultado) {
+            html += `<li class="text-gray-400">Sin resultado cargado todavía</li>`;
+          }
           html += `</ul>`;
         }
         card.innerHTML = html;
