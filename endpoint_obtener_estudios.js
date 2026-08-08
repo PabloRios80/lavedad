@@ -178,6 +178,18 @@ function registrarEndpointObtenerEstudios(app, supabase) {
                 'anticuerpos anti_v', 'laboratorio'
             ];
 
+            // Descripciones de acciones internas de facturación (módulos, cierres,
+            // consultas propias) que ya se muestran completas desde su propia
+            // fuente real (odontologia_consultas, enfermeria_consultas, etc.) y
+            // NO deben aparecer acá de nuevo, ya que estas filas no tienen
+            // resultado ni PDF adjunto — solo sirven para el cálculo de facturación.
+            const DESCRIPCIONES_EXCLUIR_FACTURACION = [
+                'consulta odontológica', 'consulta de enfermería',
+                'consulta médica (día preventivo)', 'módulo día preventivo',
+                'módulo extramódulo', 'módulo seguimiento', 'práctica bioquímica',
+                'topicación', 'enseñanza técnica'
+            ];
+
             const { data: practicasInd } = await supabase
                 .from('practicas_autorizadas')
                 .select('*')
@@ -188,8 +200,10 @@ function registrarEndpointObtenerEstudios(app, supabase) {
             (practicasInd || []).forEach(p => {
                 const desc = (p.descripcion_practica || '').toLowerCase();
 
-                // Saltar si es de laboratorio (ya cubierto)
+                // Saltar si es de laboratorio (ya cubierto) o si es una acción
+                // interna de facturación (ya cubierta por su propia fuente real)
                 if (DESCRIPCIONES_LABORATORIO.some(lab => desc.includes(lab))) return;
+                if (DESCRIPCIONES_EXCLUIR_FACTURACION.some(f => desc.includes(f))) return;
 
                 const tipo = mapearTipoPractica(desc);
 
