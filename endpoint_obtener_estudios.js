@@ -42,6 +42,10 @@ function registrarEndpointObtenerEstudios(app, supabase) {
                     Prestador: lab.prestador || '',
                     LinkPDF: links[0] || '',
                     LinksPDF: links, // array completo para mostrar múltiples botones
+                    // PDFs específicos por práctica individual (si existen).
+                    // Cuando una práctica no tiene entrada acá, corresponde
+                    // usar el PDF general (LinkPDF/LinksPDF) de arriba.
+                    LinkPdfPorPractica: lab.link_pdf_por_practica || {},
                     ResultadosLaboratorio: {
                         'Glucemia':                          lab.glucemia || '',
                         'Creatinina':                        lab.creatinina || '',

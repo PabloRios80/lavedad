@@ -653,6 +653,95 @@ document.addEventListener("DOMContentLoaded", () => {
     },
   ];
 
+  // ── Mapeo: campo del formulario → columna(s) de practicas_historicas ──
+  // Un campo puede agrupar varias determinaciones (ej. "Dislipemias" junta
+  // colesterol total, HDL, LDL y triglicéridos).
+  const CAMPO_A_COLUMNAS_LAB = {
+    ITS: ["hiv", "vdrl"], // Categoría redundante, referenciada a HIV+VDRL por ahora
+    Hepatitis_B: ["hepatitis_b_antigeno", "hepatitis_b_anti_core"],
+    Hepatitis_C: ["hepatitis_c"],
+    VIH: ["hiv"],
+    Dislipemias: [
+      "colesterol_total",
+      "colesterol_hdl",
+      "colesterol_ldl",
+      "trigliceridos",
+    ],
+    Diabetes: ["glucemia", "hemoglobina_glicosilada"],
+    Cancer_cervico_uterino_HPV: [
+      "hpv_genotipo_16",
+      "hpv_genotipo_18",
+      "hpv_otros",
+    ],
+    ERC: [
+      "creatinina",
+      "indice_filtrado_glomerular",
+      "microalbuminuria",
+      "proteinuria",
+      "clearence_creatinina",
+      "rac_albumina_creatinina",
+    ],
+    VDRL: ["vdrl"],
+    Prostata_PSA: ["psa"],
+    Chagas: ["chagas_hai", "chagas_eclia"],
+  };
+
+  // Dado un field.name y field.studyType, decide si hay algo cargado para
+  // ese campo y devuelve el/los link(s) de PDF correctos: prioriza el PDF
+  // individual de la práctica puntual si existe, y si no, cae al PDF
+  // general de laboratorio (el de la carga masiva por IA).
+  function resolverEstadoEstudio(fieldName, studyType) {
+    if (studyType === "SOMF") {
+      const somf = window._estudioSomfPaciente;
+      return {
+        tieneAlgo: !!(somf && (somf.enlace_pdf || somf.resultado_texto)),
+        links: somf && somf.enlace_pdf ? [somf.enlace_pdf] : [],
+      };
+    }
+
+    const estudios = window._estudiosPaciente || [];
+
+    if (studyType === "Laboratorio") {
+      const registrosLab = estudios.filter((s) => s.TipoEstudio === "Laboratorio");
+      if (registrosLab.length === 0) return { tieneAlgo: false, links: [] };
+
+      const columnas = CAMPO_A_COLUMNAS_LAB[fieldName] || [];
+      const linksIndividuales = [];
+      let tieneResultado = false;
+
+      registrosLab.forEach((reg) => {
+        const mapaIndividual = reg.LinkPdfPorPractica || {};
+        columnas.forEach((col) => {
+          if (mapaIndividual[col]) linksIndividuales.push(mapaIndividual[col]);
+        });
+        const valoresCampo = reg.ResultadosLaboratorio || {};
+        // Si cualquiera de los valores de este grupo tiene contenido real, cuenta
+        if (Object.values(valoresCampo).some((v) => v && v !== "")) {
+          tieneResultado = true;
+        }
+      });
+
+      if (linksIndividuales.length > 0) {
+        return { tieneAlgo: true, links: linksIndividuales };
+      }
+      // Sin PDF individual: usar el PDF general si existe
+      const linkGeneral = registrosLab[0]?.LinksPDF || [];
+      return {
+        tieneAlgo: tieneResultado || linkGeneral.length > 0,
+        links: linkGeneral,
+      };
+    }
+
+    // Resto de categorías (Mamografia, Odontologia, VCC, etc.)
+    const registro = estudios.find((s) => s.TipoEstudio === studyType);
+    if (!registro) return { tieneAlgo: false, links: [] };
+    const links = registro.LinksPDF || (registro.LinkPDF ? [registro.LinkPDF] : []);
+    return {
+      tieneAlgo: !!(links.length > 0 || registro.Resultado),
+      links,
+    };
+  }
+
   // Función para generar los pasos del formulario
   function generateFormSteps() {
     formStepsContainer.innerHTML = ""; // Limpiar contenido previo
@@ -770,19 +859,32 @@ document.addEventListener("DOMContentLoaded", () => {
         inputGroup.className = "flex items-center";
         inputGroup.appendChild(inputElement);
 
+        const estado = resolverEstadoEstudio(field.name, field.studyType);
+
         const studyButton = document.createElement("button");
-        studyButton.className =
-          "bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-r ml-2 focus:outline-none focus:shadow-outline flex-shrink-0 text-sm";
-        studyButton.innerHTML = `<i class="fas fa-search mr-1"></i>Ver Estudio`; // Añadido texto "Ver Estudio"
-        studyButton.title = `Ver Estudio de ${field.label}`; // Tooltip
+        studyButton.className = estado.tieneAlgo
+          ? "bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-r ml-2 focus:outline-none focus:shadow-outline flex-shrink-0 text-sm"
+          : "bg-gray-300 hover:bg-gray-400 text-gray-600 font-bold py-2 px-4 rounded-r ml-2 focus:outline-none focus:shadow-outline flex-shrink-0 text-sm";
+        studyButton.innerHTML = estado.tieneAlgo
+          ? `<i class="fas fa-check-circle mr-1"></i>Ver Estudio`
+          : `<i class="fas fa-search mr-1"></i>Ver Estudio`;
+        studyButton.title = estado.tieneAlgo
+          ? `Hay estudio cargado para ${field.label}`
+          : `Sin estudios cargados para ${field.label}`;
         studyButton.dataset.studyType = field.studyType;
+        studyButton.dataset.fieldName = field.name;
         studyButton.addEventListener("click", (e) => {
           e.preventDefault(); // Prevenir envío del formulario
+          if (!estado.tieneAlgo) {
+            alert(`No hay estudios cargados todavía para ${field.label}.`);
+            return;
+          }
           if (currentPatientData && currentPatientData.DNI) {
             mostrarEstudiosModal(
               currentPatientData.DNI,
               studyButton.dataset.studyType,
-            ); // <-- ESTA ES LA CORRECCIÓN
+              studyButton.dataset.fieldName,
+            );
           } else {
             alert("DNI del paciente no disponible para ver estudios.");
           }
@@ -960,6 +1062,41 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Guardar datos para uso posterior
       window._datosPaciente = data;
+
+      // Precargar los estudios del paciente UNA SOLA VEZ, para poder
+      // avisar visualmente en cada botón "Ver Estudio" si hay algo
+      // cargado o no, sin que el médico tenga que abrir cada uno a ciegas.
+      try {
+        const respEstudios = await fetch("/obtener-estudios-paciente", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dni }),
+        });
+        const dataEstudios = await respEstudios.json();
+        window._estudiosPaciente = dataEstudios.success
+          ? dataEstudios.estudios
+          : [];
+      } catch (e) {
+        console.warn("No se pudieron precargar los estudios:", e.message);
+        window._estudiosPaciente = [];
+      }
+
+      // Precargar también el resultado de SOMF (fuente separada)
+      try {
+        const respSomf = await fetch("/obtener-estudio-somf", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dni }),
+        });
+        const dataSomf = await respSomf.json();
+        window._estudioSomfPaciente =
+          dataSomf.success && dataSomf.estudios.length > 0
+            ? dataSomf.estudios[0]
+            : null;
+      } catch (e) {
+        console.warn("No se pudo precargar el estudio de SOMF:", e.message);
+        window._estudioSomfPaciente = null;
+      }
     } catch (e) {
       console.error("Error:", e);
       alert("Error de conexión al cargar datos.");
@@ -1102,7 +1239,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   // --- FUNCIÓN GLOBAL PARA MOSTRAR ESTUDIOS EN UN MODAL ---
   // Esta función será llamada por los botones "Ver Estudio"
-  async function mostrarEstudiosModal(dni, studyType) {
+  async function mostrarEstudiosModal(dni, studyType, fieldName) {
     if (!dni) {
       alert("DNI del paciente no disponible para ver estudios.");
       return;
@@ -1112,6 +1249,53 @@ document.addEventListener("DOMContentLoaded", () => {
     estudiosModalContent.innerHTML =
       '<p class="text-center text-gray-500">Cargando estudios...</p>';
     estudiosModal.classList.remove("hidden"); // Mostrar el modal
+
+    // Laboratorio: mostrar solo el/los PDF que corresponden al campo
+    // específico que se clickeó, priorizando el individual sobre el general.
+    if (studyType === "Laboratorio" && fieldName) {
+      estudiosModalContent.innerHTML = "";
+      const estado = resolverEstadoEstudio(fieldName, "Laboratorio");
+      const registrosLab = (window._estudiosPaciente || []).filter(
+        (s) => s.TipoEstudio === "Laboratorio",
+      );
+
+      if (registrosLab.length === 0) {
+        estudiosModalContent.innerHTML =
+          '<p class="text-center text-gray-500">No se encontraron estudios de laboratorio para este paciente.</p>';
+        return;
+      }
+
+      registrosLab.forEach((reg) => {
+        const card = document.createElement("div");
+        card.className =
+          "bg-blue-50 p-4 rounded-lg shadow-sm border border-blue-200 mb-4";
+        let html = `<h4 class="font-bold text-blue-700 mb-2">Laboratorio - Fecha: ${reg.Fecha || "N/A"}</h4>`;
+        html += `<p><strong>Prestador:</strong> ${reg.Prestador || "N/A"}</p>`;
+        const columnas = CAMPO_A_COLUMNAS_LAB[fieldName] || [];
+        if (columnas.length > 0) {
+          html += `<p class="mt-2"><strong>Resultados relacionados:</strong></p><ul class="list-disc list-inside">`;
+          Object.entries(reg.ResultadosLaboratorio || {}).forEach(
+            ([label, valor]) => {
+              if (valor) html += `<li>${label}: ${valor}</li>`;
+            },
+          );
+          html += `</ul>`;
+        }
+        card.innerHTML = html;
+
+        if (estado.links.length > 0) {
+          const linksBox = document.createElement("div");
+          linksBox.className = "mt-2 flex flex-wrap gap-2";
+          estado.links.forEach((link, i) => {
+            linksBox.innerHTML += `<a href="${link}" target="_blank" class="bg-green-400 hover:bg-green-500 text-gray-900 font-bold py-1 px-2 rounded inline-block"><i class="fas fa-file-pdf mr-1"></i> Ver PDF${estado.links.length > 1 ? " " + (i + 1) : ""}</a>`;
+          });
+          card.appendChild(linksBox);
+        }
+
+        estudiosModalContent.appendChild(card);
+      });
+      return;
+    }
 
     // SOMF tiene su propia fuente (Supabase), separada del resto de Laboratorio (Sheets)
     if (studyType === "SOMF") {
