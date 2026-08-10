@@ -733,12 +733,23 @@ document.addEventListener("DOMContentLoaded", () => {
       return { tieneAlgo: false, links: [] };
     }
 
-    // Resto de categorías (Mamografia, Odontologia, VCC, etc.)
+    // Resto de categorías (Mamografia, Odontologia, VCC, Enfermeria, etc.)
     const registro = estudios.find((s) => s.TipoEstudio === studyType);
     if (!registro) return { tieneAlgo: false, links: [] };
     const links = registro.LinksPDF || (registro.LinkPDF ? [registro.LinkPDF] : []);
+
+    // Enfermería no tiene Resultado/LinkPDF genérico — sus datos viven en
+    // ResultadosEnfermeria (altura, peso, presión, etc.). Si cualquiera de
+    // esos campos tiene contenido, consideramos que sí hay algo cargado.
+    let tieneResultadoEspecifico = !!registro.Resultado;
+    if (registro.ResultadosEnfermeria) {
+      tieneResultadoEspecifico =
+        tieneResultadoEspecifico ||
+        Object.values(registro.ResultadosEnfermeria).some((v) => v && v !== "");
+    }
+
     return {
-      tieneAlgo: !!(links.length > 0 || registro.Resultado),
+      tieneAlgo: !!(links.length > 0 || tieneResultadoEspecifico),
       links,
     };
   }

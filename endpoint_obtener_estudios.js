@@ -142,7 +142,7 @@ function registrarEndpointObtenerEstudios(app, supabase) {
                     ResultadosEnfermeria: {
                         'Altura':                e.altura_cm ? String(e.altura_cm) : '',
                         'Peso':                  e.peso_kg ? String(e.peso_kg) : '',
-                        'Circunferencia_cintura': e.cintura_cm ? String(e.cintura_cm) : '',
+                        'Circunferencia_cintura': e.circunferencia_cintura_cm ? String(e.circunferencia_cintura_cm) : '',
                         'Presion_Arterial':      e.presion_arterial || '',
                         'Vacunas':               e.vacunas || '',
                         'AgudezaVisual':         e.agudeza_visual || '',
