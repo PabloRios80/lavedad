@@ -1266,7 +1266,6 @@ document.addEventListener("DOMContentLoaded", () => {
     // específico que se clickeó, priorizando el individual sobre el general.
     if (studyType === "Laboratorio" && fieldName) {
       estudiosModalContent.innerHTML = "";
-      const estado = resolverEstadoEstudio(fieldName, "Laboratorio");
       const registrosLab = (window._estudiosPaciente || []).filter(
         (s) => s.TipoEstudio === "Laboratorio",
       );
@@ -1277,13 +1276,26 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
+      const columnas = CAMPO_A_COLUMNAS_LAB[fieldName] || [];
+
       registrosLab.forEach((reg) => {
+        // El link correcto es el propio de ESTE registro (reg), no el del
+        // primero de la lista: individual si existe para alguna columna
+        // de este campo, y si no, el PDF general de ESTE mismo registro.
+        const mapaIndividual = reg.LinkPdfPorPractica || {};
+        const linksIndividuales = columnas
+          .map((col) => mapaIndividual[col])
+          .filter(Boolean);
+        const linksDeEsteRegistro =
+          linksIndividuales.length > 0
+            ? linksIndividuales
+            : reg.LinksPDF || (reg.LinkPDF ? [reg.LinkPDF] : []);
+
         const card = document.createElement("div");
         card.className =
           "bg-blue-50 p-4 rounded-lg shadow-sm border border-blue-200 mb-4";
         let html = `<h4 class="font-bold text-blue-700 mb-2">Laboratorio - Fecha: ${reg.Fecha || "N/A"}</h4>`;
         html += `<p><strong>Prestador:</strong> ${reg.Prestador || "N/A"}</p>`;
-        const columnas = CAMPO_A_COLUMNAS_LAB[fieldName] || [];
         if (columnas.length > 0) {
           html += `<p class="mt-2"><strong>Resultados relacionados:</strong></p><ul class="list-disc list-inside">`;
           const valoresPorColumna = reg.ResultadosPorColumna || {};
@@ -1327,11 +1339,11 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         card.innerHTML = html;
 
-        if (estado.links.length > 0) {
+        if (linksDeEsteRegistro.length > 0) {
           const linksBox = document.createElement("div");
           linksBox.className = "mt-2 flex flex-wrap gap-2";
-          estado.links.forEach((link, i) => {
-            linksBox.innerHTML += `<a href="${link}" target="_blank" class="bg-green-400 hover:bg-green-500 text-gray-900 font-bold py-1 px-2 rounded inline-block"><i class="fas fa-file-pdf mr-1"></i> Ver PDF${estado.links.length > 1 ? " " + (i + 1) : ""}</a>`;
+          linksDeEsteRegistro.forEach((link, i) => {
+            linksBox.innerHTML += `<a href="${link}" target="_blank" class="bg-green-400 hover:bg-green-500 text-gray-900 font-bold py-1 px-2 rounded inline-block"><i class="fas fa-file-pdf mr-1"></i> Ver PDF${linksDeEsteRegistro.length > 1 ? " " + (i + 1) : ""}</a>`;
           });
           card.appendChild(linksBox);
         }
