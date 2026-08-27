@@ -756,6 +756,22 @@ app.post("/api/cierre/guardar", async (req, res) => {
 
     // Guardar también en Supabase
     try {
+      // El efector y la sede real del cierre, NO un valor fijo — antes
+      // quedaba hardcodeado "IAPOS ESP PREST" sin importar la sede real.
+      const idSedeDp = formData["id_sede_dp"]
+        ? parseInt(formData["id_sede_dp"])
+        : null;
+      const SEDES_EFECTOR = {
+        1: "IAPOS ESP PREST",
+        2: "ATEM",
+        3: "Hospital Italiano Rosario",
+        4: "Delta",
+        5: "Sunchales",
+        6: "Coronda",
+        7: "Reconquista",
+      };
+      const efectorReal = SEDES_EFECTOR[idSedeDp] || "IAPOS ESP PREST";
+
       const supabaseData = {
         dni: dni,
         apellido_y_nombre:
@@ -764,7 +780,8 @@ app.post("/api/cierre/guardar", async (req, res) => {
           formData["Fecha_cierre_DP"] || new Date().toISOString().split("T")[0],
         edad: formData["Edad"] || null,
         sexo: formData["Sexo"] || null,
-        efector: "IAPOS ESP PREST",
+        efector: efectorReal,
+        id_sede_dp: idSedeDp,
         tipo: "Adultos",
         profesional: profesionalName,
         marca_temporal: new Date().toISOString(),
@@ -860,10 +877,12 @@ app.post("/api/cierre/guardar", async (req, res) => {
             nombre_completo:
               `${formData["Apellido"] || ""} ${formData["Nombre"] || ""}`.trim(),
             descripcion_practica: "Consulta médica (Día Preventivo)",
+            codigo_prestacion: "B040101",
             estado: "REALIZADA",
             fecha_autorizacion: hoy,
             fecha_carga: hoy,
             nombre_prestador: profesionalName,
+            id_sede_dp: idSedeDp,
           });
           console.log(
             "✅ Consulta médica registrada como REALIZADA para DNI:",
@@ -871,9 +890,6 @@ app.post("/api/cierre/guardar", async (req, res) => {
           );
 
           // Disparar Módulo Día Preventivo (339159) al prestador de Coordinación DP de la sede
-          const idSedeDp = formData["id_sede_dp"]
-            ? parseInt(formData["id_sede_dp"])
-            : null;
           if (idSedeDp) {
             const { data: prestadoresCoordSede } = await supabase
               .from("prestador_sedes")
@@ -908,6 +924,7 @@ app.post("/api/cierre/guardar", async (req, res) => {
                 nombre_completo:
                   `${formData["Apellido"] || ""} ${formData["Nombre"] || ""}`.trim(),
                 descripcion_practica: "Módulo Día Preventivo",
+                codigo_prestacion: "339159",
                 estado: "REALIZADA",
                 fecha_autorizacion: hoy,
                 fecha_carga: hoy,
@@ -915,6 +932,7 @@ app.post("/api/cierre/guardar", async (req, res) => {
                 nombre_prestador:
                   prestadorCoord.prestadores_institucionales
                     ?.nombre_institucion,
+                id_sede_dp: idSedeDp,
               });
               console.log("✅ Módulo DP (339159) registrado para DNI:", dni);
             } else {
