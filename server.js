@@ -1415,6 +1415,36 @@ app.post("/cargar-datos-paciente", async (req, res) => {
       mensaje: "⚠️ Hipertensión registrada en DP anterior",
     });
 
+  // ── BLOQUEO POR CIERRE RECIENTE ──
+  // No puede haber un nuevo cierre de Día Preventivo si no pasó un año
+  // completo desde el último "Módulo Día Preventivo" REALIZADA (la fecha
+  // real del cierre, no la de la visita/intake en historial_dia_preventivo).
+  let bloqueoCierreAnual = null;
+  const modulosRealizados = (practicas || [])
+    .filter(
+      (p) =>
+        p.descripcion_practica === "Módulo Día Preventivo" &&
+        p.estado === "REALIZADA" &&
+        p.fecha_carga,
+    )
+    .sort((a, b) => new Date(b.fecha_carga) - new Date(a.fecha_carga));
+
+  if (modulosRealizados.length > 0) {
+    const fechaUltimoCierre = new Date(modulosRealizados[0].fecha_carga);
+    const diasDesdeUltimoCierre = Math.floor(
+      (Date.now() - fechaUltimoCierre.getTime()) / (1000 * 60 * 60 * 24),
+    );
+    if (diasDesdeUltimoCierre < 365) {
+      bloqueoCierreAnual = {
+        bloqueado: true,
+        fechaUltimoCierre: fechaUltimoCierre.toISOString().split("T")[0],
+        diasDesdeUltimoCierre,
+        diasRestantes: 365 - diasDesdeUltimoCierre,
+        nombrePrestador: modulosRealizados[0].nombre_prestador || null,
+      };
+    }
+  }
+
   res.json({
     success: true,
     iapos: datosIAPOS,
@@ -1422,6 +1452,7 @@ app.post("/cargar-datos-paciente", async (req, res) => {
     ultimoDP: ultimoDP || null,
     practicasRealizadas: practicas || [],
     alertas,
+    bloqueoCierreAnual,
   });
 });
 function mapearTipoEstudio(descripcion) {

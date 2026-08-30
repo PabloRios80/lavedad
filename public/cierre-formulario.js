@@ -1026,6 +1026,23 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
+      // ── BLOQUEO POR CIERRE RECIENTE (menos de 1 año) ──
+      if (data.bloqueoCierreAnual?.bloqueado) {
+        const b = data.bloqueoCierreAnual;
+        const fechaLegible = new Date(
+          b.fechaUltimoCierre + "T00:00:00",
+        ).toLocaleDateString("es-AR");
+        alert(
+          `⛔ Este paciente ya tiene un Día Preventivo cerrado el ${fechaLegible}` +
+            (b.nombrePrestador ? ` (${b.nombrePrestador})` : "") +
+            `.\n\nTodavía faltan ${b.diasRestantes} días para que se cumpla el año y pueda cerrarse un nuevo ciclo.`,
+        );
+        cargarDatosBtn.disabled = false;
+        cargarDatosBtn.innerHTML =
+          '<i class="fas fa-search mr-2"></i>Cargar Datos';
+        return;
+      }
+
       // Autocompletar desde IAPOS
       if (data.iapos?.esActivo) {
         const nombreCompleto = data.iapos.nombre || "";
