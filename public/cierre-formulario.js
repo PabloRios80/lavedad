@@ -1027,6 +1027,11 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       // ── BLOQUEO POR CIERRE RECIENTE (menos de 1 año) ──
+      // DESACTIVADO TEMPORALMENTE (2026-08-30) para poder auditar si los
+      // médicos vieron los estudios complementarios antes de cerrar en
+      // casos ya cerrados. Reactivar descomentando este bloque cuando
+      // termine la investigación — es un control importante.
+      /*
       if (data.bloqueoCierreAnual?.bloqueado) {
         const b = data.bloqueoCierreAnual;
         const fechaLegible = new Date(
@@ -1042,6 +1047,7 @@ document.addEventListener("DOMContentLoaded", () => {
           '<i class="fas fa-search mr-2"></i>Cargar Datos';
         return;
       }
+      */
 
       // Autocompletar desde IAPOS
       window._afiliadoInactivoConfirmado = false;
