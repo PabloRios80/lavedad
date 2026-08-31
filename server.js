@@ -988,6 +988,26 @@ app.post("/api/cierre/guardar", async (req, res) => {
       console.error("Error Supabase cierre:", supabaseErr.message);
     }
 
+    // ── GUARDAR NOVEDADES (discrepancias médico vs. laboratorio confirmadas) ──
+    if (Array.isArray(formData.discrepanciasConfirmadas) && formData.discrepanciasConfirmadas.length > 0) {
+      try {
+        const filas = formData.discrepanciasConfirmadas.map((d) => ({
+          dni,
+          nombre_completo: `${formData["Apellido"] || ""} ${formData["Nombre"] || ""}`.trim(),
+          campo: d.campo,
+          valor_medico: d.valorMedico,
+          valor_lab: d.valorLab,
+          observacion_medico: d.observacion,
+          profesional: profesionalName,
+          id_sede_dp: formData["id_sede_dp"] ? parseInt(formData["id_sede_dp"]) : null,
+        }));
+        await supabase.from("novedades_coordinacion").insert(filas);
+        console.log(`⚠️ ${filas.length} novedad(es) registrada(s) para DNI ${dni}`);
+      } catch (novErr) {
+        console.error("Error guardando novedades_coordinacion:", novErr.message);
+      }
+    }
+
     console.log(
       `SERVER: Nuevo registro de cierre guardado para DNI: ${dni} por ${profesionalName}`,
     );
@@ -1477,6 +1497,157 @@ app.post("/cargar-datos-paciente", async (req, res) => {
     }
   }
 
+  // ── VALORES ESPERADOS DE LABORATORIO (para el cruce con lo que carga el médico) ──
+  // Misma función/umbrales que usa el bioquímico en prestadores.js, portada
+  // acá para evaluar los valores numéricos (glucemia, colesterol, etc.).
+  function evaluarSemaforoNode(campo, valor, sexoBiologico) {
+    if (!valor) return null;
+    const v = valor.toString().trim();
+    const vUpper = v.toUpperCase();
+    const vNum = parseFloat(v.replace(",", "."));
+    const sexo = (sexoBiologico || "").toLowerCase();
+
+    const VERDE = "VERDE";
+    const AMARILLO = "AMARILLO";
+    const ROJO = "ROJO";
+
+    if (campo === "glucemia") {
+      if (isNaN(vNum)) return null;
+      const glucVal = vUpper.includes("MG") ? vNum / 1000 : vNum;
+      if (glucVal <= 1.0) return VERDE;
+      if (glucVal <= 1.25) return AMARILLO;
+      return ROJO;
+    }
+    if (campo === "colesterol_total") {
+      if (isNaN(vNum)) return null;
+      if (vNum < 200) return VERDE;
+      if (vNum < 240) return AMARILLO;
+      return ROJO;
+    }
+    if (campo === "colesterol_hdl") {
+      if (isNaN(vNum)) return null;
+      const hdlMin = sexo.includes("fem") ? 50 : 40;
+      const hdlLimite = sexo.includes("fem") ? 40 : 35;
+      if (vNum >= hdlMin) return VERDE;
+      if (vNum >= hdlLimite) return AMARILLO;
+      return ROJO;
+    }
+    if (campo === "colesterol_ldl") {
+      if (isNaN(vNum)) return null;
+      if (vNum < 130) return VERDE;
+      if (vNum < 160) return AMARILLO;
+      return ROJO;
+    }
+    if (campo === "trigliceridos") {
+      if (isNaN(vNum)) return null;
+      if (vNum < 150) return VERDE;
+      if (vNum < 200) return AMARILLO;
+      return ROJO;
+    }
+    return null;
+  }
+
+  // Mapeo entre campo del formulario y campo(s) del laboratorio leído por IA.
+  const MAPEO_LAB_FORM = {
+    VIH: { tipo: "binario", labCampos: ["hiv"], positivo: "Positivo", negativo: "Negativo" },
+    Hepatitis_B: {
+      tipo: "binario_multiple",
+      labCampos: ["hepatitis_b_antigeno_superficie", "hepatitis_b_anti_core"],
+      positivo: "Positivo",
+      negativo: "Negativo",
+    },
+    Hepatitis_C: { tipo: "binario", labCampos: ["hepatitis_c"], positivo: "Positivo", negativo: "Negativo" },
+    VDRL: { tipo: "binario", labCampos: ["vdrl"], positivo: "Positivo", negativo: "Negativo" },
+    Chagas: {
+      tipo: "binario_multiple",
+      labCampos: ["chagas_hai", "chagas_eclia"],
+      positivo: "Positivo",
+      negativo: "Negativo",
+    },
+    Cancer_cervico_uterino_HPV: {
+      tipo: "detectable_multiple",
+      labCampos: ["hpv_genotipo_16", "hpv_genotipo_18", "hpv_otros"],
+      positivo: "Patologico",
+      negativo: "Normal",
+    },
+    Cancer_colon_SOMF: { tipo: "binario", labCampos: ["somf"], positivo: "Patologico", negativo: "Normal" },
+    Dislipemias: {
+      tipo: "semaforo_multiple",
+      labCampos: ["colesterol_total", "colesterol_hdl", "colesterol_ldl", "trigliceridos"],
+      positivo: "Presenta",
+      negativo: "No presenta",
+    },
+    Diabetes: {
+      tipo: "semaforo_simple",
+      labCampos: ["glucemia"],
+      positivo: "Presenta",
+      negativo: "No presenta",
+    },
+  };
+
+  let valoresEsperadosLab = {};
+  try {
+    const { data: ultimoLab } = await supabase
+      .from("practicas_historicas")
+      .select("*")
+      .eq("dni", dni)
+      .eq("tipo_practica", "laboratorio")
+      .order("fecha", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (ultimoLab) {
+      const sexoBiologico = (afiliado || menor)?.sexo || datosIAPOS?.sexo;
+
+      Object.entries(MAPEO_LAB_FORM).forEach(([campoForm, cfg]) => {
+        const valoresLab = cfg.labCampos.map((lc) => ultimoLab[lc]).filter(Boolean);
+        if (valoresLab.length === 0) return; // sin dato de lab, no comparamos
+
+        let esperado = null;
+
+        if (cfg.tipo === "binario" || cfg.tipo === "binario_multiple") {
+          const hayPositivo = valoresLab.some((v) =>
+            ["POSITIVO", "REACTIVO"].includes(v.toString().toUpperCase()),
+          );
+          const todosNegativo = valoresLab.every((v) =>
+            ["NEGATIVO", "NO REACTIVO"].includes(v.toString().toUpperCase()),
+          );
+          if (hayPositivo) esperado = cfg.positivo;
+          else if (todosNegativo) esperado = cfg.negativo;
+        } else if (cfg.tipo === "detectable_multiple") {
+          const hayDetectable = valoresLab.some((v) =>
+            v.toString().toUpperCase().includes("DETECTABLE") &&
+            !v.toString().toUpperCase().includes("NO DETECTABLE"),
+          );
+          const todosNoDetectable = valoresLab.every((v) =>
+            v.toString().toUpperCase().includes("NO DETECTABLE"),
+          );
+          if (hayDetectable) esperado = cfg.positivo;
+          else if (todosNoDetectable) esperado = cfg.negativo;
+        } else if (cfg.tipo === "semaforo_multiple" || cfg.tipo === "semaforo_simple") {
+          const colores = cfg.labCampos
+            .map((lc) => evaluarSemaforoNode(lc, ultimoLab[lc], sexoBiologico))
+            .filter(Boolean);
+          if (colores.includes("ROJO")) esperado = cfg.positivo;
+          else if (colores.length > 0 && colores.every((c) => c === "VERDE"))
+            esperado = cfg.negativo;
+          // Si solo hay AMARILLO (sin rojo), queda ambiguo: no se marca.
+        }
+
+        if (esperado) {
+          valoresEsperadosLab[campoForm] = {
+            esperado,
+            valorLabCrudo: valoresLab.join(" / "),
+            fechaLab: ultimoLab.fecha,
+          };
+        }
+      });
+    }
+  } catch (e) {
+    console.error("Error calculando valoresEsperadosLab:", e.message);
+    // No bloqueamos la carga del paciente por un error acá.
+  }
+
   res.json({
     success: true,
     iapos: datosIAPOS,
@@ -1485,6 +1656,7 @@ app.post("/cargar-datos-paciente", async (req, res) => {
     practicasRealizadas: practicas || [],
     alertas,
     bloqueoCierreAnual,
+    valoresEsperadosLab,
   });
 });
 function mapearTipoEstudio(descripcion) {

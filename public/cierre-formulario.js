@@ -982,6 +982,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Limpiar el aviso de cierre reciente, si estaba mostrado
     window._cierreBloqueadoAnual = null;
+    window._valoresEsperadosLab = {};
     mostrarCartelBloqueoAnual(null);
 
     // Mostrar formulario de cierre
@@ -1061,6 +1062,9 @@ document.addEventListener("DOMContentLoaded", () => {
         ? data.bloqueoCierreAnual
         : null;
       mostrarCartelBloqueoAnual(window._cierreBloqueadoAnual);
+
+      // Valores esperados de laboratorio (para el cruce al momento de guardar)
+      window._valoresEsperadosLab = data.valoresEsperadosLab || {};
 
       // Autocompletar desde IAPOS
       window._afiliadoInactivoConfirmado = false;
@@ -1277,6 +1281,49 @@ document.addEventListener("DOMContentLoaded", () => {
       );
       return;
     }
+
+    // ── CRUCE CON VALORES REALES DE LABORATORIO ──
+    const esperados = window._valoresEsperadosLab || {};
+    const discrepanciasConfirmadas = [];
+    for (const campo of Object.keys(esperados)) {
+      const valorMedico = (formData[campo] || "").trim();
+      const { esperado, valorLabCrudo } = esperados[campo];
+      if (!valorMedico || valorMedico === esperado) continue;
+
+      const nombreObs = `Observaciones_${campo}`;
+      const inputObs = cierreForm.querySelector(`[name="${nombreObs}"]`);
+
+      const confirma = confirm(
+        `⚠️ El valor que ingresaste en "${campo.replace(/_/g, " ")}" es "${valorMedico}", pero el laboratorio dice "${valorLabCrudo}" (esperado: "${esperado}").\n\n¿Confirmás que querés guardar este valor de todos modos?`,
+      );
+      if (!confirma) {
+        guardarCierreBtn.disabled = false;
+        guardarCierreBtn.textContent = "Guardar Cierre";
+        if (inputObs) inputObs.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
+
+      const observacionActual = (formData[nombreObs] || "").trim();
+      if (!observacionActual) {
+        alert(
+          `Antes de continuar, tenés que explicar en "Obs. ${campo.replace(/_/g, " ")}" por qué el valor difiere del laboratorio.`,
+        );
+        if (inputObs) {
+          inputObs.classList.add("border-red-500", "ring-red-500");
+          inputObs.scrollIntoView({ behavior: "smooth", block: "center" });
+          inputObs.focus();
+        }
+        return;
+      }
+
+      discrepanciasConfirmadas.push({
+        campo,
+        valorMedico,
+        valorLab: valorLabCrudo,
+        observacion: observacionActual,
+      });
+    }
+    formData.discrepanciasConfirmadas = discrepanciasConfirmadas;
 
     guardarCierreBtn.disabled = true;
     guardarCierreBtn.textContent = "Guardando...";
