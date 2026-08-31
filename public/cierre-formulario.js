@@ -32,6 +32,41 @@ document.addEventListener("DOMContentLoaded", () => {
   const formStepsContainer = document.getElementById("form-steps-container");
   const progressBar = document.getElementById("progress-bar");
 
+  function verificarDiscrepanciaEnVivo(selectEl) {
+    const campo = selectEl.name;
+    const esperados = window._valoresEsperadosLab || {};
+    if (!esperados[campo]) return;
+
+    const valorMedico = selectEl.value;
+    if (!valorMedico || valorMedico === esperados[campo].esperado) {
+      selectEl.dataset.discrepanciaConfirmada = "";
+      return;
+    }
+
+    const { esperado, valorLabCrudo } = esperados[campo];
+    const confirma = confirm(
+      `⚠️ El valor que elegiste en "${campo.replace(/_/g, " ")}" es "${valorMedico}", pero el laboratorio dice "${valorLabCrudo}" (esperado: "${esperado}").\n\n¿Confirmás que querés dejarlo así? Vas a tener que explicar el motivo en el campo de Observaciones correspondiente antes de poder guardar el cierre.`,
+    );
+
+    if (!confirma) {
+      selectEl.value = "";
+      selectEl.dataset.discrepanciaConfirmada = "";
+      selectEl.focus();
+      return;
+    }
+
+    selectEl.dataset.discrepanciaConfirmada = "true";
+    const nombreObs = `Observaciones_${campo}`;
+    const inputObs = cierreForm.querySelector(`[name="${nombreObs}"]`);
+    if (inputObs) {
+      inputObs.classList.add("border-yellow-500", "ring-yellow-500");
+      setTimeout(() => {
+        inputObs.scrollIntoView({ behavior: "smooth", block: "center" });
+        inputObs.focus();
+      }, 200);
+    }
+  }
+
   function mostrarCartelBloqueoAnual(bloqueo) {
     let cartel = document.getElementById("cartelBloqueoAnual");
     if (!bloqueo) {
@@ -833,6 +868,10 @@ document.addEventListener("DOMContentLoaded", () => {
           option.textContent = optionText;
           inputElement.appendChild(option);
         });
+
+        inputElement.addEventListener("change", () =>
+          verificarDiscrepanciaEnVivo(inputElement),
+        );
       } else if (field.type === "textarea") {
         inputElement = document.createElement("textarea");
         inputElement.className = `${inputClasses} h-20 resize-y`;
@@ -1288,30 +1327,30 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ── CRUCE CON VALORES REALES DE LABORATORIO ──
+    // (red de seguridad: la mayoría de los avisos ya se mostraron en vivo,
+    // al elegir cada valor — acá solo se confirma que quedó todo prolijo)
     const esperados = window._valoresEsperadosLab || {};
-    console.log("── Iniciando cruce de laboratorio ──");
-    console.log("Campos con valor esperado:", Object.keys(esperados));
     const discrepanciasConfirmadas = [];
     for (const campo of Object.keys(esperados)) {
       const valorMedico = (formData[campo] || "").trim();
       const { esperado, valorLabCrudo } = esperados[campo];
-      console.log(
-        `Campo "${campo}": médico puso "${valorMedico}", esperado "${esperado}" (lab: ${valorLabCrudo})`,
-      );
       if (!valorMedico || valorMedico === esperado) continue;
-      console.log(`  → DISCREPANCIA detectada en "${campo}"`);
 
       const nombreObs = `Observaciones_${campo}`;
       const inputObs = cierreForm.querySelector(`[name="${nombreObs}"]`);
+      const selectEl = cierreForm.querySelector(`[name="${campo}"]`);
+      const yaConfirmadoEnVivo = selectEl?.dataset.discrepanciaConfirmada === "true";
 
-      const confirma = confirm(
-        `⚠️ El valor que ingresaste en "${campo.replace(/_/g, " ")}" es "${valorMedico}", pero el laboratorio dice "${valorLabCrudo}" (esperado: "${esperado}").\n\n¿Confirmás que querés guardar este valor de todos modos?`,
-      );
-      if (!confirma) {
-        guardarCierreBtn.disabled = false;
-        guardarCierreBtn.textContent = "Guardar Cierre";
-        if (inputObs) inputObs.scrollIntoView({ behavior: "smooth", block: "center" });
-        return;
+      if (!yaConfirmadoEnVivo) {
+        const confirma = confirm(
+          `⚠️ El valor que ingresaste en "${campo.replace(/_/g, " ")}" es "${valorMedico}", pero el laboratorio dice "${valorLabCrudo}" (esperado: "${esperado}").\n\n¿Confirmás que querés guardar este valor de todos modos?`,
+        );
+        if (!confirma) {
+          guardarCierreBtn.disabled = false;
+          guardarCierreBtn.textContent = "Guardar Cierre";
+          if (inputObs) inputObs.scrollIntoView({ behavior: "smooth", block: "center" });
+          return;
+        }
       }
 
       const observacionActual = (formData[nombreObs] || "").trim();
