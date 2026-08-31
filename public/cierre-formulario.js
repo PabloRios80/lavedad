@@ -1044,6 +1044,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       // Autocompletar desde IAPOS
+      window._afiliadoInactivoConfirmado = false;
       if (data.iapos?.esActivo) {
         const nombreCompleto = data.iapos.nombre || "";
         const partes = nombreCompleto.split(",");
@@ -1054,9 +1055,20 @@ document.addEventListener("DOMContentLoaded", () => {
         pacienteEdadInput.value = data.iapos.edad || "";
         if (sexoSelect) sexoSelect.value = data.iapos.sexo === "2" ? "F" : "M";
         patientInfoDisplay.classList.remove("hidden");
-      } else {
+      } else if (data.iapos === null) {
+        // No se pudo consultar el padrón de IAPOS (caído/timeout): no
+        // sabemos si está activo o no. Se deja continuar con carga
+        // manual, con aviso, para no frenar el trabajo por una falla
+        // técnica ajena al paciente.
         alert(
-          "⚠️ El afiliado no está activo en IAPOS. Verificar antes de continuar.",
+          "⚠️ No se pudo verificar el estado del afiliado en IAPOS (padrón no respondió). Verificá manualmente antes de continuar.",
+        );
+      } else {
+        // IAPOS respondió explícitamente que el afiliado NO está activo:
+        // esto sí bloquea, no es un problema de conexión.
+        window._afiliadoInactivoConfirmado = true;
+        alert(
+          "⛔ El afiliado no está activo en IAPOS. No se puede continuar con el cierre.",
         );
       }
 
@@ -1136,6 +1148,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Asignar DNI a currentPatientData para el botón "Ver Estudio"
     currentPatientData = { DNI: dni };
+
+    // Si IAPOS confirmó que el afiliado está inactivo, no se muestra el
+    // formulario — a diferencia de una falla de conexión, que sí permite
+    // continuar con carga manual.
+    if (window._afiliadoInactivoConfirmado) {
+      return;
+    }
 
     // Mostrar campos fijos de paciente y el formulario de cierre
     patientInfoDisplay.classList.remove("hidden");
