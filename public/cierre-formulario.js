@@ -1066,7 +1066,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Valores esperados de laboratorio (para el cruce al momento de guardar)
       window._valoresEsperadosLab = data.valoresEsperadosLab || {};
-      console.log("valoresEsperadosLab recibidos:", window._valoresEsperadosLab);
+      console.log(
+        "valoresEsperadosLab recibidos:",
+        JSON.stringify(window._valoresEsperadosLab, null, 2),
+      );
 
       // Autocompletar desde IAPOS
       window._afiliadoInactivoConfirmado = false;
@@ -1286,11 +1289,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // ── CRUCE CON VALORES REALES DE LABORATORIO ──
     const esperados = window._valoresEsperadosLab || {};
+    console.log("── Iniciando cruce de laboratorio ──");
+    console.log("Campos con valor esperado:", Object.keys(esperados));
     const discrepanciasConfirmadas = [];
     for (const campo of Object.keys(esperados)) {
       const valorMedico = (formData[campo] || "").trim();
       const { esperado, valorLabCrudo } = esperados[campo];
+      console.log(
+        `Campo "${campo}": médico puso "${valorMedico}", esperado "${esperado}" (lab: ${valorLabCrudo})`,
+      );
       if (!valorMedico || valorMedico === esperado) continue;
+      console.log(`  → DISCREPANCIA detectada en "${campo}"`);
 
       const nombreObs = `Observaciones_${campo}`;
       const inputObs = cierreForm.querySelector(`[name="${nombreObs}"]`);
