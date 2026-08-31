@@ -1500,12 +1500,13 @@ app.post("/cargar-datos-paciente", async (req, res) => {
   // ── VALORES ESPERADOS DE LABORATORIO (para el cruce con lo que carga el médico) ──
   // Misma función/umbrales que usa el bioquímico en prestadores.js, portada
   // acá para evaluar los valores numéricos (glucemia, colesterol, etc.).
-  function evaluarSemaforoNode(campo, valor, sexoBiologico) {
+  function evaluarSemaforoNode(campo, valor, sexoBiologico, edadPaciente) {
     if (!valor) return null;
     const v = valor.toString().trim();
     const vUpper = v.toUpperCase();
     const vNum = parseFloat(v.replace(",", "."));
     const sexo = (sexoBiologico || "").toLowerCase();
+    const edad = parseInt(edadPaciente) || 0;
 
     const VERDE = "VERDE";
     const AMARILLO = "AMARILLO";
@@ -1542,6 +1543,41 @@ app.post("/cargar-datos-paciente", async (req, res) => {
       if (isNaN(vNum)) return null;
       if (vNum < 150) return VERDE;
       if (vNum < 200) return AMARILLO;
+      return ROJO;
+    }
+    if (campo === "creatinina") {
+      if (isNaN(vNum)) return null;
+      const creatMax = sexo.includes("fem") ? 0.9 : 1.2;
+      const creatLimite = sexo.includes("fem") ? 1.2 : 1.5;
+      if (vNum <= creatMax) return VERDE;
+      if (vNum <= creatLimite) return AMARILLO;
+      return ROJO;
+    }
+    if (campo === "indice_filtrado_glomerular") {
+      if (isNaN(vNum)) return null;
+      if (vNum >= 90) return VERDE;
+      if (vNum >= 60 && vNum < 70) return AMARILLO;
+      if (vNum >= 70) return VERDE;
+      return ROJO;
+    }
+    if (campo === "psa") {
+      if (isNaN(vNum)) return null;
+      let psaNormal, psaLimite;
+      if (edad <= 50) {
+        psaNormal = 2.0;
+        psaLimite = 3.0;
+      } else if (edad <= 60) {
+        psaNormal = 3.0;
+        psaLimite = 4.0;
+      } else if (edad <= 70) {
+        psaNormal = 4.0;
+        psaLimite = 5.0;
+      } else {
+        psaNormal = 4.5;
+        psaLimite = 6.0;
+      }
+      if (vNum <= psaNormal) return VERDE;
+      if (vNum <= psaLimite) return AMARILLO;
       return ROJO;
     }
     return null;
@@ -1583,6 +1619,24 @@ app.post("/cargar-datos-paciente", async (req, res) => {
       positivo: "Presenta",
       negativo: "No presenta",
     },
+    ERC: {
+      tipo: "semaforo_multiple",
+      labCampos: ["creatinina", "indice_filtrado_glomerular"],
+      positivo: "Patologico",
+      negativo: "Normal",
+    },
+    Prostata_PSA: {
+      tipo: "semaforo_simple",
+      labCampos: ["psa"],
+      positivo: "Patologico",
+      negativo: "Normal",
+    },
+  };
+
+  // Campos cuyo input de "Observaciones" no sigue el patrón estándar
+  // Observaciones_<campo> (error de nombres preexistente en el formulario).
+  const EXCEPCIONES_NOMBRE_OBSERVACION = {
+    ERC: "Observaciones_ECG",
   };
 
   let valoresEsperadosLab = {};
@@ -1598,6 +1652,7 @@ app.post("/cargar-datos-paciente", async (req, res) => {
 
     if (ultimoLab) {
       const sexoBiologico = (afiliado || menor)?.sexo || datosIAPOS?.sexo;
+      const edadPaciente = (afiliado || menor)?.edad || datosIAPOS?.edad;
 
       Object.entries(MAPEO_LAB_FORM).forEach(([campoForm, cfg]) => {
         const valoresLab = cfg.labCampos.map((lc) => ultimoLab[lc]).filter(Boolean);
@@ -1626,7 +1681,7 @@ app.post("/cargar-datos-paciente", async (req, res) => {
           else if (todosNoDetectable) esperado = cfg.negativo;
         } else if (cfg.tipo === "semaforo_multiple" || cfg.tipo === "semaforo_simple") {
           const colores = cfg.labCampos
-            .map((lc) => evaluarSemaforoNode(lc, ultimoLab[lc], sexoBiologico))
+            .map((lc) => evaluarSemaforoNode(lc, ultimoLab[lc], sexoBiologico, edadPaciente))
             .filter(Boolean);
           if (colores.includes("ROJO")) esperado = cfg.positivo;
           else if (colores.length > 0 && colores.every((c) => c === "VERDE"))
@@ -1642,6 +1697,33 @@ app.post("/cargar-datos-paciente", async (req, res) => {
           };
         }
       });
+
+      // ITS es un compuesto de VIH + Hepatitis B + Hepatitis C + VDRL
+      // (Chagas queda afuera, no es una ITS). Se calcula después de tener
+      // ya resueltos esos cuatro campos individuales.
+      const componentesITS = ["VIH", "Hepatitis_B", "Hepatitis_C", "VDRL"];
+      const esperadosITS = componentesITS
+        .map((c) => valoresEsperadosLab[c]?.esperado)
+        .filter(Boolean);
+      if (esperadosITS.length > 0) {
+        const hayPositivoITS = esperadosITS.includes("Positivo");
+        const todosNegativoITS = esperadosITS.every((e) => e === "Negativo");
+        if (hayPositivoITS) {
+          valoresEsperadosLab["ITS"] = {
+            esperado: "Positivo",
+            valorLabCrudo: componentesITS
+              .filter((c) => valoresEsperadosLab[c]?.esperado === "Positivo")
+              .join(" / "),
+            fechaLab: ultimoLab.fecha,
+          };
+        } else if (todosNegativoITS) {
+          valoresEsperadosLab["ITS"] = {
+            esperado: "Negativo",
+            valorLabCrudo: "VIH / Hepatitis B / Hepatitis C / VDRL negativos",
+            fechaLab: ultimoLab.fecha,
+          };
+        }
+      }
     }
   } catch (e) {
     console.error("Error calculando valoresEsperadosLab:", e.message);
@@ -1657,6 +1739,7 @@ app.post("/cargar-datos-paciente", async (req, res) => {
     alertas,
     bloqueoCierreAnual,
     valoresEsperadosLab,
+    excepcionesNombreObservacion: EXCEPCIONES_NOMBRE_OBSERVACION,
   });
 });
 function mapearTipoEstudio(descripcion) {

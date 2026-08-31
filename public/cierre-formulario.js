@@ -56,7 +56,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     selectEl.dataset.discrepanciaConfirmada = "true";
-    const nombreObs = `Observaciones_${campo}`;
+    const nombreObs =
+      (window._excepcionesNombreObservacion || {})[campo] ||
+      `Observaciones_${campo}`;
     const inputObs = cierreForm.querySelector(`[name="${nombreObs}"]`);
     if (inputObs) {
       inputObs.classList.add("border-yellow-500", "ring-yellow-500");
@@ -1105,6 +1107,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Valores esperados de laboratorio (para el cruce al momento de guardar)
       window._valoresEsperadosLab = data.valoresEsperadosLab || {};
+      window._excepcionesNombreObservacion =
+        data.excepcionesNombreObservacion || {};
       console.log(
         "valoresEsperadosLab recibidos:",
         JSON.stringify(window._valoresEsperadosLab, null, 2),
@@ -1336,7 +1340,9 @@ document.addEventListener("DOMContentLoaded", () => {
       const { esperado, valorLabCrudo } = esperados[campo];
       if (!valorMedico || valorMedico === esperado) continue;
 
-      const nombreObs = `Observaciones_${campo}`;
+      const nombreObs =
+        (window._excepcionesNombreObservacion || {})[campo] ||
+        `Observaciones_${campo}`;
       const inputObs = cierreForm.querySelector(`[name="${nombreObs}"]`);
       const selectEl = cierreForm.querySelector(`[name="${campo}"]`);
       const yaConfirmadoEnVivo = selectEl?.dataset.discrepanciaConfirmada === "true";
