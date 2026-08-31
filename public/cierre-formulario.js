@@ -1,3 +1,4 @@
+console.log("%c🔵 cierre-formulario.js VERSION 2026-08-31-cruce-lab", "background: blue; color: white; font-size: 14px; padding: 4px;");
 document.addEventListener("DOMContentLoaded", () => {
   const unauthorizedMessage = document.getElementById("unauthorized-message");
   const mainContent = document.getElementById("main-content");
