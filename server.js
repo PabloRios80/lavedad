@@ -1552,7 +1552,7 @@ app.post("/cargar-datos-paciente", async (req, res) => {
     VIH: { tipo: "binario", labCampos: ["hiv"], positivo: "Positivo", negativo: "Negativo" },
     Hepatitis_B: {
       tipo: "binario_multiple",
-      labCampos: ["hepatitis_b_antigeno_superficie", "hepatitis_b_anti_core"],
+      labCampos: ["hepatitis_b_antigeno", "hepatitis_b_anti_core"],
       positivo: "Positivo",
       negativo: "Negativo",
     },
