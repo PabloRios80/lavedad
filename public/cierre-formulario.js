@@ -42,7 +42,7 @@ document.addEventListener("DOMContentLoaded", () => {
     ).toLocaleDateString("es-AR");
     const html = `
       <div id="cartelBloqueoAnual" style="position: sticky; top: 0; z-index: 50; background: #dc2626; color: white; padding: 14px 20px; border-radius: 8px; margin-bottom: 16px; font-weight: bold; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">
-        ⛔ Este paciente ya tiene un Día Preventivo cerrado el ${fechaLegible}${bloqueo.nombrePrestador ? ` (${bloqueo.nombrePrestador})` : ""}.
+        ⛔ Este paciente ya tiene un Día Preventivo cerrado el ${fechaLegible}.
         Todavía faltan ${bloqueo.diasRestantes} días para cumplir el año. Podés revisar el caso, pero NO se va a poder guardar un nuevo cierre.
       </div>`;
     if (cartel) {
@@ -1254,9 +1254,7 @@ document.addEventListener("DOMContentLoaded", () => {
         b.fechaUltimoCierre + "T00:00:00",
       ).toLocaleDateString("es-AR");
       alert(
-        `⛔ No se puede guardar este cierre.\n\nEste paciente ya tiene un Día Preventivo cerrado el ${fechaLegible}` +
-          (b.nombrePrestador ? ` (${b.nombrePrestador})` : "") +
-          `. Todavía faltan ${b.diasRestantes} días para cumplir el año.`,
+        `⛔ No se puede guardar este cierre.\n\nEste paciente ya tiene un Día Preventivo cerrado el ${fechaLegible}. Todavía faltan ${b.diasRestantes} días para cumplir el año.`,
       );
       resetForm();
       return;
