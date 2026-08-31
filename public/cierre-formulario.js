@@ -30,6 +30,29 @@ document.addEventListener("DOMContentLoaded", () => {
   const cierreForm = document.getElementById("cierre-form");
   const formStepsContainer = document.getElementById("form-steps-container");
   const progressBar = document.getElementById("progress-bar");
+
+  function mostrarCartelBloqueoAnual(bloqueo) {
+    let cartel = document.getElementById("cartelBloqueoAnual");
+    if (!bloqueo) {
+      if (cartel) cartel.remove();
+      return;
+    }
+    const fechaLegible = new Date(
+      bloqueo.fechaUltimoCierre + "T00:00:00",
+    ).toLocaleDateString("es-AR");
+    const html = `
+      <div id="cartelBloqueoAnual" style="position: sticky; top: 0; z-index: 50; background: #dc2626; color: white; padding: 14px 20px; border-radius: 8px; margin-bottom: 16px; font-weight: bold; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">
+        ⛔ Este paciente ya tiene un Día Preventivo cerrado el ${fechaLegible}${bloqueo.nombrePrestador ? ` (${bloqueo.nombrePrestador})` : ""}.
+        Todavía faltan ${bloqueo.diasRestantes} días para cumplir el año. Podés revisar el caso, pero NO se va a poder guardar un nuevo cierre.
+      </div>`;
+    if (cartel) {
+      cartel.outerHTML = html;
+    } else {
+      document
+        .getElementById("main-content")
+        .insertAdjacentHTML("afterbegin", html);
+    }
+  }
   const prevStepBtn = document.getElementById("prev-step-btn");
   const nextStepBtn = document.getElementById("next-step-btn");
   const guardarCierreBtn = document.getElementById("guardar-cierre-btn");
@@ -957,6 +980,10 @@ document.addEventListener("DOMContentLoaded", () => {
     // Asignar DNI a currentPatientData para el botón "Ver Estudio"
     currentPatientData = null;
 
+    // Limpiar el aviso de cierre reciente, si estaba mostrado
+    window._cierreBloqueadoAnual = null;
+    mostrarCartelBloqueoAnual(null);
+
     // Mostrar formulario de cierre
     cierreForm.classList.remove("hidden");
     // Habilitar edición de campos fijos
@@ -1026,28 +1053,14 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      // ── BLOQUEO POR CIERRE RECIENTE (menos de 1 año) ──
-      // DESACTIVADO TEMPORALMENTE (2026-08-30) para poder auditar si los
-      // médicos vieron los estudios complementarios antes de cerrar en
-      // casos ya cerrados. Reactivar descomentando este bloque cuando
-      // termine la investigación — es un control importante.
-      /*
-      if (data.bloqueoCierreAnual?.bloqueado) {
-        const b = data.bloqueoCierreAnual;
-        const fechaLegible = new Date(
-          b.fechaUltimoCierre + "T00:00:00",
-        ).toLocaleDateString("es-AR");
-        alert(
-          `⛔ Este paciente ya tiene un Día Preventivo cerrado el ${fechaLegible}` +
-            (b.nombrePrestador ? ` (${b.nombrePrestador})` : "") +
-            `.\n\nTodavía faltan ${b.diasRestantes} días para que se cumpla el año y pueda cerrarse un nuevo ciclo.`,
-        );
-        cargarDatosBtn.disabled = false;
-        cargarDatosBtn.innerHTML =
-          '<i class="fas fa-search mr-2"></i>Cargar Datos';
-        return;
-      }
-      */
+      // ── AVISO POR CIERRE RECIENTE (menos de 1 año) ──
+      // A diferencia de antes: ahora se deja avanzar por todo el
+      // formulario con un cartel rojo persistente, y el bloqueo real
+      // ocurre recién al intentar guardar (ver más abajo, en el submit).
+      window._cierreBloqueadoAnual = data.bloqueoCierreAnual?.bloqueado
+        ? data.bloqueoCierreAnual
+        : null;
+      mostrarCartelBloqueoAnual(window._cierreBloqueadoAnual);
 
       // Autocompletar desde IAPOS
       window._afiliadoInactivoConfirmado = false;
@@ -1234,6 +1247,20 @@ document.addEventListener("DOMContentLoaded", () => {
     formData["Nombre"] = pacienteNombreInput.value.trim();
     formData["Edad"] = pacienteEdadInput.value.trim();
     formData["Sexo"] = sexoSelect.value.trim();
+
+    if (window._cierreBloqueadoAnual) {
+      const b = window._cierreBloqueadoAnual;
+      const fechaLegible = new Date(
+        b.fechaUltimoCierre + "T00:00:00",
+      ).toLocaleDateString("es-AR");
+      alert(
+        `⛔ No se puede guardar este cierre.\n\nEste paciente ya tiene un Día Preventivo cerrado el ${fechaLegible}` +
+          (b.nombrePrestador ? ` (${b.nombrePrestador})` : "") +
+          `. Todavía faltan ${b.diasRestantes} días para cumplir el año.`,
+      );
+      resetForm();
+      return;
+    }
 
     // Recolectar datos de campos dinámicos y validar
     allFormInputs.forEach((input) => {

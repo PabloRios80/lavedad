@@ -717,6 +717,38 @@ app.post("/api/cierre/guardar", async (req, res) => {
     });
   }
 
+  // ── VALIDACIÓN SERVER-SIDE DEL BLOQUEO ANUAL ──
+  // No confiar solo en que el frontend respete el aviso: se verifica de
+  // nuevo acá, independiente de lo que haya hecho el navegador.
+  try {
+    const { data: modulosPrevios } = await supabase
+      .from("practicas_autorizadas")
+      .select("fecha_carga, nombre_prestador")
+      .eq("dni", dni)
+      .eq("descripcion_practica", "Módulo Día Preventivo")
+      .eq("estado", "REALIZADA")
+      .not("fecha_carga", "is", null)
+      .order("fecha_carga", { ascending: false })
+      .limit(1);
+
+    if (modulosPrevios && modulosPrevios.length > 0) {
+      const fechaUltimoCierre = new Date(modulosPrevios[0].fecha_carga);
+      const diasDesdeUltimoCierre = Math.floor(
+        (Date.now() - fechaUltimoCierre.getTime()) / (1000 * 60 * 60 * 24),
+      );
+      if (diasDesdeUltimoCierre < 365) {
+        return res.status(409).json({
+          success: false,
+          error: `No se puede guardar: este paciente ya tiene un Día Preventivo cerrado el ${fechaUltimoCierre.toISOString().split("T")[0]}. Faltan ${365 - diasDesdeUltimoCierre} días para cumplir el año.`,
+        });
+      }
+    }
+  } catch (e) {
+    console.error("Error verificando bloqueo anual:", e.message);
+    // No bloqueamos el guardado por un error en esta verificación —
+    // solo lo registramos, para no frenar el trabajo por una falla técnica.
+  }
+
   try {
     await doc.loadInfo();
     const pacientesSheet = doc.sheetsByTitle["Hoja 1"];
