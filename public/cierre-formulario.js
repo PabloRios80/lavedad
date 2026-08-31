@@ -1065,6 +1065,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Valores esperados de laboratorio (para el cruce al momento de guardar)
       window._valoresEsperadosLab = data.valoresEsperadosLab || {};
+      console.log("valoresEsperadosLab recibidos:", window._valoresEsperadosLab);
 
       // Autocompletar desde IAPOS
       window._afiliadoInactivoConfirmado = false;
