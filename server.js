@@ -786,13 +786,44 @@ app.post("/api/cierre/guardar", async (req, res) => {
 
     await pacientesSheet.addRow(newRowData);
 
+    // La sede correcta es la de la ADMISIÓN REAL del paciente en
+    // tablero_dia (si existe una para hoy), no la del perfil/sesión del
+    // profesional que carga el cierre. Esto evita el problema real que
+    // encontramos: un médico con la sede vieja/mal cargada en su sesión
+    // (por ejemplo, si se corrigió su perfil después de que ya estaba
+    // logueado) terminaba facturando el módulo a la sede equivocada,
+    // aunque el paciente estuviera físicamente en otra. Si el paciente
+    // no tiene ninguna admisión de hoy (sedes que todavía no usan
+    // Tablero del Día, como Rosario), se cae al valor que mandó el
+    // frontend (la sede del profesional), igual que antes.
+    let idSedeDp = formData["id_sede_dp"]
+      ? parseInt(formData["id_sede_dp"])
+      : null;
+    try {
+      const hoyLocal = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "America/Argentina/Buenos_Aires",
+      }).format(new Date());
+      const { data: admisionHoy } = await supabase
+        .from("tablero_dia")
+        .select("id_sede_dp")
+        .eq("dni", dni)
+        .eq("fecha", hoyLocal)
+        .not("id_sede_dp", "is", null)
+        .maybeSingle();
+      if (admisionHoy?.id_sede_dp) {
+        idSedeDp = admisionHoy.id_sede_dp;
+      }
+    } catch (eSedeReal) {
+      console.warn(
+        "No se pudo verificar la sede real por tablero_dia, se usa la del profesional:",
+        eSedeReal.message,
+      );
+    }
+
     // Guardar también en Supabase
     try {
       // El efector y la sede real del cierre, NO un valor fijo — antes
       // quedaba hardcodeado "IAPOS ESP PREST" sin importar la sede real.
-      const idSedeDp = formData["id_sede_dp"]
-        ? parseInt(formData["id_sede_dp"])
-        : null;
       const SEDES_EFECTOR = {
         1: "IAPOS ESP PREST",
         2: "ATEM",
@@ -999,7 +1030,7 @@ app.post("/api/cierre/guardar", async (req, res) => {
           valor_lab: d.valorLab,
           observacion_medico: d.observacion,
           profesional: profesionalName,
-          id_sede_dp: formData["id_sede_dp"] ? parseInt(formData["id_sede_dp"]) : null,
+          id_sede_dp: idSedeDp,
         }));
         await supabase.from("novedades_coordinacion").insert(filas);
         console.log(`⚠️ ${filas.length} novedad(es) registrada(s) para DNI ${dni}`);
