@@ -1,1852 +1,2129 @@
-console.log("%c🔵 cierre-formulario.js VERSION 2026-08-31-cruce-lab", "background: blue; color: white; font-size: 14px; padding: 4px;");
-document.addEventListener("DOMContentLoaded", () => {
-  const unauthorizedMessage = document.getElementById("unauthorized-message");
-  const mainContent = document.getElementById("main-content");
+require("dotenv").config();
+const v8 = require("v8");
+v8.setFlagsFromString("--max-old-space-size=8192"); // 8GB
+const {
+  registrarEndpointObtenerEstudios,
+} = require("./endpoint_obtener_estudios");
 
-  // Primero, verifica el estado de autenticación del usuario
-  checkAuthStatus();
-  async function checkAuthStatus() {
-    const prof = window.dpProfesional;
-    if (prof && prof.nombre) {
-      document.getElementById("unauthorized-message")?.classList.add("hidden");
-      document.getElementById("main-content")?.classList.remove("hidden");
-      // Si hay campo de profesional, llenarlo automáticamente
-      const profInput = document.getElementById("profesional-nombre");
-      if (profInput) profInput.value = `${prof.nombre} ${prof.apellido}`;
-    } else {
-      document
-        .getElementById("unauthorized-message")
-        ?.classList.remove("hidden");
-      document.getElementById("main-content")?.classList.add("hidden");
-    }
+const { createClient } = require("@supabase/supabase-js");
+const axios = require("axios");
+const https = require("https");
+const agenteIapos = new https.Agent({ rejectUnauthorized: false });
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY,
+);
+
+// Limitar el tamaño del heap de Node.js
+const heapSizeLimit = 8192 * 1024 * 1024; // 8GB en bytes
+if (process.memoryUsage().heapTotal > heapSizeLimit) {
+  console.warn("⚠️  Memoria cerca del límite, forzando garbage collection");
+  global.gc();
+}
+
+// 1. Agregamos un pequeño caché al inicio del archivo server.js
+const cachePacientes = new Map();
+const CACHE_EXPIRATION = 1000 * 60 * 10; // 10 minutos
+
+// Garbage collection automático cada 30 segundos
+setInterval(() => {
+  if (global.gc) {
+    global.gc();
+    console.log("🧹 Garbage collection ejecutado");
   }
-  const verEstudiosBtn = document.getElementById("ver-estudios-btn");
-  const dniInput = document.getElementById("paciente-dni");
-  const cargarDatosBtn = document.getElementById("cargar-datos-btn");
-  const patientInfoDisplay = document.getElementById("patient-info-display");
-  const pacienteApellidoInput = document.getElementById("paciente-apellido");
-  const pacienteNombreInput = document.getElementById("paciente-nombre");
-  const pacienteEdadInput = document.getElementById("paciente-edad");
-  const sexoSelect = document.getElementById("paciente-sexo");
-  const cierreForm = document.getElementById("cierre-form");
-  const formStepsContainer = document.getElementById("form-steps-container");
-  const progressBar = document.getElementById("progress-bar");
+}, 30000);
 
-  function verificarDiscrepanciaEnVivo(selectEl) {
-    const campo = selectEl.name;
-    const esperados = window._valoresEsperadosLab || {};
-    if (!esperados[campo]) return;
+// ====================================================================
+// FUNCIÓN HIPER-OPTIMIZADA PARA GOOGLE SHEETS
+// ====================================================================
+async function getUltraOptimizedSheetData(sheetIdentifier, filters = {}) {
+  if (!doc) throw new Error("Google Sheet not initialized");
 
-    const valorMedico = selectEl.value;
-    if (!valorMedico || valorMedico === esperados[campo].esperado) {
-      selectEl.dataset.discrepanciaConfirmada = "";
-      return;
+  let sheet;
+  if (typeof sheetIdentifier === "string")
+    sheet = doc.sheetsByTitle[sheetIdentifier];
+  else if (typeof sheetIdentifier === "number")
+    sheet = doc.sheetsByIndex[sheetIdentifier];
+
+  if (!sheet) {
+    console.warn(`Hoja "${sheetIdentifier}" no encontrada`);
+    return [];
+  }
+
+  // ✅ OPTIMIZACIÓN CRÍTICA: Cargar SOLO las columnas necesarias
+  await sheet.loadHeaderRow();
+  const rows = await sheet.getRows();
+
+  // Filtrar MUY eficientemente
+  return rows
+    .filter((row) => {
+      if (!filters.dni) return true;
+      const rowDni = String(row["DNI"] || row["Documento"] || "").trim();
+      return rowDni === String(filters.dni).trim();
+    })
+    .map((row) => {
+      const rowData = {};
+      // ✅ Solo incluir campos esenciales
+      const essentialFields = [
+        "DNI",
+        "Documento",
+        "Nombre",
+        "Apellido",
+        "Fecha",
+        "Prestador",
+        "Resultado",
+      ];
+      sheet.headerValues.forEach((header) => {
+        if (
+          essentialFields.includes(header) ||
+          header.includes("Link") ||
+          header.includes("PDF")
+        ) {
+          rowData[header] = row[header] || "";
+        }
+      });
+      return rowData;
+    });
+}
+
+// Manejo de errores no capturados
+process.on("uncaughtException", (error) => {
+  console.error("Uncaught Exception:", error);
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("Unhandled Rejection at:", promise, "reason:", reason);
+});
+
+const express = require("express");
+const path = require("path");
+const { GoogleSpreadsheet } = require("google-spreadsheet");
+const { google } = require("googleapis");
+const app = express();
+const PORT = process.env.PORT || 3000;
+const SPREADSHEET_ID = "15YPfBG9PBfN3nBW5xXJYjIXEgYIS9z71pI0VpeCtAAU";
+const API_BASE_URL =
+  process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+
+app.get("/cierre-formulario.html", (req, res) => {
+  res.sendFile(path.join(__dirname, "private", "cierre-formulario.html"));
+});
+app.get("/cierre-formulario.js", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "cierre-formulario.js"));
+});
+app.get("/consultas.html", (req, res) => {
+  res.sendFile(path.join(__dirname, "private", "consultas.html"));
+});
+// --- MIDDLEWARE ---
+app.use(express.json());
+app.use(express.static("public")); // Sirve archivos estáticos desde la carpeta 'public'
+
+// Nueva ruta para que el frontend obtenga la URL base de la API
+app.get("/api/config", (req, res) => {
+  res.json({ apiBaseUrl: API_BASE_URL });
+});
+
+// --- VARIABLES GLOBALES ---
+let doc;
+let credentials;
+
+app.post("/api/enfermeria/guardar", async (req, res) => {
+  try {
+    const newRow = req.body;
+    newRow["Fecha_cierre_Enf"] = new Date().toLocaleDateString("es-AR");
+
+    // 1. Guardar en Google Sheets
+    const sheet = doc.sheetsByTitle["Enfermeria"];
+    if (!sheet) {
+      return res
+        .status(500)
+        .json({ message: 'Hoja "Enfermeria" no encontrada.' });
+    }
+    await sheet.addRow(newRow);
+
+    // 2. Guardar en Supabase
+    const { error } = await supabase.from("enfermeria_consultas").insert({
+      dni: newRow["DNI"],
+      nombre: newRow["Nombre"],
+      apellido: newRow["Apellido"],
+      altura_cm: newRow["Altura (cm)"],
+      peso_kg: newRow["Peso (kg)"],
+      circunferencia_cintura_cm: newRow["Circunferencia de cintura (cm)"],
+      presion_arterial: newRow["Presion Arterial (mmhg)"],
+      vacunas: newRow["Vacunas"],
+      agudeza_visual: newRow["Agudeza Visual"],
+      espirometria_pdf: newRow["Espirometria (Enlace a PDF)"],
+      fecha_cierre_enf: newRow["Fecha_cierre_Enf"],
+      nombre_enfermera: newRow["Nombre Enfermera"],
+    });
+
+    if (error) console.error("Error Supabase enfermería:", error);
+    else
+      console.log(
+        "✅ Enfermería guardada en Supabase para DNI:",
+        newRow["DNI"],
+      );
+
+    res.status(200).json({ message: "Datos guardados correctamente." });
+  } catch (error) {
+    console.error("Error al guardar datos de enfermería:", error);
+    res.status(500).json({ message: "Error interno del servidor." });
+  }
+});
+
+// Función para inicializar el documento de Google Sheet y cargar su información (SOLO UNA VEZ)
+async function initializeGoogleSheet() {
+  try {
+    doc = new GoogleSpreadsheet(SPREADSHEET_ID);
+
+    if (process.env.CREDENTIALS_JSON) {
+      credentials = JSON.parse(process.env.CREDENTIALS_JSON);
+    } else {
+      credentials = require("./credentials.json");
     }
 
-    const { esperado, valorLabCrudo } = esperados[campo];
-    const confirma = confirm(
-      `⚠️ El valor que elegiste en "${campo.replace(/_/g, " ")}" es "${valorMedico}", pero el laboratorio dice "${valorLabCrudo}" (esperado: "${esperado}").\n\n¿Confirmás que querés dejarlo así? Vas a tener que explicar el motivo en el campo de Observaciones correspondiente antes de poder guardar el cierre.`,
+    await doc.useServiceAccountAuth({
+      client_email: credentials.client_email,
+      private_key: credentials.private_key.replace(/\\n/g, "\n"),
+    });
+    await doc.loadInfo();
+    console.log("✅ Google Sheet document loaded successfully.");
+  } catch (error) {
+    console.error("❌ Error initializing Google Sheet document:", error);
+    throw error; // Re-lanza el error para que el servidor no arranque si falla la conexión
+  }
+}
+
+// Función para obtener todos los datos de una hoja específica (por nombre o índice)
+// Usaremos esta función para ambas: la hoja principal y las hojas de estudios.
+async function getDataFromSpecificSheet(sheetIdentifier) {
+  // sheetIdentifier puede ser el nombre o el índice
+  if (!doc) {
+    throw new Error(
+      "Google Sheet document not initialized. Call initializeGoogleSheet() first.",
+    );
+  }
+  try {
+    let sheet;
+    if (typeof sheetIdentifier === "string") {
+      sheet = doc.sheetsByTitle[sheetIdentifier]; // Busca por nombre
+    } else if (typeof sheetIdentifier === "number") {
+      sheet = doc.sheetsByIndex[sheetIdentifier]; // Busca por índice
+    }
+
+    if (!sheet) {
+      console.warn(`Hoja "${sheetIdentifier}" no encontrada en el documento.`);
+      return [];
+    }
+
+    await sheet.loadHeaderRow(); // Carga la fila de encabezados de esta hoja
+    const rows = await sheet.getRows(); // Obtiene todas las filas de datos
+
+    const allData = rows.map((row) => {
+      const rowData = {};
+      sheet.headerValues.forEach((header) => {
+        // Maneja valores nulos o indefinidos, devolviendo una cadena vacía
+        rowData[header] = row[header] || "";
+      });
+      return rowData;
+    });
+    return allData;
+  } catch (error) {
+    console.error(
+      `Error al leer la hoja de cálculo "${sheetIdentifier}":`,
+      error,
+    );
+    throw error; // Re-lanza el error para que sea manejado por la ruta que la llamó
+  }
+}
+
+async function uploadFileToDrive(fileBuffer, fileName, mimeType) {
+  const FOLDER_ID = "1JhWxc3eFhZaT3edEjiUM-vHY4Y9MgVy-";
+
+  const auth = new google.auth.GoogleAuth({
+    credentials: {
+      client_email: credentials.client_email,
+      private_key: credentials.private_key.replace(/\\n/g, "\n"),
+    },
+    // The scopes must be changed to allow writing to shared folders.
+    scopes: ["https://www.googleapis.com/auth/drive"],
+  });
+
+  const drive = google.drive({ version: "v3", auth });
+  const fileStream = streamifier.createReadStream(fileBuffer);
+
+  const fileMetadata = {
+    name: fileName,
+    mimeType: mimeType,
+    parents: [FOLDER_ID],
+  };
+
+  const media = {
+    mimeType: mimeType,
+    body: fileStream,
+  };
+
+  const response = await drive.files.create({
+    requestBody: fileMetadata,
+    media: media,
+    fields: "id, webViewLink",
+  });
+
+  return response.data.webViewLink;
+}
+
+// ====================================================================
+// RUTAS EXISTENTES - ADAPTADAS PARA USAR EL OBJETO 'doc' GLOBAL
+// Y la nueva función 'getDataFromSpecificSheet'
+// ====================================================================
+
+// Ruta para obtener todos los campos (para el selector), excluyendo los de observaciones
+app.get("/obtener-campos", async (req, res) => {
+  try {
+    // Asumimos que los campos a filtrar están en la primera hoja (índice 0)
+    const data = await getDataFromSpecificSheet(0);
+    if (data && data.length > 0) {
+      const headers = Object.keys(data[0]).filter(
+        (header) => !header.startsWith("Observaciones"),
+      );
+      res.json(headers);
+    } else {
+      res.status(404).send("No se encontraron datos en la hoja principal.");
+    }
+  } catch (error) {
+    console.error("Error al obtener los campos:", error);
+    res.status(500).send("Error al obtener los campos.");
+  }
+});
+
+// Nueva ruta para obtener todas las opciones únicas de un campo específico
+app.get("/obtener-opciones-campo/:campo", async (req, res) => {
+  const campo = req.params.campo;
+  try {
+    // Asumimos que las opciones están en la primera hoja (índice 0)
+    const allData = await getDataFromSpecificSheet(0);
+    // Obtiene valores únicos y elimina los vacíos o nulos (filter(Boolean))
+    const opcionesUnicas = [
+      ...new Set(allData.map((item) => item[campo]).filter(Boolean)),
+    ];
+    res.json(opcionesUnicas);
+  } catch (error) {
+    console.error(
+      `Error al obtener las opciones para el campo ${campo}:`,
+      error,
+    );
+    res.status(500).json({
+      error: `Error al obtener las opciones para el campo ${campo}`,
+      details: error.message,
+    });
+  }
+});
+
+// --- RUTA PRINCIPAL DE BÚSQUEDA - /buscar ---
+app.post("/buscar", async (req, res) => {
+  try {
+    const allData = await getDataFromSpecificSheet(0); // Suponiendo que los datos del Día Preventivo están en la hoja 0
+    const dniABuscar = String(req.body.dni).trim();
+
+    const NOMBRE_COLUMNA_FECHA = "Fecha_cierre_DP"; // Asegúrate de que este es el nombre exacto de la columna de fecha
+
+    const parseDateDDMMYYYY = (dateString) => {
+      if (!dateString) return new Date(NaN);
+      const parts = dateString.split("/");
+      if (parts.length === 3) {
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const year = parseInt(parts[2], 10);
+        if (isNaN(day) || isNaN(month) || isNaN(year)) return new Date(NaN);
+        return new Date(year, month, day);
+      }
+      return new Date(NaN);
+    };
+
+    // 1. Filtrar TODOS los registros para el DNI
+    const resultadosParaDNI = allData.filter(
+      (patient) =>
+        String(patient["DNI"] || patient["Documento"] || "").trim() ===
+        dniABuscar,
     );
 
-    if (!confirma) {
-      selectEl.value = "";
-      selectEl.dataset.discrepanciaConfirmada = "";
-      selectEl.focus();
-      return;
+    if (resultadosParaDNI.length === 0) {
+      console.log(`SERVER: DNI ${dniABuscar} no encontrado.`);
+      // Cuando no se encuentra, devolvemos un objeto con 'error'
+      return res.json({ error: "DNI no encontrado." });
     }
 
-    selectEl.dataset.discrepanciaConfirmada = "true";
-    const nombreObs =
-      (window._excepcionesNombreObservacion || {})[campo] ||
-      `Observaciones_${campo}`;
-    const inputObs = cierreForm.querySelector(`[name="${nombreObs}"]`);
-    if (inputObs) {
-      inputObs.classList.add("border-yellow-500", "ring-yellow-500");
-      setTimeout(() => {
-        inputObs.scrollIntoView({ behavior: "smooth", block: "center" });
-        inputObs.focus();
-      }, 200);
-    }
-  }
+    // 2. Ordenar los resultados por fecha (más reciente primero)
+    resultadosParaDNI.sort((a, b) => {
+      const dateA = parseDateDDMMYYYY(a[NOMBRE_COLUMNA_FECHA]);
+      const dateB = parseDateDDMMYYYY(b[NOMBRE_COLUMNA_FECHA]);
 
-  // Mapeo campo del formulario -> columna en historial_dia_preventivo.
-  // Espejo exacto del que arma el server en /api/cierre/guardar y
-  // /api/cierre/corregir — si se agrega un campo nuevo al formulario, hay
-  // que agregarlo también acá y en las dos listas del server.
-  const CAMPO_A_COLUMNA = {
-    Presion_Arterial: "presion_arterial",
-    Observaciones_Presion_Arterial: "obs_presion_arterial",
-    IMC: "imc",
-    Observaciones_IMC: "obs_imc",
-    Agudeza_visual: "agudeza_visual",
-    Observaciones_Agudeza_visual: "obs_agudeza_visual",
-    Control_odontologico: "control_odontologico_adultos",
-    Observaciones_Control_odontologico: "obs_control_odontologico",
-    Alimentacion_saludable: "alimentacion_saludable",
-    Observaciones_Alimentacion_saludable: "obs_alimentacion",
-    Actividad_fisica: "actividad_fisica",
-    Observaciones_Actividad_fisica: "obs_actividad_fisica",
-    Seguridad_vial: "seguridad_vial",
-    Observaciones_Seguridad_vial: "obs_seguridad_vial",
-    Abuso_alcohol: "abuso_alcohol",
-    Observaciones_Abuso_alcohol: "obs_abuso_alcohol",
-    Tabaco: "tabaco",
-    Observaciones_Tabaco: "obs_tabaco",
-    Violencia: "violencia",
-    Observaciones_Violencia: "obs_violencia",
-    Depresion: "depresion",
-    Observaciones_Depresion: "obs_depresion",
-    ITS: "its",
-    Observaciones_ITS: "obs_its",
-    Hepatitis_B: "hepatitis_b",
-    Observaciones_Hepatitis_B: "obs_hepatitis_b",
-    Hepatitis_C: "hepatitis_c",
-    Observaciones_Hepatitis_C: "obs_hepatitis_c",
-    VIH: "vih",
-    Observaciones_VIH: "obs_vih",
-    Dislipemias: "dislipemias",
-    Observaciones_Dislipemias: "obs_dislipemias",
-    Diabetes: "diabetes",
-    Observaciones_Diabetes: "obs_diabetes",
-    Cancer_cervico_uterino_HPV: "cancer_cervico_hpv",
-    Observaciones_Cancer_cervico_uterino_HPV: "obs_hpv",
-    Cancer_cervico_uterino_PAP: "cancer_cervico_pap",
-    Observaciones_PAP: "obs_pap",
-    Cancer_colon_SOMF: "somf",
-    Observaciones_Cancer_colon_SOMF: "obs_somf",
-    Cancer_colon_Colonoscopia: "cancer_colon_colonoscopia",
-    Observaciones_Colonoscopia: "obs_colonoscopia",
-    Cancer_mama_Mamografia: "cancer_mama_mamografia",
-    Observaciones_Mamografia: "obs_mamografia",
-    Cancer_mama_Eco_mamaria: "cancer_mama_eco_mamaria",
-    Observaciones_Eco_mamaria: "obs_eco_mamaria",
-    ERC: "erc",
-    Observaciones_ECG: "obs_erc",
-    EPOC: "epoc",
-    Observaciones_EPOC: "obs_epoc",
-    Aneurisma_aorta: "aneurisma_aorta",
-    Observaciones_Aneurisma_aorta: "obs_aneurisma_aorta",
-    Osteoporosis: "osteoporosis",
-    Observaciones_Osteoporosis: "obs_osteoporosis",
-    Estratificacion_riesgo_CV: "estratificacion_riesgo_cv",
-    Observaciones_Riesgo_CV: "obs_riesgo_cv",
-    Aspirina: "aspirina",
-    Observaciones_Aspirina: "obs_aspirina",
-    Inmunizaciones: "inmunizaciones",
-    Observaciones_Inmunizaciones: "obs_inmunizaciones",
-    VDRL: "vdrl",
-    Observaciones_VDRL: "obs_vdrl",
-    Prostata_PSA: "prostata_psa",
-    Observaciones_PSA: "obs_psa",
-    Chagas: "chagas",
-    Observaciones_Chagas: "obs_chagas",
-    Cuidados_adultos_mayores: "caidas_adultos_mayores",
-    Observaciones_Cuidados_adultos_mayores: "obs_caidas",
-    Acido_folico: "acido_folico",
-    Observaciones_Acido_folico: "obs_acido_folico",
-  };
+      if (isNaN(dateA.getTime()) && isNaN(dateB.getTime())) return 0;
+      if (isNaN(dateA.getTime())) return 1;
+      if (isNaN(dateB.getTime())) return -1;
 
-  // Precarga el formulario con los valores del último cierre activo, para
-  // que corregir sea "editar lo que ya está", no empezar de cero.
-  function prefillFormDesdeUltimoDP(ultimoDP) {
-    if (!ultimoDP) {
-      console.warn("prefillFormDesdeUltimoDP: no hay ultimoDP para precargar.");
-      return;
-    }
-    let encontrados = 0;
-    Object.entries(CAMPO_A_COLUMNA).forEach(([campo, columna]) => {
-      const valor = ultimoDP[columna];
-      if (valor === null || valor === undefined) return;
-      const el = cierreForm.querySelector(`[name="${campo}"]`);
-      if (el) {
-        el.value = valor;
-        encontrados++;
-      } else {
-        console.warn(`prefillFormDesdeUltimoDP: no se encontró el campo "${campo}" en el DOM.`);
-      }
+      return dateB.getTime() - dateA.getTime();
     });
-    console.log(`prefillFormDesdeUltimoDP: ${encontrados} campos precargados.`);
+
+    // El primer elemento es el más reciente (el que se mostrará como principal)
+    const pacientePrincipal = resultadosParaDNI[0];
+
+    // Los estudios previos son todos los demás, si existen.
+    // Mapeamos solo la fecha para el cartel informativo.
+    const estudiosPrevios = resultadosParaDNI.slice(1).map((estudio) => ({
+      fecha: estudio[NOMBRE_COLUMNA_FECHA] || "Fecha desconocida",
+    }));
+
+    console.log(
+      `SERVER: DNI ${dniABuscar} encontrado. Enviando el más reciente y ${estudiosPrevios.length} estudios previos.`,
+    );
+
+    // 3. ¡LA CLAVE! Enviamos un objeto con dos propiedades claras.
+    // Esto evita que tu frontend se confunda sobre dónde están los datos principales.
+    res.json({
+      pacientePrincipal: pacientePrincipal,
+      estudiosPrevios: estudiosPrevios,
+    });
+  } catch (error) {
+    console.error("Error en servidor al buscar paciente por DNI:", error);
+    res.status(500).json({
+      error: "Error interno del servidor",
+      details: error.message,
+    });
+  }
+});
+
+// Ruta para consultas grupales (usada en estadisticas.html)
+app.post("/consultar-grupo", async (req, res) => {
+  try {
+    const { conditions, combinator = "AND", fieldsToRetrieve = [] } = req.body;
+
+    // Obtener todos los datos de la hoja principal (índice 0)
+    const allData = await getDataFromSpecificSheet(0);
+    const totalRegistros = allData.length;
+    let filteredResults;
+
+    if (combinator === "AND") {
+      filteredResults = allData.filter((patient) => {
+        return conditions.every((condition) => {
+          const patientValue = patient[condition.field];
+          const conditionValue = condition.value;
+          const operator = condition.operator;
+
+          switch (operator) {
+            case "equals":
+              return (
+                String(patientValue || "").trim() ===
+                String(conditionValue || "").trim()
+              );
+            case "notEquals":
+              return (
+                String(patientValue || "").trim() !==
+                String(conditionValue || "").trim()
+              );
+            case "greaterThan":
+              return Number(patientValue) > Number(conditionValue);
+            case "greaterThanOrEqual":
+              return Number(patientValue) >= Number(conditionValue);
+            case "lessThan":
+              return Number(patientValue) < Number(conditionValue);
+            case "lessThanOrEqual":
+              return Number(patientValue) <= Number(conditionValue);
+            case "includes":
+              return String(patientValue || "")
+                .toLowerCase()
+                .includes(String(conditionValue || "").toLowerCase());
+            case "in":
+              if (Array.isArray(conditionValue)) {
+                return conditionValue.some(
+                  (val) =>
+                    String(patientValue || "").trim() ===
+                    String(val || "").trim(),
+                );
+              }
+              return false;
+            default:
+              return false;
+          }
+        });
+      });
+    } else if (combinator === "OR") {
+      filteredResults = allData.filter((patient) => {
+        return conditions.some((condition) => {
+          const patientValue = patient[condition.field];
+          const conditionValue = condition.value;
+          const operator = condition.operator;
+
+          switch (operator) {
+            case "equals":
+              return (
+                String(patientValue || "").trim() ===
+                String(conditionValue || "").trim()
+              );
+            case "notEquals":
+              return (
+                String(patientValue || "").trim() !==
+                String(conditionValue || "").trim()
+              );
+            case "greaterThan":
+              return Number(patientValue) > Number(conditionValue);
+            case "greaterThanOrEqual":
+              return Number(patientValue) >= Number(conditionValue);
+            case "lessThan":
+              return Number(patientValue) < Number(conditionValue);
+            case "lessThanOrEqual":
+              return Number(patientValue) <= Number(conditionValue);
+            case "includes":
+              return String(patientValue || "")
+                .toLowerCase()
+                .includes(String(conditionValue || "").toLowerCase());
+            case "in":
+              if (Array.isArray(conditionValue)) {
+                return conditionValue.some(
+                  (val) =>
+                    String(patientValue || "").trim() ===
+                    String(val || "").trim(),
+                );
+              }
+              return false;
+            default:
+              return false;
+          }
+        });
+      });
+    } else {
+      filteredResults = []; // Si no se especifica el combinador
+    }
+
+    const conteoCruce = filteredResults.length;
+    const criteriosCruce = {};
+    conditions.forEach((condition) => {
+      criteriosCruce[condition.field] = condition.value;
+    });
+
+    res.json({
+      total_registros: totalRegistros,
+      conteo_cruce: conteoCruce,
+      criterios_cruce: criteriosCruce,
+      data: filteredResults, // Incluimos el array completo de filteredResults para la exportación
+    });
+  } catch (error) {
+    console.error("Error al realizar la consulta grupal:", error);
+    res.status(500).json({ error: "Error al realizar la consulta" });
+  }
+});
+
+app.get("/obtener-resultados-variable/:variable", async (req, res) => {
+  const variable = req.params.variable;
+  try {
+    // Obtener datos de la hoja principal (índice 0)
+    const data = await getDataFromSpecificSheet(0);
+    if (data && data.length > 0 && data[0].hasOwnProperty(variable)) {
+      const resultadosUnicos = [
+        ...new Set(
+          data.map((row) => row[variable]).filter((value) => value !== ""),
+        ),
+      ];
+      res.json(resultadosUnicos);
+    } else {
+      res.status(404).send(`Variable "${variable}" no encontrada o sin datos.`);
+    }
+  } catch (error) {
+    console.error(
+      `Error al obtener los resultados para la variable "${variable}":`,
+      error,
+    );
+    res
+      .status(500)
+      .send(`Error al obtener los resultados para la variable "${variable}".`);
+  }
+});
+
+// Agrega esta nueva ruta GET en tu server.js, junto a tus otras rutas
+app.get("/api/user", (req, res) => {
+  // Si el usuario está autenticado, req.isAuthenticated() será verdadero
+  if (req.isAuthenticated()) {
+    res.json({
+      isLoggedIn: true,
+      user: {
+        name: req.user.displayName,
+        email: req.user.emails[0].value,
+      },
+    });
+  } else {
+    res.json({
+      isLoggedIn: false,
+    });
+  }
+});
+// ====================================================================
+// NUEVA RUTA - OBTENER ESTUDIOS COMPLEMENTARIOS POR DNI
+// ====================================================================
+
+app.post("/api/seguimiento/guardar", async (req, res) => {
+  const {
+    fecha,
+    profesional,
+    paciente,
+    evaluaciones,
+    observacionProfesional,
+    pdfLinks,
+  } = req.body;
+  console.log(
+    `SERVER: Recibido informe de seguimiento para DNI: ${paciente.dni} en fecha: ${fecha}`,
+  );
+
+  if (!doc) {
+    console.error("SERVER ERROR: Google Sheet document not initialized.");
+    return res.status(500).json({
+      error: "Error interno del servidor: Base de datos no disponible.",
+    });
   }
 
-  function mostrarCartelBloqueoAnual(bloqueo) {
-    let cartel = document.getElementById("cartelBloqueoAnual");
-    if (!bloqueo) {
-      if (cartel) cartel.remove();
-      window._modoCorreccion = false;
-      window._motivoCorreccion = "";
-      return;
-    }
-    const fechaLegible = new Date(
-      bloqueo.fechaUltimoCierre + "T00:00:00",
-    ).toLocaleDateString("es-AR");
-    const html = `
-      <div id="cartelBloqueoAnual" style="position: sticky; top: 0; z-index: 50; background: #dc2626; color: white; padding: 14px 20px; border-radius: 8px; margin-bottom: 16px; font-weight: bold; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">
-        <div>
-          ⛔ Este paciente ya tiene un Día Preventivo cerrado el ${fechaLegible}.
-          Todavía faltan ${bloqueo.diasRestantes} días para cumplir el año. Podés revisar el caso, pero NO se va a poder guardar un nuevo cierre — salvo que sea una corrección del que ya existe.
-        </div>
-        <div id="bloqueEdicionCierre" style="margin-top: 10px;">
-          <button type="button" id="btnEditarCierreAnterior" style="background:white; color:#dc2626; font-weight:bold; padding:6px 14px; border-radius:6px; border:none; cursor:pointer;">
-            ✏️ Editar cierre anterior (corregir un error de carga)
-          </button>
-        </div>
-      </div>`;
-    if (cartel) {
-      cartel.outerHTML = html;
-    } else {
-      document
-        .getElementById("main-content")
-        .insertAdjacentHTML("afterbegin", html);
+  try {
+    await doc.loadInfo();
+    let sheetSeguimiento = doc.sheetsByTitle["Seguimiento"];
+
+    if (!sheetSeguimiento) {
+      console.log(
+        'SERVER: Creando nueva hoja "Seguimiento" en Google Sheet con encabezados predefinidos.',
+      );
+      sheetSeguimiento = await doc.addSheet({
+        title: "Seguimiento",
+        headerValues: [
+          "Fecha_Seguimiento",
+          "DNI_Paciente",
+          "Nombre_Paciente",
+          "Profesional_Apellido_Nombre",
+          "Profesional_Matricula",
+          "Riesgo_Cardiovascular_Calificacion",
+          "Riesgo_Cardiovascular_Observaciones",
+          "Diabetes_Calificacion",
+          "Diabetes_Observaciones",
+          "Dislipemia_Calificacion",
+          "Dislipemia_Observaciones",
+          "Tabaquismo_Calificacion",
+          "Tabaquismo_Observaciones",
+          "Actividad_fisica_Calificacion",
+          "Actividad_fisica_Observaciones",
+          "Observacion_Profesional",
+          "Links_PDFs",
+        ],
+      });
     }
 
-    document
-      .getElementById("btnEditarCierreAnterior")
-      ?.addEventListener("click", () => {
-        const motivo = prompt(
-          "Motivo de la corrección (obligatorio — quedará guardado junto con el registro original, que no se borra):",
+    // *************************************************************************
+    // ** ESTE CÓDIGO DEBE ESTAR DENTRO DE LA RUTA /api/seguimiento/guardar **
+    // *************************************************************************
+    const newRow = {
+      Fecha_Seguimiento: fecha,
+      DNI_Paciente: paciente.dni,
+      Nombre_Paciente: paciente.nombre,
+      Profesional_Apellido_Nombre: profesional.nombre,
+      Profesional_Matricula: profesional.matricula,
+      Observacion_Profesional: observacionProfesional,
+      Links_PDFs: JSON.stringify(pdfLinks),
+    };
+
+    if (evaluaciones && evaluaciones.length > 0) {
+      evaluaciones.forEach((eva) => {
+        let motivoOriginal = eva.motivo;
+        let motivoParaColumna = motivoOriginal;
+
+        motivoParaColumna = motivoParaColumna.replace(/\s*\([^)]*\)\s*/g, " ");
+        motivoParaColumna = motivoParaColumna.replace(
+          /\s*Se verifica\s*$/i,
+          "",
         );
-        if (!motivo || !motivo.trim()) {
-          alert("Necesitás indicar el motivo para poder corregir el cierre.");
-          return;
+        motivoParaColumna = motivoParaColumna.replace(/\s*Pendiente\s*$/i, "");
+        motivoParaColumna = motivoParaColumna.replace(
+          /\s*Riesgo Alto\s*$/i,
+          "",
+        );
+
+        if (motivoOriginal.includes("Control Odontológico")) {
+          motivoParaColumna = "Control Odontologico";
+        } else if (motivoOriginal.includes("Agudeza visual")) {
+          motivoParaColumna = "Agudeza visual";
+        } else if (motivoOriginal.includes("Seguridad Vial")) {
+          motivoParaColumna = "Seguridad Vial";
+        } else if (motivoOriginal === "IMC") {
+          motivoParaColumna = "IMC";
         }
-        window._modoCorreccion = true;
-        window._motivoCorreccion = motivo.trim();
-        // Se regenera el formulario acá mismo, justo antes de precargar
-        // (no alcanza con confiar en que ya esté armado desde el "Cargar
-        // Datos" inicial — si se lo vuelve a tocar después, esto no se
-        // rompe porque construye y llena en el mismo paso).
-        generateFormSteps();
-        console.log("Precargando corrección con:", window._datosPaciente?.ultimoDP);
-        prefillFormDesdeUltimoDP(window._datosPaciente?.ultimoDP);
-        const bloque = document.getElementById("bloqueEdicionCierre");
-        if (bloque)
-          bloque.innerHTML = `✅ Modo corrección activo — el formulario se precargó con los datos del cierre del ${fechaLegible}. Corregí lo que esté mal y guardá normalmente.`;
+        motivoParaColumna = motivoParaColumna.trim();
+
+        let columnaBase = motivoParaColumna;
+        columnaBase = columnaBase.replace(/\s+/g, "_");
+        columnaBase = columnaBase
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "");
+        columnaBase = columnaBase.replace(/[^\w]/g, "");
+        columnaBase = columnaBase.replace(/_+/g, "_");
+        columnaBase = columnaBase.replace(/^_|_$/g, "");
+
+        console.log(
+          `SERVER DEBUG: Motivo original recibido: "${motivoOriginal}"`,
+        );
+        console.log(
+          `SERVER DEBUG: Motivo normalizado (para columna): "${motivoParaColumna}"`,
+        );
+        console.log(
+          `SERVER DEBUG: Nombre de columna sanitizado FINAL: "${columnaBase}"`,
+        );
+
+        newRow[`${columnaBase}_Calificacion`] = eval.calificacion;
+        newRow[`${columnaBase}_Observaciones`] = eval.observaciones;
+      });
+    }
+
+    await sheetSeguimiento.addRow(newRow);
+
+    console.log("SERVER: Informe de seguimiento guardado con éxito.");
+    res.json({ success: true, message: "Informe de seguimiento guardado." });
+  } catch (error) {
+    console.error(
+      "SERVER ERROR: Fallo al guardar informe de seguimiento:",
+      error,
+    );
+    res.status(500).json({
+      success: false,
+      error: "Error interno del servidor al guardar el informe de seguimiento.",
+      details: error.message,
+    });
+  }
+}); // <--- ESTA ES LA LLAVE DE CIERRE CORRECTA PARA LA RUTA DE SEGUIMIENTO
+// *************************************************************************
+app.post("/api/cierre/guardar", async (req, res) => {
+  // AHORA VERIFICA SI EL USUARIO ESTÁ AUTENTICADO
+  const profesionalName = req.body["Profesional"] || "Desconocido";
+  const formData = req.body;
+
+  const dni = String(formData["DNI"]).trim();
+  const fechaCierre = String(formData["Fecha_cierre_dp"]).trim();
+
+  if (!doc) {
+    console.error("SERVER ERROR: Google Sheet document not initialized.");
+    return res.status(500).json({
+      error: "Error interno del servidor: Base de datos no disponible.",
+    });
+  }
+
+  if (!dni || !fechaCierre) {
+    return res.status(400).json({
+      success: false,
+      error:
+        "DNI del paciente y Fecha de Cierre son requeridos para guardar el cierre.",
+    });
+  }
+
+  // ── VALIDACIÓN SERVER-SIDE DEL BLOQUEO ANUAL ──
+  // No confiar solo en que el frontend respete el aviso: se verifica de
+  // nuevo acá, independiente de lo que haya hecho el navegador.
+  try {
+    const { data: modulosPrevios } = await supabase
+      .from("practicas_autorizadas")
+      .select("fecha_carga, nombre_prestador")
+      .eq("dni", dni)
+      .eq("descripcion_practica", "Módulo Día Preventivo")
+      .eq("estado", "REALIZADA")
+      .not("fecha_carga", "is", null)
+      .order("fecha_carga", { ascending: false })
+      .limit(1);
+
+    if (modulosPrevios && modulosPrevios.length > 0) {
+      const fechaUltimoCierre = new Date(modulosPrevios[0].fecha_carga);
+      const diasDesdeUltimoCierre = Math.floor(
+        (Date.now() - fechaUltimoCierre.getTime()) / (1000 * 60 * 60 * 24),
+      );
+      if (diasDesdeUltimoCierre < 365) {
+        return res.status(409).json({
+          success: false,
+          error: `No se puede guardar: este paciente ya tiene un Día Preventivo cerrado el ${fechaUltimoCierre.toISOString().split("T")[0]}. Faltan ${365 - diasDesdeUltimoCierre} días para cumplir el año.`,
+        });
+      }
+    }
+  } catch (e) {
+    console.error("Error verificando bloqueo anual:", e.message);
+    // No bloqueamos el guardado por un error en esta verificación —
+    // solo lo registramos, para no frenar el trabajo por una falla técnica.
+  }
+
+  try {
+    await doc.loadInfo();
+    const pacientesSheet = doc.sheetsByTitle["Hoja 1"];
+
+    if (!pacientesSheet) {
+      console.error(
+        'SERVER ERROR: Hoja "Hoja 1" no encontrada. Por favor, asegúrese de que la hoja exista y se llame "Hoja 1".',
+      );
+      return res.status(500).json({
+        success: false,
+        error:
+          'Error interno del servidor: La hoja de pacientes ("Hoja 1") no fue encontrada.',
+      });
+    }
+
+    await pacientesSheet.loadHeaderRow();
+
+    const newRowData = {};
+    pacientesSheet.headerValues.forEach((header) => {
+      newRowData[header] =
+        formData[header] !== undefined ? String(formData[header]) : "";
+    });
+
+    // ✅ AÑADIMOS EL NOMBRE DEL PROFESIONAL Y LA FECHA
+    newRowData["Profesional"] = profesionalName;
+    newRowData["Fecha_cierre_DP"] = new Date().toLocaleDateString("es-AR");
+
+    // ✅ AQUÍ AGREGAMOS LOS NUEVOS CAMPOS DEL FORMULARIO
+    newRowData["Cancer_mama_Eco_mamaria"] = formData["Cancer_mama_Eco_mamaria"];
+    newRowData["Observaciones_Eco_mamaria"] =
+      formData["Observaciones_Eco_mamaria"];
+
+    newRowData["DNI"] = dni;
+    newRowData["Fecha_cierre_dp"] = fechaCierre;
+
+    await pacientesSheet.addRow(newRowData);
+
+    // La sede correcta es la de la ADMISIÓN REAL del paciente en
+    // tablero_dia (si existe una para hoy), no la del perfil/sesión del
+    // profesional que carga el cierre. Esto evita el problema real que
+    // encontramos: un médico con la sede vieja/mal cargada en su sesión
+    // (por ejemplo, si se corrigió su perfil después de que ya estaba
+    // logueado) terminaba facturando el módulo a la sede equivocada,
+    // aunque el paciente estuviera físicamente en otra. Si el paciente
+    // no tiene ninguna admisión de hoy (sedes que todavía no usan
+    // Tablero del Día, como Rosario), se cae al valor que mandó el
+    // frontend (la sede del profesional), igual que antes.
+    let idSedeDp = formData["id_sede_dp"]
+      ? parseInt(formData["id_sede_dp"])
+      : null;
+    try {
+      const hoyLocal = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "America/Argentina/Buenos_Aires",
+      }).format(new Date());
+      const { data: admisionHoy } = await supabase
+        .from("tablero_dia")
+        .select("id_sede_dp")
+        .eq("dni", dni)
+        .eq("fecha", hoyLocal)
+        .not("id_sede_dp", "is", null)
+        .maybeSingle();
+      if (admisionHoy?.id_sede_dp) {
+        idSedeDp = admisionHoy.id_sede_dp;
+      }
+    } catch (eSedeReal) {
+      console.warn(
+        "No se pudo verificar la sede real por tablero_dia, se usa la del profesional:",
+        eSedeReal.message,
+      );
+    }
+
+    // Guardar también en Supabase
+    try {
+      // El efector y la sede real del cierre, NO un valor fijo — antes
+      // quedaba hardcodeado "IAPOS ESP PREST" sin importar la sede real.
+      const SEDES_EFECTOR = {
+        1: "IAPOS ESP PREST",
+        2: "ATEM",
+        3: "Hospital Italiano Rosario",
+        4: "Delta",
+        5: "Sunchales",
+        6: "Coronda",
+        7: "Reconquista",
+      };
+      const efectorReal = SEDES_EFECTOR[idSedeDp] || "IAPOS ESP PREST";
+
+      const supabaseData = {
+        dni: dni,
+        apellido_y_nombre:
+          `${formData["Apellido"] || ""} ${formData["Nombre"] || ""}`.trim(),
+        fechax:
+          formData["Fecha_cierre_DP"] || new Date().toISOString().split("T")[0],
+        edad: formData["Edad"] || null,
+        sexo: formData["Sexo"] || null,
+        efector: efectorReal,
+        id_sede_dp: idSedeDp,
+        tipo: "Adultos",
+        profesional: profesionalName,
+        marca_temporal: new Date().toISOString(),
+        // Campos clínicos
+        presion_arterial: formData["Presion_Arterial"] || null,
+        obs_presion_arterial:
+          formData["Observaciones_Presion_Arterial"] || null,
+        imc: formData["IMC"] || null,
+        obs_imc: formData["Observaciones_IMC"] || null,
+        agudeza_visual: formData["Agudeza_visual"] || null,
+        obs_agudeza_visual: formData["Observaciones_Agudeza_visual"] || null,
+        control_odontologico_adultos: formData["Control_odontologico"] || null,
+        obs_control_odontologico:
+          formData["Observaciones_Control_odontologico"] || null,
+        alimentacion_saludable: formData["Alimentacion_saludable"] || null,
+        obs_alimentacion:
+          formData["Observaciones_Alimentacion_saludable"] || null,
+        actividad_fisica: formData["Actividad_fisica"] || null,
+        obs_actividad_fisica:
+          formData["Observaciones_Actividad_fisica"] || null,
+        seguridad_vial: formData["Seguridad_vial"] || null,
+        obs_seguridad_vial: formData["Observaciones_Seguridad_vial"] || null,
+        abuso_alcohol: formData["Abuso_alcohol"] || null,
+        obs_abuso_alcohol: formData["Observaciones_Abuso_alcohol"] || null,
+        tabaco: formData["Tabaco"] || null,
+        obs_tabaco: formData["Observaciones_Tabaco"] || null,
+        violencia: formData["Violencia"] || null,
+        obs_violencia: formData["Observaciones_Violencia"] || null,
+        depresion: formData["Depresion"] || null,
+        obs_depresion: formData["Observaciones_Depresion"] || null,
+        its: formData["ITS"] || null,
+        obs_its: formData["Observaciones_ITS"] || null,
+        hepatitis_b: formData["Hepatitis_B"] || null,
+        obs_hepatitis_b: formData["Observaciones_Hepatitis_B"] || null,
+        hepatitis_c: formData["Hepatitis_C"] || null,
+        obs_hepatitis_c: formData["Observaciones_Hepatitis_C"] || null,
+        vih: formData["VIH"] || null,
+        obs_vih: formData["Observaciones_VIH"] || null,
+        dislipemias: formData["Dislipemias"] || null,
+        obs_dislipemias: formData["Observaciones_Dislipemias"] || null,
+        diabetes: formData["Diabetes"] || null,
+        obs_diabetes: formData["Observaciones_Diabetes"] || null,
+        cancer_cervico_hpv: formData["Cancer_cervico_uterino_HPV"] || null,
+        obs_hpv: formData["Observaciones_Cancer_cervico_uterino_HPV"] || null,
+        cancer_cervico_pap: formData["Cancer_cervico_uterino_PAP"] || null,
+        obs_pap: formData["Observaciones_PAP"] || null,
+        somf: formData["Cancer_colon_SOMF"] || null,
+        obs_somf: formData["Observaciones_Cancer_colon_SOMF"] || null,
+        cancer_colon_colonoscopia:
+          formData["Cancer_colon_Colonoscopia"] || null,
+        obs_colonoscopia: formData["Observaciones_Colonoscopia"] || null,
+        cancer_mama_mamografia: formData["Cancer_mama_Mamografia"] || null,
+        obs_mamografia: formData["Observaciones_Mamografia"] || null,
+        cancer_mama_eco_mamaria: formData["Cancer_mama_Eco_mamaria"] || null,
+        obs_eco_mamaria: formData["Observaciones_Eco_mamaria"] || null,
+        erc: formData["ERC"] || null,
+        obs_erc: formData["Observaciones_ECG"] || null,
+        epoc: formData["EPOC"] || null,
+        obs_epoc: formData["Observaciones_EPOC"] || null,
+        aneurisma_aorta: formData["Aneurisma_aorta"] || null,
+        obs_aneurisma_aorta: formData["Observaciones_Aneurisma_aorta"] || null,
+        osteoporosis: formData["Osteoporosis"] || null,
+        obs_osteoporosis: formData["Observaciones_Osteoporosis"] || null,
+        estratificacion_riesgo_cv:
+          formData["Estratificacion_riesgo_CV"] || null,
+        obs_riesgo_cv: formData["Observaciones_Riesgo_CV"] || null,
+        aspirina: formData["Aspirina"] || null,
+        obs_aspirina: formData["Observaciones_Aspirina"] || null,
+        inmunizaciones: formData["Inmunizaciones"] || null,
+        obs_inmunizaciones: formData["Observaciones_Inmunizaciones"] || null,
+        vdrl: formData["VDRL"] || null,
+        obs_vdrl: formData["Observaciones_VDRL"] || null,
+        prostata_psa: formData["Prostata_PSA"] || null,
+        obs_psa: formData["Observaciones_PSA"] || null,
+        chagas: formData["Chagas"] || null,
+        obs_chagas: formData["Observaciones_Chagas"] || null,
+        caidas_adultos_mayores: formData["Cuidados_adultos_mayores"] || null,
+        obs_caidas: formData["Observaciones_Cuidados_adultos_mayores"] || null,
+        acido_folico: formData["Acido_folico"] || null,
+        obs_acido_folico: formData["Observaciones_Acido_folico"] || null,
+      };
+
+      const { error: supabaseError } = await supabase
+        .from("historial_dia_preventivo")
+        .insert(supabaseData);
+
+      if (supabaseError) {
+        console.error("Error al guardar en Supabase:", supabaseError);
+      } else {
+        console.log("✅ Cierre guardado en Supabase para DNI:", dni);
+
+        // Registrar la consulta médica como acción facturable (módulo DP)
+        try {
+          const hoy = new Date().toISOString().split("T")[0];
+          await supabase.from("practicas_autorizadas").insert({
+            dni: dni,
+            nombre_completo:
+              `${formData["Apellido"] || ""} ${formData["Nombre"] || ""}`.trim(),
+            descripcion_practica: "Consulta médica (Día Preventivo)",
+            codigo_prestacion: "B040101",
+            estado: "REALIZADA",
+            fecha_autorizacion: hoy,
+            fecha_carga: hoy,
+            nombre_prestador: profesionalName,
+            id_sede_dp: idSedeDp,
+          });
+          console.log(
+            "✅ Consulta médica registrada como REALIZADA para DNI:",
+            dni,
+          );
+
+          // Disparar Módulo Día Preventivo (339159) al prestador de Coordinación DP de la sede
+          if (idSedeDp) {
+            const { data: prestadoresCoordSede } = await supabase
+              .from("prestador_sedes")
+              .select("id_prestador")
+              .eq("id_sede_dp", idSedeDp);
+
+            let prestadorCoord = null;
+            if (prestadoresCoordSede && prestadoresCoordSede.length > 0) {
+              const idsPrestadores = prestadoresCoordSede.map(
+                (r) => r.id_prestador,
+              );
+              const { data: institucionCoord } = await supabase
+                .from("prestadores_institucionales")
+                .select("id, nombre_institucion")
+                .in("id", idsPrestadores)
+                .eq("especialidad", "coordinacion_dp")
+                .maybeSingle();
+
+              if (institucionCoord) {
+                prestadorCoord = {
+                  id_prestador: institucionCoord.id,
+                  prestadores_institucionales: {
+                    nombre_institucion: institucionCoord.nombre_institucion,
+                  },
+                };
+              }
+            }
+
+            if (prestadorCoord) {
+              await supabase.from("practicas_autorizadas").insert({
+                dni: dni,
+                nombre_completo:
+                  `${formData["Apellido"] || ""} ${formData["Nombre"] || ""}`.trim(),
+                descripcion_practica: "Módulo Día Preventivo",
+                codigo_prestacion: "339159",
+                estado: "REALIZADA",
+                fecha_autorizacion: hoy,
+                fecha_carga: hoy,
+                id_prestador: prestadorCoord.id_prestador,
+                nombre_prestador:
+                  prestadorCoord.prestadores_institucionales
+                    ?.nombre_institucion,
+                id_sede_dp: idSedeDp,
+              });
+              console.log("✅ Módulo DP (339159) registrado para DNI:", dni);
+            } else {
+              console.warn(
+                `No hay prestador de Coordinación DP configurado para sede ${idSedeDp}`,
+              );
+            }
+          } else {
+            console.warn(
+              "No se recibió id_sede_dp, no se pudo asignar Módulo DP a ningún prestador.",
+            );
+          }
+        } catch (medErr) {
+          console.error(
+            "Error al registrar consulta médica/módulo en practicas_autorizadas:",
+            medErr.message,
+          );
+        }
+      }
+    } catch (supabaseErr) {
+      console.error("Error Supabase cierre:", supabaseErr.message);
+    }
+
+    // ── GUARDAR NOVEDADES (discrepancias médico vs. laboratorio confirmadas) ──
+    if (Array.isArray(formData.discrepanciasConfirmadas) && formData.discrepanciasConfirmadas.length > 0) {
+      try {
+        const filas = formData.discrepanciasConfirmadas.map((d) => ({
+          dni,
+          nombre_completo: `${formData["Apellido"] || ""} ${formData["Nombre"] || ""}`.trim(),
+          campo: d.campo,
+          valor_medico: d.valorMedico,
+          valor_lab: d.valorLab,
+          observacion_medico: d.observacion,
+          profesional: profesionalName,
+          id_sede_dp: idSedeDp,
+        }));
+        await supabase.from("novedades_coordinacion").insert(filas);
+        console.log(`⚠️ ${filas.length} novedad(es) registrada(s) para DNI ${dni}`);
+      } catch (novErr) {
+        console.error("Error guardando novedades_coordinacion:", novErr.message);
+      }
+    }
+
+    console.log(
+      `SERVER: Nuevo registro de cierre guardado para DNI: ${dni} por ${profesionalName}`,
+    );
+    return res.json({
+      success: true,
+      message:
+        "Formulario de cierre guardado exitosamente como nuevo registro.",
+    });
+  } catch (error) {
+    console.error(
+      "SERVER ERROR: Fallo al guardar el formulario de cierre:",
+      error,
+    );
+    res.status(500).json({
+      success: false,
+      error: "Error interno del servidor al guardar el formulario de cierre.",
+      details: error.message,
+    });
+  }
+});
+// ── CORREGIR un cierre de Día Preventivo ya guardado ──
+// A diferencia de /api/cierre/guardar, esto NO es un cierre nuevo:
+// - No corre el candado de "un DP por año" (justamente estamos editando
+//   el que ya existe, no creando uno adicional).
+// - No vuelve a insertar en practicas_autorizadas (Consulta médica /
+//   Módulo DP 339159) — eso ya se facturó y pagó, y se queda como está,
+//   tal cual se decidió.
+// - Nunca borra ni pisa el registro original en historial_dia_preventivo:
+//   lo marca estado_registro='corregido' y crea uno nuevo activo, con
+//   motivo y quién corrigió. Los dos quedan disponibles para auditoría.
+app.post("/api/cierre/corregir", async (req, res) => {
+  const profesionalName = req.body["Profesional"] || "Desconocido";
+  const formData = req.body;
+  const dni = String(formData["DNI"] || "").trim();
+  const idOriginal = formData["id_registro_original"];
+  const motivoCorreccion = String(formData["motivo_correccion"] || "").trim();
+
+  if (!dni || !idOriginal) {
+    return res.status(400).json({
+      success: false,
+      error: "Faltan DNI o id_registro_original para corregir el cierre.",
+    });
+  }
+  if (!motivoCorreccion) {
+    return res.status(400).json({
+      success: false,
+      error: "El motivo de la corrección es obligatorio.",
+    });
+  }
+
+  try {
+    // Verificar que el registro original exista, sea de este DNI y esté
+    // activo (no se puede corregir algo que ya fue corregido antes por
+    // esta misma vía sin pasar por la nueva versión).
+    const { data: original, error: errOriginal } = await supabase
+      .from("historial_dia_preventivo")
+      .select("id, dni, estado_registro")
+      .eq("id", idOriginal)
+      .single();
+
+    if (errOriginal || !original) {
+      return res.status(404).json({
+        success: false,
+        error: "No se encontró el registro original a corregir.",
+      });
+    }
+    if (String(original.dni) !== dni) {
+      return res.status(400).json({
+        success: false,
+        error: "El registro original no corresponde a este DNI.",
+      });
+    }
+    if (original.estado_registro !== "activo") {
+      return res.status(409).json({
+        success: false,
+        error:
+          "Este registro ya fue corregido antes. Volvé a cargar los datos del paciente para ver la versión vigente.",
+      });
+    }
+
+    const supabaseData = {
+      dni: dni,
+      apellido_y_nombre:
+        `${formData["Apellido"] || ""} ${formData["Nombre"] || ""}`.trim(),
+      fechax: formData["Fecha_cierre_DP"] || new Date().toISOString().split("T")[0],
+      edad: formData["Edad"] || null,
+      sexo: formData["Sexo"] || null,
+      efector: formData["efector"] || null,
+      id_sede_dp: formData["id_sede_dp"] ? parseInt(formData["id_sede_dp"]) : null,
+      tipo: "Adultos",
+      profesional: profesionalName,
+      marca_temporal: new Date().toISOString(),
+      presion_arterial: formData["Presion_Arterial"] || null,
+      obs_presion_arterial: formData["Observaciones_Presion_Arterial"] || null,
+      imc: formData["IMC"] || null,
+      obs_imc: formData["Observaciones_IMC"] || null,
+      agudeza_visual: formData["Agudeza_visual"] || null,
+      obs_agudeza_visual: formData["Observaciones_Agudeza_visual"] || null,
+      control_odontologico_adultos: formData["Control_odontologico"] || null,
+      obs_control_odontologico: formData["Observaciones_Control_odontologico"] || null,
+      alimentacion_saludable: formData["Alimentacion_saludable"] || null,
+      obs_alimentacion: formData["Observaciones_Alimentacion_saludable"] || null,
+      actividad_fisica: formData["Actividad_fisica"] || null,
+      obs_actividad_fisica: formData["Observaciones_Actividad_fisica"] || null,
+      seguridad_vial: formData["Seguridad_vial"] || null,
+      obs_seguridad_vial: formData["Observaciones_Seguridad_vial"] || null,
+      abuso_alcohol: formData["Abuso_alcohol"] || null,
+      obs_abuso_alcohol: formData["Observaciones_Abuso_alcohol"] || null,
+      tabaco: formData["Tabaco"] || null,
+      obs_tabaco: formData["Observaciones_Tabaco"] || null,
+      violencia: formData["Violencia"] || null,
+      obs_violencia: formData["Observaciones_Violencia"] || null,
+      depresion: formData["Depresion"] || null,
+      obs_depresion: formData["Observaciones_Depresion"] || null,
+      its: formData["ITS"] || null,
+      obs_its: formData["Observaciones_ITS"] || null,
+      hepatitis_b: formData["Hepatitis_B"] || null,
+      obs_hepatitis_b: formData["Observaciones_Hepatitis_B"] || null,
+      hepatitis_c: formData["Hepatitis_C"] || null,
+      obs_hepatitis_c: formData["Observaciones_Hepatitis_C"] || null,
+      vih: formData["VIH"] || null,
+      obs_vih: formData["Observaciones_VIH"] || null,
+      dislipemias: formData["Dislipemias"] || null,
+      obs_dislipemias: formData["Observaciones_Dislipemias"] || null,
+      diabetes: formData["Diabetes"] || null,
+      obs_diabetes: formData["Observaciones_Diabetes"] || null,
+      cancer_cervico_hpv: formData["Cancer_cervico_uterino_HPV"] || null,
+      obs_hpv: formData["Observaciones_Cancer_cervico_uterino_HPV"] || null,
+      cancer_cervico_pap: formData["Cancer_cervico_uterino_PAP"] || null,
+      obs_pap: formData["Observaciones_PAP"] || null,
+      somf: formData["Cancer_colon_SOMF"] || null,
+      obs_somf: formData["Observaciones_Cancer_colon_SOMF"] || null,
+      cancer_colon_colonoscopia: formData["Cancer_colon_Colonoscopia"] || null,
+      obs_colonoscopia: formData["Observaciones_Colonoscopia"] || null,
+      cancer_mama_mamografia: formData["Cancer_mama_Mamografia"] || null,
+      obs_mamografia: formData["Observaciones_Mamografia"] || null,
+      cancer_mama_eco_mamaria: formData["Cancer_mama_Eco_mamaria"] || null,
+      obs_eco_mamaria: formData["Observaciones_Eco_mamaria"] || null,
+      erc: formData["ERC"] || null,
+      obs_erc: formData["Observaciones_ECG"] || null,
+      epoc: formData["EPOC"] || null,
+      obs_epoc: formData["Observaciones_EPOC"] || null,
+      aneurisma_aorta: formData["Aneurisma_aorta"] || null,
+      obs_aneurisma_aorta: formData["Observaciones_Aneurisma_aorta"] || null,
+      osteoporosis: formData["Osteoporosis"] || null,
+      obs_osteoporosis: formData["Observaciones_Osteoporosis"] || null,
+      estratificacion_riesgo_cv: formData["Estratificacion_riesgo_CV"] || null,
+      obs_riesgo_cv: formData["Observaciones_Riesgo_CV"] || null,
+      aspirina: formData["Aspirina"] || null,
+      obs_aspirina: formData["Observaciones_Aspirina"] || null,
+      inmunizaciones: formData["Inmunizaciones"] || null,
+      obs_inmunizaciones: formData["Observaciones_Inmunizaciones"] || null,
+      vdrl: formData["VDRL"] || null,
+      obs_vdrl: formData["Observaciones_VDRL"] || null,
+      prostata_psa: formData["Prostata_PSA"] || null,
+      obs_psa: formData["Observaciones_PSA"] || null,
+      chagas: formData["Chagas"] || null,
+      obs_chagas: formData["Observaciones_Chagas"] || null,
+      caidas_adultos_mayores: formData["Cuidados_adultos_mayores"] || null,
+      obs_caidas: formData["Observaciones_Cuidados_adultos_mayores"] || null,
+      acido_folico: formData["Acido_folico"] || null,
+      obs_acido_folico: formData["Observaciones_Acido_folico"] || null,
+      // ── Versionado / auditoría ──
+      estado_registro: "activo",
+      id_registro_original: idOriginal,
+      motivo_correccion: motivoCorreccion,
+      corregido_por: profesionalName,
+      fecha_correccion: new Date().toISOString(),
+    };
+
+    // Hay un índice único (dni, fechax) que solo aplica a filas "activo"
+    // — no puede haber dos cierres activos del mismo día para el mismo
+    // afiliado. Por eso el orden importa: primero hay que "liberar" la
+    // fecha marcando el original como corregido, y recién después crear
+    // la nueva fila activa. Si el insert fallara después de esto, se
+    // revierte el original a "activo" para no dejar al paciente sin
+    // ninguna versión vigente.
+    const { error: errMarcar, data: filasMarcadas } = await supabase
+      .from("historial_dia_preventivo")
+      .update({ estado_registro: "corregido" })
+      .eq("id", idOriginal)
+      .eq("estado_registro", "activo")
+      .select("id");
+
+    if (errMarcar || !filasMarcadas || filasMarcadas.length === 0) {
+      console.error("Error al marcar el original como corregido:", errMarcar);
+      return res.status(409).json({
+        success: false,
+        error:
+          "No se pudo iniciar la corrección (el registro original ya no está activo, puede que otro usuario ya lo haya corregido). Volvé a cargar los datos del paciente.",
+      });
+    }
+
+    const { error: errInsert } = await supabase
+      .from("historial_dia_preventivo")
+      .insert(supabaseData);
+
+    if (errInsert) {
+      console.error("Error al insertar corrección:", errInsert);
+      // Compensar: si no se pudo crear la versión nueva, el original
+      // vuelve a quedar activo — nunca dejamos al paciente sin ninguna
+      // fila vigente.
+      await supabase
+        .from("historial_dia_preventivo")
+        .update({ estado_registro: "activo" })
+        .eq("id", idOriginal);
+      return res.status(500).json({
+        success: false,
+        error: "No se pudo guardar la corrección.",
+        details: [errInsert.message, errInsert.details, errInsert.hint]
+          .filter(Boolean)
+          .join(" | "),
+      });
+    }
+
+    console.log(
+      `SERVER: Cierre corregido para DNI ${dni} por ${profesionalName} (original id ${idOriginal})`,
+    );
+    return res.json({
+      success: true,
+      message: "Corrección guardada. La versión anterior queda conservada para auditoría.",
+    });
+  } catch (error) {
+    console.error("SERVER ERROR: Fallo al guardar la corrección del cierre:", error);
+    res.status(500).json({
+      success: false,
+      error: "Error interno del servidor al guardar la corrección.",
+      details: error.message,
+    });
+  }
+});
+
+app.post("/guardar-consulta", async (req, res) => {
+  console.log("Datos recibidos del cliente:", req.body);
+  const profesionalName = req.body["Profesional"] || "Desconocido";
+  console.log(
+    "Solicitud para guardar consulta recibida por el profesional:",
+    profesionalNombre,
+  );
+
+  const {
+    DNI,
+    Nombre,
+    Apellido,
+    Edad,
+    Sexo,
+    "motivo de consulta": motivoConsulta,
+    diagnostico,
+    indicaciones,
+    recordatorio,
+  } = req.body;
+
+  if (!DNI || !profesionalNombre) {
+    return res.status(400).json({
+      success: false,
+      message: "Faltan datos obligatorios (DNI o Profesional).",
+    });
+  }
+
+  try {
+    // ✅ CLAVE: Usamos la variable 'doc' que ya está inicializada globalmente.
+    // Las siguientes dos líneas son ELIMINADAS porque son la causa del error.
+    // const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID, jwt);
+    // await doc.useServiceAccountAuth(jwt);
+
+    await doc.loadInfo();
+
+    const sheetTitle = "Consultas";
+    let sheet = doc.sheetsByTitle[sheetTitle];
+
+    if (!sheet) {
+      console.log(`La hoja "${sheetTitle}" no existe. Creándola...`);
+      sheet = await doc.addSheet({
+        title: sheetTitle,
+        headerValues: [
+          "DNI",
+          "Nombre",
+          "Apellido",
+          "Edad",
+          "Sexo",
+          "Motivo de consulta",
+          "Diagnóstico",
+          "Indicaciones",
+          "Recordatorio",
+          "Profesional",
+          "Fecha",
+        ],
+      });
+    }
+
+    await sheet.addRow({
+      DNI: DNI,
+      Nombre: Nombre,
+      Apellido: Apellido,
+      Edad: Edad,
+      Sexo: Sexo,
+      "Motivo de consulta": motivoConsulta,
+      Diagnostico: diagnostico,
+      Indicaciones: indicaciones,
+      Recordatorio: recordatorio,
+      Profesional: profesionalNombre,
+      Fecha: new Date().toLocaleString("es-AR", {
+        timeZone: "America/Argentina/Buenos_Aires",
+      }),
+    });
+
+    console.log("Datos de consulta guardados con éxito.");
+    res.json({ success: true, message: "Consulta guardada con éxito." });
+  } catch (error) {
+    console.error("Error al guardar la consulta:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Error interno del servidor." });
+  }
+});
+// ====================================================================
+// INICIO DEL SERVIDOR
+// ====================================================================
+
+// Cargar datos del paciente desde IAPOS + Supabase
+app.post("/cargar-datos-paciente", async (req, res) => {
+  const { dni } = req.body;
+  if (!dni) return res.status(400).json({ error: "DNI requerido." });
+
+  const hoy = new Date().toISOString().split("T")[0];
+
+  // 1. Consultar IAPOS
+  const soapBody = `<?xml version="1.0" encoding="utf-8"?>
+    <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+        <soap:Body>
+            <BEWsValidaAfi.Execute xmlns="IAPOS_WS">
+                <Usuario>CONSULTAPDP</Usuario>
+                <Passwd>1Qaz</Passwd>
+                <Nafiliado>${dni}</Nafiliado>
+                <Badocnumdo>${dni}</Badocnumdo>
+                <Tidocodigo_de_documento>96</Tidocodigo_de_documento>
+                <Ogorcodigo>1</Ogorcodigo>
+                <Fechpresta>${hoy}</Fechpresta>
+            </BEWsValidaAfi.Execute>
+        </soap:Body>
+    </soap:Envelope>`;
+
+  let datosIAPOS = null;
+  try {
+    const iaposRes = await axios.post(
+      "https://aswe.santafe.gov.ar/iapos-sw-srvt/servlet/abewsvalidaafi",
+      soapBody,
+      {
+        headers: {
+          "Content-Type": "text/xml; charset=utf-8",
+          SOAPAction: "IAPOS_WSaction/ABEWSVALIDAAFI.Execute",
+        },
+        timeout: 10000,
+        httpsAgent: agenteIapos,
+      },
+    );
+    const xml = iaposRes.data;
+    const getValor = (tag) => {
+      const match = xml.match(new RegExp(`<${tag}[^>]*>([^<]+)<\/${tag}>`));
+      return match ? match[1].trim() : null;
+    };
+    datosIAPOS = {
+      estado: getValor("Estado"),
+      esActivo: getValor("Estado") === "A",
+      nombre: getValor("Apenom"),
+      edad: getValor("Edad"),
+      sexo: getValor("Sexo"), // 1=M, 2=F
+      localidad: getValor("Localidad"),
+      fechaNac: getValor("Fechanac"),
+    };
+  } catch (e) {
+    console.error("Error IAPOS:", e.message);
+  }
+  // 2. Buscar hoja de vida en Supabase
+  const { data: afiliado } = await supabase
+    .from("afiliados")
+    .select("*")
+    .eq("dni", dni)
+    .single();
+
+  let menor = null;
+  if (!afiliado) {
+    const { data: afiliadoMenor } = await supabase
+      .from("afiliados_menores")
+      .select("*")
+      .eq("dni", dni)
+      .order("fecha_carga", { ascending: false })
+      .limit(1)
+      .single();
+    menor = afiliadoMenor || null;
+  }
+
+  // 3. Buscar último DP (solo la versión ACTIVA — si hubo una corrección,
+  // acá tiene que verse siempre la vigente, nunca la superada).
+  // Trae todos los campos clínicos (no solo los 6 de antes) porque ahora
+  // también se usa para precargar el formulario cuando el profesional
+  // corrige un cierre anterior.
+  const { data: ultimoDP } = await supabase
+    .from("historial_dia_preventivo")
+    .select("*")
+    .eq("dni", dni)
+    .eq("estado_registro", "activo")
+    .order("fechax", { ascending: false })
+    .limit(1)
+    .single();
+  // 4. Buscar prácticas realizadas
+  const { data: practicas } = await supabase
+    .from("practicas_autorizadas")
+    .select("*")
+    .eq("dni", dni)
+    .eq("estado", "REALIZADA");
+  // 5. Buscar datos de enfermería
+  const { data: enfermeria } = await supabase
+    .from("enfermeria_consultas")
+    .select("presion_arterial, peso_kg, altura_cm")
+    .eq("dni", dni)
+    .order("fecha_cierre_enf", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  // 6. Generar alertas clínicas con campo asociado
+  const alertas = [];
+
+  if (afiliado) {
+    // ── HOJA DE VIDA (adulto) ──
+    if (afiliado?.hipertension === "si")
+      alertas.push({
+        tipo: "RIESGO",
+        campo: "Presion_Arterial",
+        mensaje: "⚠️ Declara hipertensión en hoja de vida",
+      });
+    if (afiliado?.hipertension_familiar === "si")
+      alertas.push({
+        tipo: "INFO",
+        campo: "Presion_Arterial",
+        mensaje: "ℹ️ Antecedente familiar de hipertensión",
+      });
+    if (afiliado?.diabetes === "si")
+      alertas.push({
+        tipo: "RIESGO",
+        campo: "Diabetes",
+        mensaje: "⚠️ Declara diabetes en hoja de vida",
+      });
+    if (afiliado?.diabetes_familiar === "si")
+      alertas.push({
+        tipo: "INFO",
+        campo: "Diabetes",
+        mensaje: "ℹ️ Antecedente familiar de diabetes",
+      });
+    if (afiliado?.colesterol === "si")
+      alertas.push({
+        tipo: "RIESGO",
+        campo: "Dislipemias",
+        mensaje: "⚠️ Declara colesterol alto en hoja de vida",
+      });
+    if (afiliado?.depresion === "si")
+      alertas.push({
+        tipo: "RIESGO",
+        campo: "Depresion",
+        mensaje: "⚠️ Depresión diagnosticada declarada en hoja de vida",
+      });
+    if (afiliado?.abuso_alcohol_drogas === "si")
+      alertas.push({
+        tipo: "RIESGO",
+        campo: "Abuso_alcohol",
+        mensaje: "⚠️ Declara problemas con alcohol/drogas en hoja de vida",
+      });
+    if (afiliado?.fuma && afiliado.fuma !== "nunca")
+      alertas.push({
+        tipo: "INFO",
+        campo: "Tabaco",
+        mensaje: `ℹ️ Fumador declarado: ${afiliado.fuma}`,
+      });
+    if (afiliado?.fuma && afiliado.fuma !== "nunca")
+      alertas.push({
+        tipo: "INFO",
+        campo: "EPOC",
+        mensaje: "⚠️ Fumador — evaluar espirometría",
+      });
+    if (afiliado?.cancer_de_colon === "si")
+      alertas.push({
+        tipo: "RIESGO",
+        campo: "Cancer_colon_SOMF",
+        mensaje: "⚠️ Antecedente familiar de cáncer de colon — indicar VCC",
+      });
+    if (afiliado?.cancer_de_mama === "si")
+      alertas.push({
+        tipo: "RIESGO",
+        campo: "Cancer_mama_Mamografia",
+        mensaje: "⚠️ Antecedente familiar de cáncer de mama",
+      });
+    if (afiliado?.cancer_de_prostata === "si")
+      alertas.push({
+        tipo: "RIESGO",
+        campo: "Prostata_PSA",
+        mensaje: "⚠️ Antecedente familiar de cáncer de próstata",
+      });
+    if (afiliado?.cancer_cuello_utero === "si")
+      alertas.push({
+        tipo: "RIESGO",
+        campo: "Cancer_cervico_uterino_HPV",
+        mensaje: "⚠️ Antecedente familiar de cáncer de cuello uterino",
+      });
+    if (afiliado?.stress === "si")
+      alertas.push({
+        tipo: "INFO",
+        campo: "Depresion",
+        mensaje: "ℹ️ Declara estrés/ansiedad excesiva en hoja de vida",
+      });
+  } else if (menor) {
+    // ── HOJA DE VIDA (menor) ──
+    if (menor.fam_hipertension === "si")
+      alertas.push({
+        tipo: "INFO",
+        campo: "Presion_Arterial",
+        mensaje: "ℹ️ Antecedente familiar de hipertensión",
+      });
+    if (menor.fam_diabetes === "si")
+      alertas.push({
+        tipo: "INFO",
+        campo: "Diabetes",
+        mensaje: "ℹ️ Antecedente familiar de diabetes",
+      });
+    if (menor.fam_obesidad === "si")
+      alertas.push({
+        tipo: "INFO",
+        campo: "IMC",
+        mensaje: "ℹ️ Antecedente familiar de obesidad",
+      });
+    if (menor.fam_cardio === "si")
+      alertas.push({
+        tipo: "INFO",
+        campo: "Presion_Arterial",
+        mensaje:
+          "ℹ️ Antecedente familiar cardiovascular (o ACV antes de los 55)",
+      });
+    if (menor.fam_mental === "si")
+      alertas.push({
+        tipo: "INFO",
+        campo: "Depresion",
+        mensaje: "ℹ️ Antecedente familiar de salud mental",
+      });
+    if (menor.fam_adicciones === "si")
+      alertas.push({
+        tipo: "INFO",
+        campo: "Abuso_alcohol",
+        mensaje: "ℹ️ Antecedente familiar de adicciones",
+      });
+    if (menor.fam_cancer === "si")
+      alertas.push({
+        tipo: "INFO",
+        campo: "Otros",
+        mensaje: "ℹ️ Antecedente familiar de cáncer",
+      });
+    if (menor.tabaco === "si")
+      alertas.push({
+        tipo: "RIESGO",
+        campo: "Tabaco",
+        mensaje: "⚠️ Consume o ha consumido tabaco",
+      });
+    if (menor.alcohol === "si")
+      alertas.push({
+        tipo: "RIESGO",
+        campo: "Abuso_alcohol",
+        mensaje: "⚠️ Consume o ha consumido alcohol",
+      });
+    if (menor.sustancias === "si")
+      alertas.push({
+        tipo: "URGENTE",
+        campo: "Abuso_alcohol",
+        mensaje: "🔴 Consume o ha consumido otras sustancias",
+      });
+    if (menor.violencia === "si")
+      alertas.push({
+        tipo: "URGENTE",
+        campo: "Depresion",
+        mensaje: "🔴 Refiere situaciones de violencia o abuso",
+      });
+    if (menor.tristeza === "si")
+      alertas.push({
+        tipo: "RIESGO",
+        campo: "Depresion",
+        mensaje: "⚠️ Episodios de tristeza/aislamiento prolongados",
+      });
+    if (menor.alim_trastorno === "si")
+      alertas.push({
+        tipo: "RIESGO",
+        campo: "IMC",
+        mensaje: "⚠️ Preocupación por peso/alimentación (posible trastorno)",
+      });
+    if (menor.vacunas === "no")
+      alertas.push({
+        tipo: "RIESGO",
+        campo: "Otros",
+        mensaje: "⚠️ Vacunas del calendario no están al día",
+      });
+    if (menor.condicion_salud === "si")
+      alertas.push({
+        tipo: "URGENTE",
+        campo: "Otros",
+        mensaje: `🔴 Condición de salud diagnosticada${menor.condicion_detalle ? ": " + menor.condicion_detalle : ""}`,
       });
   }
-  const prevStepBtn = document.getElementById("prev-step-btn");
-  const nextStepBtn = document.getElementById("next-step-btn");
-  const guardarCierreBtn = document.getElementById("guardar-cierre-btn");
-  const cancelarCierreBtn = document.getElementById("cancelar-cierre-btn");
-  const estudiosModal = document.getElementById("estudiosModal");
-  const closeModalBtn = document.getElementById("closeModalBtn");
-  const modalCloseButtonBottom = document.getElementById(
-    "modalCloseButtonBottom",
-  );
-  const modalDNI = document.getElementById("modalDNI");
-  const estudiosModalContent = document.getElementById("estudiosModalContent");
 
-  let currentPatientData = null;
-  let currentStep = 0;
-  let formSteps = [];
-
-  if (!dniInput.value.trim()) {
-    cargarDatosBtn.disabled = true;
+  // ── ENFERMERÍA ──
+  if (enfermeria?.presion_arterial) {
+    const ta = enfermeria.presion_arterial;
+    const partes = ta.split("/");
+    if (partes.length === 2) {
+      const sist = parseInt(partes[0]);
+      const diast = parseInt(partes[1]);
+      if (sist >= 140 || diast >= 90)
+        alertas.push({
+          tipo: "URGENTE",
+          campo: "Presion_Arterial",
+          mensaje: `🔴 Enfermería registró TA elevada: ${ta} mmHg`,
+        });
+      else if (sist >= 130 || diast >= 85)
+        alertas.push({
+          tipo: "RIESGO",
+          campo: "Presion_Arterial",
+          mensaje: `⚠️ Enfermería registró TA en límite: ${ta} mmHg`,
+        });
+    }
+  }
+  if (enfermeria?.peso_kg && enfermeria?.altura_cm) {
+    const imc =
+      parseFloat(enfermeria.peso_kg) /
+      Math.pow(parseFloat(enfermeria.altura_cm) / 100, 2);
+    if (imc >= 30)
+      alertas.push({
+        tipo: "RIESGO",
+        campo: "IMC",
+        mensaje: `⚠️ Enfermería registró IMC: ${imc.toFixed(1)} — obesidad`,
+      });
+    else if (imc >= 25)
+      alertas.push({
+        tipo: "INFO",
+        campo: "IMC",
+        mensaje: `ℹ️ Enfermería registró IMC: ${imc.toFixed(1)} — sobrepeso`,
+      });
   }
 
-  // Inicializar el formulario: ocultar campos de paciente y el formulario de cierre
-  patientInfoDisplay.classList.add("hidden");
-  cierreForm.classList.add("hidden");
-  prevStepBtn.classList.add("hidden"); // Ocultar botón anterior al inicio
+  // ── HISTORIAL DP ANTERIOR ──
+  if (ultimoDP?.cancer_cervico_hpv === "Patologico")
+    alertas.push({
+      tipo: "URGENTE",
+      campo: "Cancer_cervico_uterino_HPV",
+      mensaje: "🔴 HPV Patológico en DP anterior — verificar PAP",
+    });
+  if (ultimoDP?.somf === "Patologico")
+    alertas.push({
+      tipo: "URGENTE",
+      campo: "Cancer_colon_SOMF",
+      mensaje: "🔴 SOMF Patológico en DP anterior — indicar VCC urgente",
+    });
+  if (ultimoDP?.dislipemias === "Presenta")
+    alertas.push({
+      tipo: "RIESGO",
+      campo: "Dislipemias",
+      mensaje: "⚠️ Dislipemias presentes en DP anterior",
+    });
+  if (ultimoDP?.diabetes === "Presenta")
+    alertas.push({
+      tipo: "RIESGO",
+      campo: "Diabetes",
+      mensaje: "⚠️ Diabetes presente en DP anterior",
+    });
+  if (ultimoDP?.presion_arterial === "Hipertensión")
+    alertas.push({
+      tipo: "RIESGO",
+      campo: "Presion_Arterial",
+      mensaje: "⚠️ Hipertensión registrada en DP anterior",
+    });
 
-  // Definición de los campos del formulario con iconos
-  const fieldsConfig = [
-    {
-      name: "Presion_Arterial",
-      label: "Presión Arterial",
-      type: "select",
-      options: ["Control Normal", "Hipertensión", "No se realiza"],
-      hasStudyButton: true,
-      studyType: "Enfermeria",
-      required: true,
-      icon: "fas fa-heartbeat",
-    },
-    {
-      name: "Observaciones_Presion_Arterial",
-      label: "Obs. Presión Arterial",
-      type: "textarea",
-      required: false,
-      icon: "fas fa-comment",
-    },
-    {
-      name: "IMC",
-      label: "IMC",
-      type: "select",
-      options: [
-        "Bajo Peso",
-        "Control Normal",
-        "Sobrepeso",
-        "Obesidad",
-        "Obesidad Grado II",
-        "Obesidad Mórbida",
-        "No se realiza",
-      ],
-      hasStudyButton: true,
-      studyType: "Enfermeria",
-      required: true,
-      icon: "fas fa-weight",
-    },
-    {
-      name: "Observaciones_IMC",
-      label: "Obs. IMC",
-      type: "textarea",
-      required: false,
-      icon: "fas fa-comment",
-    },
-    {
-      name: "Agudeza_visual",
-      label: "Agudeza Visual",
-      type: "select",
-      options: ["Alterada", "Control Normal", "No se realiza"],
-      hasStudyButton: true,
-      studyType: "Enfermeria",
-      required: true,
-      icon: "fas fa-eye",
-    },
-    {
-      name: "Observaciones_Agudeza_visual",
-      label: "Obs. Agudeza Visual",
-      type: "textarea",
-      required: false,
-      icon: "fas fa-comment",
-    },
-    {
-      name: "Control_odontologico",
-      label: "Control Odontológico",
-      type: "select",
-      options: [
-        "Control Normal",
-        "No se realiza",
-        "Riesgo bajo",
-        "Riesgo medio",
-        "Riesgo alto",
-      ],
-      hasStudyButton: true,
-      studyType: "Odontologia",
-      required: true,
-      icon: "fas fa-tooth",
-    },
-    {
-      name: "Observaciones_Control_odontologico",
-      label: "Obs. Control Odontológico",
-      type: "textarea",
-      required: false,
-      icon: "fas fa-comment",
-    },
-    {
-      name: "Alimentacion_saludable",
-      label: "Alimentación Saludable",
-      type: "select",
-      options: ["Sí", "No"],
-      required: true,
-      icon: "fas fa-apple-alt",
-    },
-    {
-      name: "Observaciones_Alimentacion_saludable",
-      label: "Obs. Alimentación Saludable",
-      type: "textarea",
-      required: false,
-      icon: "fas fa-comment",
-    },
-    {
-      name: "Actividad_fisica",
-      label: "Actividad Física",
-      type: "select",
-      options: ["Sí realiza", "No realiza"],
-      required: true,
-      icon: "fas fa-running",
-    },
-    {
-      name: "Observaciones_Actividad_fisica",
-      label: "Obs. Actividad Física",
-      type: "textarea",
-      required: false,
-      icon: "fas fa-comment",
-    },
-    {
-      name: "Seguridad_vial",
-      label: "Seguridad Vial",
-      type: "select",
-      options: ["Cumple", "No cumple", "No realiza"],
-      required: true,
-      icon: "fas fa-car",
-    },
-    {
-      name: "Observaciones_Seguridad_vial",
-      label: "Obs. Seguridad Vial",
-      type: "textarea",
-      required: false,
-      icon: "fas fa-comment",
-    },
-    {
-      name: "Cuidados_adultos_mayores",
-      label: "Cuidados Adultos Mayores",
-      type: "select",
-      options: ["No se realiza", "Se verifica"],
-      required: true,
-      icon: "fas fa-hands-helping",
-    },
-    {
-      name: "Observaciones_Cuidados_adultos_mayores",
-      label: "Obs. Cuidados Adultos Mayores",
-      type: "textarea",
-      required: false,
-      icon: "fas fa-comment",
-    },
-    {
-      name: "Acido_folico",
-      label: "Ácido Fólico",
-      type: "select",
-      options: ["Indicado", "No indicado"],
-      required: true,
-      icon: "fas fa-pills",
-    },
-    {
-      name: "Observaciones_Acido_folico",
-      label: "Obs. Ácido Fólico",
-      type: "textarea",
-      required: false,
-      icon: "fas fa-comment",
-    },
-    {
-      name: "Abuso_alcohol",
-      label: "Abuso Alcohol",
-      type: "select",
-      options: ["Abuso", "No abusa", "No se realiza"],
-      required: true,
-      icon: "fas fa-beer",
-    },
-    {
-      name: "Observaciones_Abuso_alcohol",
-      label: "Obs. Abuso Alcohol",
-      type: "textarea",
-      required: false,
-      icon: "fas fa-comment",
-    },
-    {
-      name: "Tabaco",
-      label: "Tabaco",
-      type: "select",
-      options: ["Fuma", "No fuma"],
-      required: true,
-      icon: "fas fa-smoking",
-    },
-    {
-      name: "Observaciones_Tabaco",
-      label: "Obs. Tabaco",
-      type: "textarea",
-      required: false,
-      icon: "fas fa-comment",
-    },
-    {
-      name: "Violencia",
-      label: "Violencia",
-      type: "select",
-      options: ["Se verifica", "No se verifica", "No se realiza"],
-      required: true,
-      icon: "fas fa-hand-rock",
-    },
-    {
-      name: "Observaciones_Violencia",
-      label: "Obs. Violencia",
-      type: "textarea",
-      required: false,
-      icon: "fas fa-comment",
-    },
-    {
-      name: "Depresion",
-      label: "Depresión",
-      type: "select",
-      options: ["Se verifica", "No se verifica", "No se realiza"],
-      required: true,
-      icon: "fas fa-sad-tear",
-    },
-    {
-      name: "Observaciones_Depresion",
-      label: "Obs. Depresión",
-      type: "textarea",
-      required: false,
-      icon: "fas fa-comment",
-    },
-    {
-      name: "ITS",
-      label: "ITS",
-      type: "select",
-      options: ["Negativo", "Positivo", "No se realiza"],
-      hasStudyButton: true,
-      studyType: "Laboratorio",
-      required: true,
-      icon: "fas fa-microscope",
-    },
-    {
-      name: "Observaciones_ITS",
-      label: "Obs. ITS",
-      type: "textarea",
-      required: false,
-      icon: "fas fa-comment",
-    },
-    {
-      name: "Hepatitis_B",
-      label: "Hepatitis B",
-      type: "select",
-      options: ["Negativo", "Positivo", "No se realiza"],
-      hasStudyButton: true,
-      studyType: "Laboratorio",
-      required: true,
-      icon: "fas fa-virus",
-    },
-    {
-      name: "Observaciones_Hepatitis_B",
-      label: "Obs. Hepatitis B",
-      type: "textarea",
-      required: false,
-      icon: "fas fa-comment",
-    },
-    {
-      name: "Hepatitis_C",
-      label: "Hepatitis C",
-      type: "select",
-      options: ["Negativo", "Positivo", "No se realiza"],
-      hasStudyButton: true,
-      studyType: "Laboratorio",
-      required: true,
-      icon: "fas fa-virus",
-    },
-    {
-      name: "Observaciones_Hepatitis_C",
-      label: "Obs. Hepatitis C",
-      type: "textarea",
-      required: false,
-      icon: "fas fa-comment",
-    },
-    {
-      name: "VIH",
-      label: "VIH",
-      type: "select",
-      options: ["Negativo", "Positivo", "No se realiza"],
-      hasStudyButton: true,
-      studyType: "Laboratorio",
-      required: true,
-      icon: "fas fa-viruses",
-    },
-    {
-      name: "Observaciones_VIH",
-      label: "Obs. VIH",
-      type: "textarea",
-      required: false,
-      icon: "fas fa-comment",
-    },
-    {
-      name: "Dislipemias",
-      label: "Dislipemias",
-      type: "select",
-      options: ["No presenta", "Presenta", "No se realiza"],
-      hasStudyButton: true,
-      studyType: "Laboratorio",
-      required: true,
-      icon: "fas fa-blood-drop",
-    },
-    {
-      name: "Observaciones_Dislipemias",
-      label: "Obs. Dislipemias",
-      type: "textarea",
-      required: false,
-      icon: "fas fa-comment",
-    },
-    {
-      name: "Diabetes",
-      label: "Diabetes",
-      type: "select",
-      options: ["No presenta", "Presenta", "No se realiza"],
-      hasStudyButton: true,
-      studyType: "Laboratorio",
-      required: true,
-      icon: "fas fa-candy-cane",
-    }, // Icono simbólico
-    {
-      name: "Observaciones_Diabetes",
-      label: "Obs. Diabetes",
-      type: "textarea",
-      required: false,
-      icon: "fas fa-comment",
-    },
-    {
-      name: "Cancer_cervico_uterino_HPV",
-      label: "Cáncer Cérvico Uterino (HPV)",
-      type: "select",
-      options: ["Normal", "Pendiente", "No se realiza", "Patologico"],
-      hasStudyButton: true,
-      studyType: "Laboratorio",
-      required: true,
-      icon: "fas fa-dna",
-    },
-    {
-      name: "Observaciones_Cancer_cervico_uterino_HPV",
-      label: "Obs. Cáncer Cérvico Uterino (HPV)",
-      type: "textarea",
-      required: false,
-      icon: "fas fa-comment",
-    },
-    {
-      name: "Cancer_cervico_uterino_PAP",
-      label: "Cáncer Cérvico Uterino (PAP)",
-      type: "select",
-      options: ["Normal", "Pendiente", "No se realiza", "Patologico"],
-      hasStudyButton: true,
-      studyType: "Papanicolau",
-      required: true,
-      icon: "fas fa-flask",
-    },
-    {
-      name: "Observaciones_PAP",
-      label: "Obs. PAP",
-      type: "textarea",
-      required: false,
-      icon: "fas fa-comment",
-    },
-    {
-      name: "Cancer_colon_SOMF",
-      label: "Cáncer Colon (SOMF)",
-      type: "select",
-      options: ["Normal", "Pendiente", "No se realiza", "Patologico"],
-      hasStudyButton: true,
-      studyType: "SOMF",
-      required: true,
-      icon: "fas fa-poop",
-    }, // Icono simbólico
-    {
-      name: "Observaciones_Cancer_colon_SOMF",
-      label: "Obs. Cáncer Colon (SOMF)",
-      type: "textarea",
-      required: false,
-      icon: "fas fa-comment",
-    },
-    {
-      name: "Cancer_colon_Colonoscopia",
-      label: "Cáncer Colon (Colonoscopia)",
-      type: "select",
-      options: ["Normal", "Pendiente", "No se realiza", "Patologico"],
-      hasStudyButton: true,
-      studyType: "VCC",
-      required: true,
-      icon: "fas fa-colon-sign",
-    }, // Icono simbólico
-    {
-      name: "Observaciones_Colonoscopia",
-      label: "Obs. Colonoscopia",
-      type: "textarea",
-      required: false,
-      icon: "fas fa-comment",
-    },
-    {
-      name: "Cancer_mama_Mamografia",
-      label: "Cáncer Mama (Mamografía)",
-      type: "select",
-      options: ["Normal", "Pendiente", "No se realiza", "Patologico"],
-      hasStudyButton: true,
-      studyType: "Mamografia",
-      required: true,
-      icon: "fas fa-x-ray",
-    },
-    {
-      name: "Observaciones_Mamografia",
-      label: "Obs. Mamografía",
-      type: "textarea",
-      required: false,
-      icon: "fas fa-comment",
-    },
-    {
-      name: "Cancer_mama_Eco_mamaria",
-      label: "Cáncer Mama (Eco mamaria)",
-      type: "select",
-      options: ["Normal", "Pendiente", "No se realiza", "Patologico"],
-      hasStudyButton: true,
-      studyType: "Eco mamaria",
-      required: true,
-      icon: "fas fa-x-ray",
-    },
-    {
-      name: "Observaciones_Eco_mamaria",
-      label: "Obs. Ecografía Mamaria",
-      type: "textarea",
-      required: false,
-      icon: "fas fa-comment",
-    },
-    {
-      name: "ERC",
-      label: "ERC",
-      type: "select",
-      options: ["Normal", "Pendiente", "No se realiza", "Patologico"],
-      hasStudyButton: true,
-      studyType: "Laboratorio",
-      required: true,
-      icon: "fas fa-kidneys",
-    },
-    {
-      name: "Observaciones_ECG",
-      label: "Obs. ECG",
-      type: "textarea",
-      required: false,
-      icon: "fas fa-comment",
-    },
-    {
-      name: "EPOC",
-      label: "EPOC",
-      type: "select",
-      options: ["Se verifica", "No se verifica", "No se realiza"],
-      hasStudyButton: true,
-      studyType: "Espirometria",
-      required: true,
-      icon: "fas fa-lungs",
-    },
-    {
-      name: "Observaciones_EPOC",
-      label: "Obs. EPOC",
-      type: "textarea",
-      required: false,
-      icon: "fas fa-comment",
-    },
-    {
-      name: "Aneurisma_aorta",
-      label: "Aneurisma Aorta",
-      type: "select",
-      options: ["Se verifica", "No se verifica", "No se realiza"],
-      hasStudyButton: true,
-      studyType: "Ecografia",
-      required: true,
-      icon: "fas fa-heart",
-    },
-    {
-      name: "Observaciones_Aneurisma_aorta",
-      label: "Obs. Aneurisma Aorta",
-      type: "textarea",
-      required: false,
-      icon: "fas fa-comment",
-    },
-    {
-      name: "Osteoporosis",
-      label: "Osteoporosis",
-      type: "select",
-      options: ["Se verifica", "No se verifica", "No se realiza"],
-      hasStudyButton: true,
-      studyType: "Densitometria",
-      required: true,
-      icon: "fas fa-bone",
-    },
-    {
-      name: "Observaciones_Osteoporosis",
-      label: "Obs. Osteoporosis",
-      type: "textarea",
-      required: false,
-      icon: "fas fa-comment",
-    },
-    {
-      name: "Estratificacion_riesgo_CV",
-      label: "Estratificación Riesgo CV",
-      type: "select",
-      options: ["Alto", "Bajo", "Medio", "Muy Alto"],
-      required: true,
-      icon: "fas fa-chart-line",
-    },
-    {
-      name: "Observaciones_Riesgo_CV",
-      label: "Obs. Riesgo CV",
-      type: "textarea",
-      required: false,
-      icon: "fas fa-comment",
-    },
-    {
-      name: "Aspirina",
-      label: "Aspirina",
-      type: "select",
-      options: ["Indicado", "No indicado"],
-      required: true,
-      icon: "fas fa-prescription-bottle-alt",
-    },
-    {
-      name: "Observaciones_Aspirina",
-      label: "Obs. Aspirina",
-      type: "textarea",
-      required: false,
-      icon: "fas fa-comment",
-    },
-    {
-      name: "Inmunizaciones",
-      label: "Inmunizaciones",
-      type: "select",
-      options: ["Completo", "Incompleto"],
-      hasStudyButton: true,
-      studyType: "Enfermeria",
-      required: true,
-      icon: "fas fa-syringe",
-    },
-    {
-      name: "Observaciones_Inmunizaciones",
-      label: "Obs. Inmunizaciones",
-      type: "textarea",
-      required: false,
-      icon: "fas fa-comment",
-    },
-    {
-      name: "VDRL",
-      label: "VDRL",
-      type: "select",
-      options: ["Negativo", "Positivo", "No aplica", "Pendiente"],
-      hasStudyButton: true,
-      studyType: "Laboratorio",
-      required: true,
-      icon: "fas fa-vial",
-    },
-    {
-      name: "Observaciones_VDRL",
-      label: "Obs. VDRL",
-      type: "textarea",
-      required: false,
-      icon: "fas fa-comment",
-    },
-    {
-      name: "Prostata_PSA",
-      label: "Próstata (PSA)",
-      type: "select",
-      options: ["Normal", "Pendiente", "No aplica", "Patologico"],
-      hasStudyButton: true,
-      studyType: "Laboratorio",
-      required: true,
-      icon: "fas fa-male",
-    },
-    {
-      name: "Observaciones_PSA",
-      label: "Obs. PSA",
-      type: "textarea",
-      required: false,
-      icon: "fas fa-comment",
-    },
-    {
-      name: "Chagas",
-      label: "Chagas",
-      type: "select",
-      options: ["Negativo", "Positivo", "No aplica", "Pendiente"],
-      hasStudyButton: true,
-      studyType: "Laboratorio",
-      required: true,
-      icon: "fas fa-bug",
-    }, // Icono simbólico
-    {
-      name: "Observaciones_Chagas",
-      label: "Obs. Chagas",
-      type: "textarea",
-      required: false,
-      icon: "fas fa-comment",
-    },
-    {
-      name: "Fecha_cierre_DP",
-      label: "Fecha Cierre DP",
-      type: "date",
-      required: true,
-      icon: "fas fa-calendar-alt",
-    },
-  ];
+  // ── BLOQUEO POR CIERRE RECIENTE ──
+  // No puede haber un nuevo cierre de Día Preventivo si no pasó un año
+  // completo desde el último "Módulo Día Preventivo" REALIZADA (la fecha
+  // real del cierre, no la de la visita/intake en historial_dia_preventivo).
+  let bloqueoCierreAnual = null;
+  const modulosRealizados = (practicas || [])
+    .filter(
+      (p) =>
+        p.descripcion_practica === "Módulo Día Preventivo" &&
+        p.estado === "REALIZADA" &&
+        p.fecha_carga,
+    )
+    .sort((a, b) => new Date(b.fecha_carga) - new Date(a.fecha_carga));
 
-  // ── Mapeo: campo del formulario → columna(s) de practicas_historicas ──
-  // Un campo puede agrupar varias determinaciones (ej. "Dislipemias" junta
-  // colesterol total, HDL, LDL y triglicéridos).
-  const CAMPO_A_COLUMNAS_LAB = {
-    ITS: ["hiv", "vdrl"], // Categoría redundante, referenciada a HIV+VDRL por ahora
-    Hepatitis_B: ["hepatitis_b_antigeno", "hepatitis_b_anti_core"],
-    Hepatitis_C: ["hepatitis_c"],
-    VIH: ["hiv"],
-    Dislipemias: [
-      "colesterol_total",
-      "colesterol_hdl",
-      "colesterol_ldl",
-      "trigliceridos",
-    ],
-    Diabetes: ["glucemia", "hemoglobina_glicosilada"],
-    Cancer_cervico_uterino_HPV: [
-      "hpv_genotipo_16",
-      "hpv_genotipo_18",
-      "hpv_otros",
-    ],
-    ERC: [
-      "creatinina",
-      "indice_filtrado_glomerular",
-      "microalbuminuria",
-      "proteinuria",
-      "clearence_creatinina",
-      "rac_albumina_creatinina",
-    ],
-    VDRL: ["vdrl"],
-    Prostata_PSA: ["psa"],
-    Chagas: ["chagas_hai", "chagas_eclia"],
-  };
-
-  // Dado un field.name y field.studyType, decide si hay algo cargado para
-  // ese campo y devuelve el/los link(s) de PDF correctos: prioriza el PDF
-  // individual de la práctica puntual si existe, y si no, cae al PDF
-  // general de laboratorio (el de la carga masiva por IA).
-  function resolverEstadoEstudio(fieldName, studyType) {
-    if (studyType === "SOMF") {
-      const somf = window._estudioSomfPaciente;
-      return {
-        tieneAlgo: !!(somf && (somf.enlace_pdf || somf.resultado_texto)),
-        links: somf && somf.enlace_pdf ? [somf.enlace_pdf] : [],
+  if (modulosRealizados.length > 0) {
+    const fechaUltimoCierre = new Date(modulosRealizados[0].fecha_carga);
+    const diasDesdeUltimoCierre = Math.floor(
+      (Date.now() - fechaUltimoCierre.getTime()) / (1000 * 60 * 60 * 24),
+    );
+    if (diasDesdeUltimoCierre < 365) {
+      bloqueoCierreAnual = {
+        bloqueado: true,
+        fechaUltimoCierre: fechaUltimoCierre.toISOString().split("T")[0],
+        diasDesdeUltimoCierre,
+        diasRestantes: 365 - diasDesdeUltimoCierre,
+        nombrePrestador: modulosRealizados[0].nombre_prestador || null,
       };
     }
-
-    const estudios = window._estudiosPaciente || [];
-
-    if (studyType === "Laboratorio") {
-      const registrosLab = estudios.filter((s) => s.TipoEstudio === "Laboratorio");
-      if (registrosLab.length === 0) return { tieneAlgo: false, links: [] };
-
-      const columnas = CAMPO_A_COLUMNAS_LAB[fieldName] || [];
-      const linksIndividuales = [];
-      let tieneResultadoEspecifico = false;
-
-      registrosLab.forEach((reg) => {
-        const mapaIndividual = reg.LinkPdfPorPractica || {};
-        const valoresPorColumna = reg.ResultadosPorColumna || {};
-
-        columnas.forEach((col) => {
-          if (mapaIndividual[col]) linksIndividuales.push(mapaIndividual[col]);
-          // Solo cuenta si la columna PROPIA de este campo tiene valor —
-          // no alcanza con que la fila tenga otros estudios cargados.
-          if (valoresPorColumna[col]) tieneResultadoEspecifico = true;
-        });
-      });
-
-      if (linksIndividuales.length > 0) {
-        return { tieneAlgo: true, links: linksIndividuales };
-      }
-      // Sin PDF individual: si este campo específico tiene resultado
-      // (cargado en la carga masiva general), usar el PDF general.
-      if (tieneResultadoEspecifico) {
-        const linkGeneral = registrosLab[0]?.LinksPDF || [];
-        return { tieneAlgo: true, links: linkGeneral };
-      }
-      return { tieneAlgo: false, links: [] };
-    }
-
-    // Resto de categorías (Mamografia, Odontologia, VCC, Enfermeria, etc.)
-    const registro = estudios.find((s) => s.TipoEstudio === studyType);
-    if (!registro) return { tieneAlgo: false, links: [] };
-    const links = registro.LinksPDF || (registro.LinkPDF ? [registro.LinkPDF] : []);
-
-    // Enfermería no tiene Resultado/LinkPDF genérico — sus datos viven en
-    // ResultadosEnfermeria (altura, peso, presión, etc.). Si cualquiera de
-    // esos campos tiene contenido, consideramos que sí hay algo cargado.
-    let tieneResultadoEspecifico = !!registro.Resultado;
-    if (registro.ResultadosEnfermeria) {
-      tieneResultadoEspecifico =
-        tieneResultadoEspecifico ||
-        Object.values(registro.ResultadosEnfermeria).some((v) => v && v !== "");
-    }
-
-    return {
-      tieneAlgo: !!(links.length > 0 || tieneResultadoEspecifico),
-      links,
-    };
   }
 
-  // Función para generar los pasos del formulario
-  function generateFormSteps() {
-    formStepsContainer.innerHTML = ""; // Limpiar contenido previo
-    formSteps = []; // Resetear los pasos
-    let stepDiv;
-    let fieldCounter = 0;
+  // ── VALORES ESPERADOS DE LABORATORIO (para el cruce con lo que carga el médico) ──
+  // Misma función/umbrales que usa el bioquímico en prestadores.js, portada
+  // acá para evaluar los valores numéricos (glucemia, colesterol, etc.).
+  function evaluarSemaforoNode(campo, valor, sexoBiologico, edadPaciente) {
+    if (!valor) return null;
+    const v = valor.toString().trim();
+    const vUpper = v.toUpperCase();
+    const vNum = parseFloat(v.replace(",", "."));
+    const sexo = (sexoBiologico || "").toLowerCase();
+    const edad = parseInt(edadPaciente) || 0;
 
-    fieldsConfig.forEach((field) => {
-      if (fieldCounter % 2 === 0) {
-        // Cada 2 campos, crear un nuevo paso
-        stepDiv = document.createElement("div");
-        stepDiv.className =
-          "form-step grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-white rounded-lg shadow-inner border border-blue-100 hidden"; // Inicialmente ocultos
-        formStepsContainer.appendChild(stepDiv);
-        formSteps.push(stepDiv);
-      }
+    const VERDE = "VERDE";
+    const AMARILLO = "AMARILLO";
+    const ROJO = "ROJO";
 
-      const fieldContainer = document.createElement("div");
-      fieldContainer.className = "mb-4";
-
-      const label = document.createElement("label");
-      label.htmlFor = field.name;
-      label.className =
-        "block text-gray-700 text-sm font-bold mb-2 flex items-center";
-      if (field.icon) {
-        const icon = document.createElement("i");
-        icon.className = `${field.icon} mr-2 text-blue-600`;
-        label.appendChild(icon);
-      }
-      label.appendChild(document.createTextNode(field.label + ":"));
-
-      let inputElement;
-      const inputClasses =
-        "shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500";
-
-      if (field.type === "select") {
-        inputElement = document.createElement("select");
-        inputElement.className = inputClasses;
-        inputElement.id = field.name;
-        inputElement.name = field.name;
-        inputElement.required = field.required !== false;
-
-        const defaultOption = document.createElement("option");
-        defaultOption.value = "";
-        defaultOption.textContent = "Seleccione";
-        defaultOption.disabled = true;
-        defaultOption.selected = true;
-        inputElement.appendChild(defaultOption);
-
-        field.options.forEach((optionText) => {
-          const option = document.createElement("option");
-          option.value = optionText;
-          option.textContent = optionText;
-          inputElement.appendChild(option);
-        });
-
-        inputElement.addEventListener("change", () =>
-          verificarDiscrepanciaEnVivo(inputElement),
-        );
-      } else if (field.type === "textarea") {
-        inputElement = document.createElement("textarea");
-        inputElement.className = `${inputClasses} h-20 resize-y`;
-        inputElement.id = field.name;
-        inputElement.name = field.name;
-        inputElement.required = field.required !== false;
+    if (campo === "glucemia") {
+      if (isNaN(vNum)) return null;
+      const glucVal = vUpper.includes("MG") ? vNum / 1000 : vNum;
+      if (glucVal <= 1.0) return VERDE;
+      if (glucVal <= 1.25) return AMARILLO;
+      return ROJO;
+    }
+    if (campo === "colesterol_total") {
+      if (isNaN(vNum)) return null;
+      if (vNum < 200) return VERDE;
+      if (vNum < 240) return AMARILLO;
+      return ROJO;
+    }
+    if (campo === "colesterol_hdl") {
+      if (isNaN(vNum)) return null;
+      const hdlMin = sexo.includes("fem") ? 50 : 40;
+      const hdlLimite = sexo.includes("fem") ? 40 : 35;
+      if (vNum >= hdlMin) return VERDE;
+      if (vNum >= hdlLimite) return AMARILLO;
+      return ROJO;
+    }
+    if (campo === "colesterol_ldl") {
+      if (isNaN(vNum)) return null;
+      if (vNum < 130) return VERDE;
+      if (vNum < 160) return AMARILLO;
+      return ROJO;
+    }
+    if (campo === "trigliceridos") {
+      if (isNaN(vNum)) return null;
+      if (vNum < 150) return VERDE;
+      if (vNum < 200) return AMARILLO;
+      return ROJO;
+    }
+    if (campo === "creatinina") {
+      if (isNaN(vNum)) return null;
+      const creatMax = sexo.includes("fem") ? 0.9 : 1.2;
+      const creatLimite = sexo.includes("fem") ? 1.2 : 1.5;
+      if (vNum <= creatMax) return VERDE;
+      if (vNum <= creatLimite) return AMARILLO;
+      return ROJO;
+    }
+    if (campo === "indice_filtrado_glomerular") {
+      if (isNaN(vNum)) return null;
+      if (vNum >= 90) return VERDE;
+      if (vNum >= 60 && vNum < 70) return AMARILLO;
+      if (vNum >= 70) return VERDE;
+      return ROJO;
+    }
+    if (campo === "psa") {
+      if (isNaN(vNum)) return null;
+      let psaNormal, psaLimite;
+      if (edad <= 50) {
+        psaNormal = 2.0;
+        psaLimite = 3.0;
+      } else if (edad <= 60) {
+        psaNormal = 3.0;
+        psaLimite = 4.0;
+      } else if (edad <= 70) {
+        psaNormal = 4.0;
+        psaLimite = 5.0;
       } else {
-        // type 'text' o 'date' o 'number'
-        inputElement = document.createElement("input");
-        inputElement.type = field.type;
-        inputElement.className = inputClasses;
-        inputElement.id = field.name;
-        inputElement.name = field.name;
-        inputElement.required = field.required !== false;
+        psaNormal = 4.5;
+        psaLimite = 6.0;
       }
-
-      // Setear la fecha actual para el campo 'Fecha_cierre_dp' al generarse
-      if (field.name === "Fecha_cierre_DP") {
-        const today = new Date();
-        const formattedDate =
-          today.getFullYear() +
-          "-" +
-          String(today.getMonth() + 1).padStart(2, "0") +
-          "-" +
-          String(today.getDate()).padStart(2, "0");
-        inputElement.value = formattedDate;
-      }
-
-      fieldContainer.appendChild(label);
-
-      // Alertas contextuales por campo
-      const alertasDelCampo = (window._datosPaciente?.alertas || []).filter(
-        (a) => a.campo === field.name,
-      );
-      if (alertasDelCampo.length > 0) {
-        const alertaBox = document.createElement("div");
-        alertaBox.style.cssText =
-          "margin-bottom:6px; border-radius:6px; overflow:hidden;";
-        alertasDelCampo.forEach((a) => {
-          const linea = document.createElement("div");
-          const esUrgente = a.tipo === "URGENTE";
-          const esRiesgo = a.tipo === "RIESGO";
-          linea.style.cssText = `
-                        padding: 6px 10px;
-                        font-size: 12px;
-                        font-weight: 500;
-                        border-left: 3px solid ${esUrgente ? "#dc2626" : esRiesgo ? "#d97706" : "#0448a2"};
-                        background: ${esUrgente ? "#fef2f2" : esRiesgo ? "#fffbeb" : "#eff6ff"};
-                        color: ${esUrgente ? "#991b1b" : esRiesgo ? "#92400e" : "#1e40af"};
-                        margin-bottom: 2px;
-                    `;
-          linea.textContent = a.mensaje;
-          alertaBox.appendChild(linea);
-        });
-        fieldContainer.appendChild(alertaBox);
-      }
-
-      if (field.hasStudyButton) {
-        const inputGroup = document.createElement("div");
-        inputGroup.className = "flex items-center";
-        inputGroup.appendChild(inputElement);
-
-        const estado = resolverEstadoEstudio(field.name, field.studyType);
-
-        const studyButton = document.createElement("button");
-        studyButton.className = estado.tieneAlgo
-          ? "bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-r ml-2 focus:outline-none focus:shadow-outline flex-shrink-0 text-sm"
-          : "bg-gray-300 hover:bg-gray-400 text-gray-600 font-bold py-2 px-4 rounded-r ml-2 focus:outline-none focus:shadow-outline flex-shrink-0 text-sm";
-        studyButton.innerHTML = estado.tieneAlgo
-          ? `<i class="fas fa-check-circle mr-1"></i>Ver Estudio`
-          : `<i class="fas fa-search mr-1"></i>Ver Estudio`;
-        studyButton.title = estado.tieneAlgo
-          ? `Hay estudio cargado para ${field.label}`
-          : `Sin estudios cargados para ${field.label}`;
-        studyButton.dataset.studyType = field.studyType;
-        studyButton.dataset.fieldName = field.name;
-        studyButton.addEventListener("click", (e) => {
-          e.preventDefault(); // Prevenir envío del formulario
-          if (!estado.tieneAlgo) {
-            alert(`No hay estudios cargados todavía para ${field.label}.`);
-            return;
-          }
-          if (currentPatientData && currentPatientData.DNI) {
-            mostrarEstudiosModal(
-              currentPatientData.DNI,
-              studyButton.dataset.studyType,
-              studyButton.dataset.fieldName,
-            );
-          } else {
-            alert("DNI del paciente no disponible para ver estudios.");
-          }
-        });
-
-        inputGroup.appendChild(studyButton);
-        fieldContainer.appendChild(inputGroup);
-      } else {
-        fieldContainer.appendChild(inputElement);
-      }
-
-      stepDiv.appendChild(fieldContainer);
-      fieldCounter++;
-    });
-    showStep(0); // Mostrar el primer paso al generar
+      if (vNum <= psaNormal) return VERDE;
+      if (vNum <= psaLimite) return AMARILLO;
+      return ROJO;
+    }
+    return null;
   }
 
-  // Función para mostrar un paso específico
-  function showStep(stepIndex) {
-    formSteps.forEach((step, index) => {
-      step.classList.add("hidden");
-      if (index === stepIndex) {
-        step.classList.remove("hidden");
-      }
-    });
+  // Mapeo entre campo del formulario y campo(s) del laboratorio leído por IA.
+  const MAPEO_LAB_FORM = {
+    VIH: { tipo: "binario", labCampos: ["hiv"], positivo: "Positivo", negativo: "Negativo" },
+    Hepatitis_B: {
+      tipo: "binario_multiple",
+      labCampos: ["hepatitis_b_antigeno", "hepatitis_b_anti_core"],
+      positivo: "Positivo",
+      negativo: "Negativo",
+    },
+    Hepatitis_C: { tipo: "binario", labCampos: ["hepatitis_c"], positivo: "Positivo", negativo: "Negativo" },
+    VDRL: { tipo: "binario", labCampos: ["vdrl"], positivo: "Positivo", negativo: "Negativo" },
+    Chagas: {
+      tipo: "binario_multiple",
+      labCampos: ["chagas_hai", "chagas_eclia"],
+      positivo: "Positivo",
+      negativo: "Negativo",
+    },
+    Cancer_cervico_uterino_HPV: {
+      tipo: "detectable_multiple",
+      labCampos: ["hpv_genotipo_16", "hpv_genotipo_18", "hpv_otros"],
+      positivo: "Patologico",
+      negativo: "Normal",
+    },
+    Cancer_colon_SOMF: { tipo: "binario", labCampos: ["somf"], positivo: "Patologico", negativo: "Normal" },
+    Dislipemias: {
+      tipo: "semaforo_multiple",
+      labCampos: ["colesterol_total", "colesterol_hdl", "colesterol_ldl", "trigliceridos"],
+      positivo: "Presenta",
+      negativo: "No presenta",
+    },
+    Diabetes: {
+      tipo: "semaforo_simple",
+      labCampos: ["glucemia"],
+      positivo: "Presenta",
+      negativo: "No presenta",
+    },
+    ERC: {
+      tipo: "semaforo_multiple",
+      labCampos: ["creatinina", "indice_filtrado_glomerular"],
+      positivo: "Patologico",
+      negativo: "Normal",
+    },
+    Prostata_PSA: {
+      tipo: "semaforo_simple",
+      labCampos: ["psa"],
+      positivo: "Patologico",
+      negativo: "Normal",
+    },
+  };
 
-    currentStep = stepIndex;
-    updateProgressBar();
-    updateNavigationButtons();
-  }
+  // Campos cuyo input de "Observaciones" no sigue el patrón estándar
+  // Observaciones_<campo> (error de nombres preexistente en el formulario).
+  const EXCEPCIONES_NOMBRE_OBSERVACION = {
+    ERC: "Observaciones_ECG",
+  };
 
-  // Función para actualizar la barra de progreso
-  function updateProgressBar() {
-    const progress = ((currentStep + 1) / formSteps.length) * 100;
-    progressBar.style.width = `${progress}%`;
-  }
+  let valoresEsperadosLab = {};
+  try {
+    const { data: ultimoLab } = await supabase
+      .from("practicas_historicas")
+      .select("*")
+      .eq("dni", dni)
+      .eq("tipo_practica", "laboratorio")
+      .order("fecha", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-  // Función para actualizar la visibilidad de los botones de navegación
-  function updateNavigationButtons() {
-    if (currentStep === 0) {
-      prevStepBtn.classList.add("hidden");
-    } else {
-      prevStepBtn.classList.remove("hidden");
-    }
+    if (ultimoLab) {
+      const sexoBiologico = (afiliado || menor)?.sexo || datosIAPOS?.sexo;
+      const edadPaciente = (afiliado || menor)?.edad || datosIAPOS?.edad;
 
-    if (currentStep === formSteps.length - 1) {
-      nextStepBtn.classList.add("hidden");
-      guardarCierreBtn.classList.remove("hidden"); // Mostrar el botón Guardar en la última página
-    } else {
-      nextStepBtn.classList.remove("hidden");
-      guardarCierreBtn.classList.add("hidden"); // Ocultar Guardar si no es la última página
-    }
-  }
+      Object.entries(MAPEO_LAB_FORM).forEach(([campoForm, cfg]) => {
+        const valoresLab = cfg.labCampos.map((lc) => ultimoLab[lc]).filter(Boolean);
+        if (valoresLab.length === 0) return; // sin dato de lab, no comparamos
 
-  // Función para limpiar el formulario y resetear el estado
-  function resetForm() {
-    dniInput.value = "";
-    // Asignar DNI a currentPatientData para el botón "Ver Estudio"
-    currentPatientData = null;
+        let esperado = null;
 
-    // Limpiar el aviso de cierre reciente, si estaba mostrado
-    window._cierreBloqueadoAnual = null;
-    window._valoresEsperadosLab = {};
-    mostrarCartelBloqueoAnual(null);
-
-    // Mostrar formulario de cierre
-    cierreForm.classList.remove("hidden");
-    // Habilitar edición de campos fijos
-    pacienteApellidoInput.removeAttribute("readonly");
-    pacienteNombreInput.removeAttribute("readonly");
-    pacienteEdadInput.removeAttribute("readonly");
-    sexoSelect.removeAttribute("disabled");
-
-    // Generar y mostrar el primer paso del formulario dinámico
-    generateFormSteps();
-
-    patientInfoDisplay.classList.add("hidden");
-    cierreForm.classList.add("hidden");
-    formStepsContainer.innerHTML = ""; // Limpiar los pasos generados
-    currentStep = 0;
-    formSteps = [];
-    updateProgressBar();
-
-    // Restablecer el estado inicial de los campos fijos
-    pacienteApellidoInput.setAttribute("readonly", true);
-    console.log("pacienteApellidoInput:", pacienteApellidoInput);
-    console.log("pacienteNombreInput:", pacienteNombreInput);
-    pacienteNombreInput.setAttribute("readonly", true);
-    pacienteEdadInput.setAttribute("readonly", true);
-    sexoSelect.setAttribute("disabled", true);
-
-    cargarDatosBtn.disabled = true; // Deshabilitar botón de carga hasta que se ingrese DNI
-  }
-
-  // --- LÓGICA DE EVENTOS ---
-
-  // Event Listener para el DNI input: habilita el botón Cargar Datos
-  dniInput.addEventListener("input", () => {
-    if (dniInput.value.trim().length > 0) {
-      cargarDatosBtn.disabled = false;
-    } else {
-      cargarDatosBtn.disabled = true;
-      resetForm(); // Resetear el formulario si el DNI se borra
-    }
-  });
-  cargarDatosBtn.addEventListener("click", async () => {
-    console.log("Click en cargar datos - DNI:", dniInput.value);
-    const dni = dniInput.value.trim();
-    if (!dni) {
-      alert("Por favor, ingrese un DNI para cargar los datos.");
-      return;
-    }
-
-    cargarDatosBtn.disabled = true;
-    cargarDatosBtn.innerHTML =
-      '<i class="fas fa-spinner fa-spin"></i> Cargando...';
-
-    try {
-      console.log("Llamando a /cargar-datos-paciente...");
-      const response = await fetch("/cargar-datos-paciente", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dni }),
-      });
-      console.log("Response status:", response.status);
-      const data = await response.json();
-      console.log("iapos esActivo:", data.iapos?.esActivo);
-      console.log("iapos nombre:", data.iapos?.nombre);
-      console.log("Data recibida:", data);
-      if (!data.success) {
-        alert("Error al cargar datos.");
-        return;
-      }
-
-      // ── AVISO POR CIERRE RECIENTE (menos de 1 año) ──
-      // A diferencia de antes: ahora se deja avanzar por todo el
-      // formulario con un cartel rojo persistente, y el bloqueo real
-      // ocurre recién al intentar guardar (ver más abajo, en el submit).
-      window._cierreBloqueadoAnual = data.bloqueoCierreAnual?.bloqueado
-        ? data.bloqueoCierreAnual
-        : null;
-      mostrarCartelBloqueoAnual(window._cierreBloqueadoAnual);
-
-      // Valores esperados de laboratorio (para el cruce al momento de guardar)
-      window._valoresEsperadosLab = data.valoresEsperadosLab || {};
-      window._excepcionesNombreObservacion =
-        data.excepcionesNombreObservacion || {};
-      console.log(
-        "valoresEsperadosLab recibidos:",
-        JSON.stringify(window._valoresEsperadosLab, null, 2),
-      );
-
-      // Autocompletar desde IAPOS
-      window._afiliadoInactivoConfirmado = false;
-      if (data.iapos?.esActivo) {
-        const nombreCompleto = data.iapos.nombre || "";
-        const partes = nombreCompleto.split(",");
-        pacienteApellidoInput.value = partes[0]?.trim() || "";
-        console.log("pacienteApellidoInput:", pacienteApellidoInput);
-        console.log("pacienteNombreInput:", pacienteNombreInput);
-        pacienteNombreInput.value = partes[1]?.trim() || "";
-        pacienteEdadInput.value = data.iapos.edad || "";
-        if (sexoSelect) sexoSelect.value = data.iapos.sexo === "2" ? "F" : "M";
-        patientInfoDisplay.classList.remove("hidden");
-      } else if (data.iapos === null) {
-        // No se pudo consultar el padrón de IAPOS (caído/timeout): no
-        // sabemos si está activo o no. Se deja continuar con carga
-        // manual, con aviso, para no frenar el trabajo por una falla
-        // técnica ajena al paciente.
-        alert(
-          "⚠️ No se pudo verificar el estado del afiliado en IAPOS (padrón no respondió). Verificá manualmente antes de continuar.",
-        );
-      } else {
-        // IAPOS respondió explícitamente que el afiliado NO está activo:
-        // esto sí bloquea, no es un problema de conexión.
-        window._afiliadoInactivoConfirmado = true;
-        alert(
-          "⛔ El afiliado no está activo en IAPOS. No se puede continuar con el cierre.",
-        );
-      }
-
-      // Mostrar alertas clínicas
-      if (data.alertas?.length > 0) {
-        let alertasHTML =
-          '<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:12px;margin:10px 0;">';
-        alertasHTML +=
-          '<p style="font-weight:bold;margin-bottom:8px;">⚠️ Alertas Clínicas:</p>';
-        data.alertas.forEach((a) => {
-          const color = a.tipo === "URGENTE" ? "#dc3545" : "#856404";
-          alertasHTML += `<p style="color:${color};margin:4px 0;">${a.mensaje}</p>`;
-        });
-        alertasHTML += "</div>";
-
-        // Insertamos las alertas antes del formulario
-        const formContainer =
-          document.querySelector(".form-container") ||
-          document.querySelector("form") ||
-          document.body;
-        const alertasDiv = document.createElement("div");
-        alertasDiv.id = "alertas-clinicas";
-        alertasDiv.innerHTML = alertasHTML;
-
-        // Evitar duplicados
-        const existente = document.getElementById("alertas-clinicas");
-        if (existente) existente.remove();
-
-        dniInput.closest("div")?.after(alertasDiv) ||
-          formContainer.prepend(alertasDiv);
-      }
-
-      // Guardar datos para uso posterior
-      window._datosPaciente = data;
-
-      // Precargar los estudios del paciente UNA SOLA VEZ, para poder
-      // avisar visualmente en cada botón "Ver Estudio" si hay algo
-      // cargado o no, sin que el médico tenga que abrir cada uno a ciegas.
-      try {
-        const respEstudios = await fetch("/obtener-estudios-paciente", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ dni }),
-        });
-        const dataEstudios = await respEstudios.json();
-        window._estudiosPaciente = dataEstudios.success
-          ? dataEstudios.estudios
-          : [];
-      } catch (e) {
-        console.warn("No se pudieron precargar los estudios:", e.message);
-        window._estudiosPaciente = [];
-      }
-
-      // Precargar también el resultado de SOMF (fuente separada)
-      try {
-        const respSomf = await fetch("/obtener-estudio-somf", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ dni }),
-        });
-        const dataSomf = await respSomf.json();
-        window._estudioSomfPaciente =
-          dataSomf.success && dataSomf.estudios.length > 0
-            ? dataSomf.estudios[0]
-            : null;
-      } catch (e) {
-        console.warn("No se pudo precargar el estudio de SOMF:", e.message);
-        window._estudioSomfPaciente = null;
-      }
-    } catch (e) {
-      console.error("Error:", e);
-      alert("Error de conexión al cargar datos.");
-    } finally {
-      cargarDatosBtn.disabled = false;
-      cargarDatosBtn.innerHTML = '<i class="fas fa-search"></i> Cargar Datos';
-    }
-
-    // Asignar DNI a currentPatientData para el botón "Ver Estudio"
-    currentPatientData = { DNI: dni };
-
-    // Si IAPOS confirmó que el afiliado está inactivo, no se muestra el
-    // formulario — a diferencia de una falla de conexión, que sí permite
-    // continuar con carga manual.
-    if (window._afiliadoInactivoConfirmado) {
-      return;
-    }
-
-    // Mostrar campos fijos de paciente y el formulario de cierre
-    patientInfoDisplay.classList.remove("hidden");
-    cierreForm.classList.remove("hidden");
-
-    // Habilitar edición de campos fijos
-    pacienteApellidoInput.removeAttribute("readonly");
-    console.log("pacienteApellidoInput:", pacienteApellidoInput);
-    console.log("pacienteNombreInput:", pacienteNombreInput);
-    pacienteNombreInput.removeAttribute("readonly");
-    pacienteEdadInput.removeAttribute("readonly");
-    sexoSelect.removeAttribute("disabled");
-
-    // Generar y mostrar el primer paso del formulario dinámico
-    generateFormSteps();
-  });
-
-  // Event Listeners para los botones de navegación del formulario multi-paso
-  nextStepBtn.addEventListener("click", () => {
-    // Validar campos de la página actual antes de avanzar
-    const currentStepFields = formSteps[currentStep].querySelectorAll(
-      "input, select, textarea",
-    );
-    let stepIsValid = true;
-    currentStepFields.forEach((field) => {
-      if (field.required && !field.value.trim()) {
-        field.classList.add("border-red-500", "ring-red-500");
-        stepIsValid = false;
-      } else {
-        field.classList.remove("border-red-500", "ring-red-500");
-      }
-    });
-
-    if (!stepIsValid) {
-      alert(
-        "Por favor, complete todos los campos obligatorios antes de avanzar.",
-      );
-      return;
-    }
-
-    if (currentStep < formSteps.length - 1) {
-      showStep(currentStep + 1);
-    }
-  });
-
-  prevStepBtn.addEventListener("click", () => {
-    if (currentStep > 0) {
-      showStep(currentStep - 1);
-    }
-  });
-
-  // Event Listener para el botón "Guardar Cierre"
-  guardarCierreBtn.addEventListener("click", async (e) => {
-    e.preventDefault(); // Prevenir el envío tradicional del formulario
-
-    // Validar todos los campos del formulario (incluyendo el último paso)
-    const allFormInputs = cierreForm.querySelectorAll(
-      "input:not([readonly]), select:not([disabled]), textarea",
-    );
-    let allFieldsValid = true;
-    const formData = {};
-
-    // Recolectar datos de campos fijos de paciente
-    formData["DNI"] = dniInput.value.trim();
-    formData["Apellido"] = pacienteApellidoInput.value.trim();
-    const prof = window.dpProfesional;
-    formData["Profesional"] = prof
-      ? `${prof.nombre} ${prof.apellido}`
-      : "Desconocido";
-    formData["id_sede_dp"] = prof?.id_sede_dp || null;
-    formData["Nombre"] = pacienteNombreInput.value.trim();
-    formData["Edad"] = pacienteEdadInput.value.trim();
-    formData["Sexo"] = sexoSelect.value.trim();
-
-    if (window._cierreBloqueadoAnual && !window._modoCorreccion) {
-      const b = window._cierreBloqueadoAnual;
-      const fechaLegible = new Date(
-        b.fechaUltimoCierre + "T00:00:00",
-      ).toLocaleDateString("es-AR");
-      alert(
-        `⛔ No se puede guardar este cierre.\n\nEste paciente ya tiene un Día Preventivo cerrado el ${fechaLegible}. Todavía faltan ${b.diasRestantes} días para cumplir el año.\n\nSi lo que necesitás es corregir un dato mal cargado de ese cierre, usá el botón "Editar cierre anterior" en el cartel rojo.`,
-      );
-      resetForm();
-      return;
-    }
-
-    // Recolectar datos de campos dinámicos y validar
-    allFormInputs.forEach((input) => {
-      if (input.required && !input.value.trim()) {
-        allFieldsValid = false;
-        input.classList.add("border-red-500", "ring-red-500"); // Resaltar campos vacíos
-      } else {
-        input.classList.remove("border-red-500", "ring-red-500");
-      }
-      formData[input.name] = input.value.trim();
-    });
-
-    if (!allFieldsValid) {
-      alert(
-        "Por favor, complete todos los campos obligatorios del formulario.",
-      );
-      return;
-    }
-
-    // ── CRUCE CON VALORES REALES DE LABORATORIO ──
-    // (red de seguridad: la mayoría de los avisos ya se mostraron en vivo,
-    // al elegir cada valor — acá solo se confirma que quedó todo prolijo)
-    const esperados = window._valoresEsperadosLab || {};
-    const discrepanciasConfirmadas = [];
-    for (const campo of Object.keys(esperados)) {
-      const valorMedico = (formData[campo] || "").trim();
-      const { esperado, valorLabCrudo } = esperados[campo];
-      if (!valorMedico || valorMedico === esperado) continue;
-
-      const nombreObs =
-        (window._excepcionesNombreObservacion || {})[campo] ||
-        `Observaciones_${campo}`;
-      const inputObs = cierreForm.querySelector(`[name="${nombreObs}"]`);
-      const selectEl = cierreForm.querySelector(`[name="${campo}"]`);
-      const yaConfirmadoEnVivo = selectEl?.dataset.discrepanciaConfirmada === "true";
-
-      if (!yaConfirmadoEnVivo) {
-        const confirma = confirm(
-          `⚠️ El valor que ingresaste en "${campo.replace(/_/g, " ")}" es "${valorMedico}", pero el laboratorio dice "${valorLabCrudo}" (esperado: "${esperado}").\n\n¿Confirmás que querés guardar este valor de todos modos?`,
-        );
-        if (!confirma) {
-          guardarCierreBtn.disabled = false;
-          guardarCierreBtn.textContent = "Guardar Cierre";
-          if (inputObs) inputObs.scrollIntoView({ behavior: "smooth", block: "center" });
-          return;
+        if (cfg.tipo === "binario" || cfg.tipo === "binario_multiple") {
+          const hayPositivo = valoresLab.some((v) =>
+            ["POSITIVO", "REACTIVO"].includes(v.toString().toUpperCase()),
+          );
+          const todosNegativo = valoresLab.every((v) =>
+            ["NEGATIVO", "NO REACTIVO"].includes(v.toString().toUpperCase()),
+          );
+          if (hayPositivo) esperado = cfg.positivo;
+          else if (todosNegativo) esperado = cfg.negativo;
+        } else if (cfg.tipo === "detectable_multiple") {
+          const hayDetectable = valoresLab.some((v) =>
+            v.toString().toUpperCase().includes("DETECTABLE") &&
+            !v.toString().toUpperCase().includes("NO DETECTABLE"),
+          );
+          const todosNoDetectable = valoresLab.every((v) =>
+            v.toString().toUpperCase().includes("NO DETECTABLE"),
+          );
+          if (hayDetectable) esperado = cfg.positivo;
+          else if (todosNoDetectable) esperado = cfg.negativo;
+        } else if (cfg.tipo === "semaforo_multiple" || cfg.tipo === "semaforo_simple") {
+          const colores = cfg.labCampos
+            .map((lc) => evaluarSemaforoNode(lc, ultimoLab[lc], sexoBiologico, edadPaciente))
+            .filter(Boolean);
+          if (colores.includes("ROJO")) esperado = cfg.positivo;
+          else if (colores.length > 0 && colores.every((c) => c === "VERDE"))
+            esperado = cfg.negativo;
+          // Si solo hay AMARILLO (sin rojo), queda ambiguo: no se marca.
         }
-      }
 
-      const observacionActual = (formData[nombreObs] || "").trim();
-      if (!observacionActual) {
-        alert(
-          `Antes de continuar, tenés que explicar en "Obs. ${campo.replace(/_/g, " ")}" por qué el valor difiere del laboratorio.`,
-        );
-        if (inputObs) {
-          inputObs.classList.add("border-red-500", "ring-red-500");
-          inputObs.scrollIntoView({ behavior: "smooth", block: "center" });
-          inputObs.focus();
-        }
-        return;
-      }
-
-      discrepanciasConfirmadas.push({
-        campo,
-        valorMedico,
-        valorLab: valorLabCrudo,
-        observacion: observacionActual,
-      });
-    }
-    formData.discrepanciasConfirmadas = discrepanciasConfirmadas;
-
-    if (window._modoCorreccion) {
-      formData.id_registro_original = window._datosPaciente?.ultimoDP?.id;
-      formData.motivo_correccion = window._motivoCorreccion || "";
-      if (!formData.id_registro_original) {
-        alert(
-          "No se encontró el registro original a corregir. Volvé a cargar el DNI e intentá de nuevo.",
-        );
-        guardarCierreBtn.disabled = false;
-        guardarCierreBtn.textContent = "Guardar Cierre";
-        return;
-      }
-    }
-
-    guardarCierreBtn.disabled = true;
-    guardarCierreBtn.textContent = "Guardando...";
-
-    try {
-      const endpoint = window._modoCorreccion
-        ? "/api/cierre/corregir"
-        : "/api/cierre/guardar";
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        alert(result.message);
-        resetForm(); // Resetear el formulario y volver al estado inicial
-      } else {
-        alert(`Error al guardar: ${result.error}${result.details ? "\n\nDetalle técnico: " + result.details : ""}`);
-      }
-    } catch (error) {
-      console.error("Error al guardar el formulario de cierre:", error);
-      alert("Ocurrió un error al guardar el formulario. Intente nuevamente.");
-    } finally {
-      guardarCierreBtn.disabled = false;
-      guardarCierreBtn.innerHTML =
-        '<i class="fas fa-save mr-2"></i>Guardar Cierre';
-    }
-  });
-
-  // Event Listener para el botón "Cancelar"
-  cancelarCierreBtn.addEventListener("click", () => {
-    if (
-      confirm(
-        "¿Está seguro de que desea cancelar? Se perderán los cambios no guardados.",
-      )
-    ) {
-      resetForm(); // Volver al estado inicial
-    }
-  });
-  // --- FUNCIÓN GLOBAL PARA MOSTRAR ESTUDIOS EN UN MODAL ---
-  // Esta función será llamada por los botones "Ver Estudio"
-  async function mostrarEstudiosModal(dni, studyType, fieldName) {
-    if (!dni) {
-      alert("DNI del paciente no disponible para ver estudios.");
-      return;
-    }
-
-    modalDNI.textContent = `DNI: ${dni} - Tipo: ${studyType}`;
-    estudiosModalContent.innerHTML =
-      '<p class="text-center text-gray-500">Cargando estudios...</p>';
-    estudiosModal.classList.remove("hidden"); // Mostrar el modal
-
-    // Laboratorio: mostrar solo el/los PDF que corresponden al campo
-    // específico que se clickeó, priorizando el individual sobre el general.
-    if (studyType === "Laboratorio" && fieldName) {
-      estudiosModalContent.innerHTML = "";
-      const registrosLab = (window._estudiosPaciente || []).filter(
-        (s) => s.TipoEstudio === "Laboratorio",
-      );
-
-      if (registrosLab.length === 0) {
-        estudiosModalContent.innerHTML =
-          '<p class="text-center text-gray-500">No se encontraron estudios de laboratorio para este paciente.</p>';
-        return;
-      }
-
-      const columnas = CAMPO_A_COLUMNAS_LAB[fieldName] || [];
-
-      registrosLab.forEach((reg) => {
-        // El link correcto es el propio de ESTE registro (reg), no el del
-        // primero de la lista: individual si existe para alguna columna
-        // de este campo, y si no, el PDF general de ESTE mismo registro.
-        const mapaIndividual = reg.LinkPdfPorPractica || {};
-        const linksIndividuales = columnas
-          .map((col) => mapaIndividual[col])
-          .filter(Boolean);
-        const linksDeEsteRegistro =
-          linksIndividuales.length > 0
-            ? linksIndividuales
-            : reg.LinksPDF || (reg.LinkPDF ? [reg.LinkPDF] : []);
-
-        const card = document.createElement("div");
-        card.className =
-          "bg-blue-50 p-4 rounded-lg shadow-sm border border-blue-200 mb-4";
-        let html = `<h4 class="font-bold text-blue-700 mb-2">Laboratorio - Fecha: ${reg.Fecha || "N/A"}</h4>`;
-        html += `<p><strong>Prestador:</strong> ${reg.Prestador || "N/A"}</p>`;
-        if (columnas.length > 0) {
-          html += `<p class="mt-2"><strong>Resultados relacionados:</strong></p><ul class="list-disc list-inside">`;
-          const valoresPorColumna = reg.ResultadosPorColumna || {};
-          const labelsPorColumna = {
-            glucemia: "Glucemia",
-            creatinina: "Creatinina",
-            indice_filtrado_glomerular: "Índice Filtrado Glomerular",
-            colesterol_total: "Colesterol Total",
-            colesterol_hdl: "Colesterol HDL",
-            colesterol_ldl: "Colesterol LDL",
-            trigliceridos: "Triglicéridos",
-            hiv: "HIV",
-            somf: "SOMF",
-            hepatitis_b_antigeno: "Hepatitis B Antígeno Superficie",
-            hepatitis_c: "Hepatitis C",
-            hepatitis_b_anti_core: "Hepatitis B Anti Core",
-            hpv_genotipo_16: "HPV Genotipo 16",
-            hpv_genotipo_18: "HPV Genotipo 18",
-            hpv_otros: "HPV Otros Genotipos Alto Riesgo",
-            vdrl: "VDRL",
-            psa: "PSA",
-            chagas_hai: "Chagas HAI",
-            chagas_eclia: "Chagas ECLIA",
-            hemoglobina_glicosilada: "Hemoglobina Glicosilada",
-            microalbuminuria: "Microalbuminuria",
-            proteinuria: "Proteinuria",
-            clearence_creatinina: "Clearence Creatinina",
+        if (esperado) {
+          valoresEsperadosLab[campoForm] = {
+            esperado,
+            valorLabCrudo: valoresLab.join(" / "),
+            fechaLab: ultimoLab.fecha,
           };
-          let algunResultado = false;
-          columnas.forEach((col) => {
-            const valor = valoresPorColumna[col];
-            if (valor) {
-              algunResultado = true;
-              html += `<li>${labelsPorColumna[col] || col}: ${valor}</li>`;
-            }
-          });
-          if (!algunResultado) {
-            html += `<li class="text-gray-400">Sin resultado cargado todavía</li>`;
-          }
-          html += `</ul>`;
         }
-        card.innerHTML = html;
-
-        if (linksDeEsteRegistro.length > 0) {
-          const linksBox = document.createElement("div");
-          linksBox.className = "mt-2 flex flex-wrap gap-2";
-          linksDeEsteRegistro.forEach((link, i) => {
-            linksBox.innerHTML += `<a href="${link}" target="_blank" class="bg-green-400 hover:bg-green-500 text-gray-900 font-bold py-1 px-2 rounded inline-block"><i class="fas fa-file-pdf mr-1"></i> Ver PDF${linksDeEsteRegistro.length > 1 ? " " + (i + 1) : ""}</a>`;
-          });
-          card.appendChild(linksBox);
-        }
-
-        estudiosModalContent.appendChild(card);
       });
-      return;
-    }
 
-    // SOMF tiene su propia fuente (Supabase), separada del resto de Laboratorio (Sheets)
-    if (studyType === "SOMF") {
-      try {
-        const respSomf = await fetch("/obtener-estudio-somf", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ dni }),
-        });
-        const dataSomf = await respSomf.json();
-        estudiosModalContent.innerHTML = "";
-
-        if (dataSomf.success && dataSomf.estudios.length > 0) {
-          dataSomf.estudios.forEach((e) => {
-            const card = document.createElement("div");
-            card.className =
-              "bg-blue-50 p-4 rounded-lg shadow-sm border border-blue-200 mb-4";
-            const fecha = e.fecha_carga
-              ? new Date(e.fecha_carga).toLocaleDateString("es-AR")
-              : "N/A";
-            let html = `<h4 class="font-bold text-blue-700 mb-2">SOMF - Fecha: ${fecha}</h4>`;
-            html += `<p><strong>Prestador:</strong> ${e.nombre_prestador || "N/A"}</p>`;
-            if (e.resultado_texto) {
-              html += `<p><strong>Resultado:</strong> ${e.resultado_texto}</p>`;
-            }
-            if (e.enlace_pdf) {
-              html += `<p class="mt-2"><a href="${e.enlace_pdf}" target="_blank" class="bg-green-400 hover:bg-green-500 text-gray-900 font-bold py-1 px-2 rounded inline-block"><i class="fas fa-file-pdf mr-1"></i> Ver PDF</a></p>`;
-            }
-            card.innerHTML = html;
-            estudiosModalContent.appendChild(card);
-          });
-        } else {
-          estudiosModalContent.innerHTML =
-            '<p class="text-center text-gray-500">No se encontraron resultados de SOMF para este paciente.</p>';
+      // ITS es un compuesto de VIH + Hepatitis B + Hepatitis C + VDRL
+      // (Chagas queda afuera, no es una ITS). Se calcula después de tener
+      // ya resueltos esos cuatro campos individuales.
+      const componentesITS = ["VIH", "Hepatitis_B", "Hepatitis_C", "VDRL"];
+      const esperadosITS = componentesITS
+        .map((c) => valoresEsperadosLab[c]?.esperado)
+        .filter(Boolean);
+      if (esperadosITS.length > 0) {
+        const hayPositivoITS = esperadosITS.includes("Positivo");
+        const todosNegativoITS = esperadosITS.every((e) => e === "Negativo");
+        if (hayPositivoITS) {
+          valoresEsperadosLab["ITS"] = {
+            esperado: "Positivo",
+            valorLabCrudo: componentesITS
+              .filter((c) => valoresEsperadosLab[c]?.esperado === "Positivo")
+              .join(" / "),
+            fechaLab: ultimoLab.fecha,
+          };
+        } else if (todosNegativoITS) {
+          valoresEsperadosLab["ITS"] = {
+            esperado: "Negativo",
+            valorLabCrudo: "VIH / Hepatitis B / Hepatitis C / VDRL negativos",
+            fechaLab: ultimoLab.fecha,
+          };
         }
-      } catch (e) {
-        estudiosModalContent.innerHTML =
-          '<p class="text-center text-red-500">Error al cargar el resultado de SOMF.</p>';
       }
-      return;
     }
-
-    try {
-      const response = await fetch("/obtener-estudios-paciente", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dni: dni }),
-      });
-      const data = await response.json();
-
-      estudiosModalContent.innerHTML = ""; // Limpiar el contenido de carga
-
-      if (data.success && data.estudios.length > 0) {
-        const filteredStudies = data.estudios.filter(
-          (s) =>
-            s.TipoEstudio === studyType ||
-            (studyType === "Laboratorio" &&
-              s.TipoEstudio === "LaboratorioIndividual"),
-        );
-
-        if (filteredStudies.length > 0) {
-          filteredStudies.forEach((estudio) => {
-            const estudioCard = document.createElement("div");
-            estudioCard.className =
-              "bg-blue-50 p-4 rounded-lg shadow-sm border border-blue-200 mb-4";
-
-            let contentHtml = `<h4 class="font-bold text-blue-700 mb-2">${estudio.TipoEstudio} - Fecha: ${estudio.Fecha || "N/A"}</h4>`;
-            contentHtml += `<p><strong>Prestador:</strong> ${estudio.Prestador || "N/A"}</p>`;
-
-            // LÓGICA UNIFICADA PARA RESULTADOS DETALLADOS
-            const resultados =
-              estudio.ResultadosLaboratorio || estudio.ResultadosEnfermeria;
-
-            if (resultados) {
-              const esIndividual =
-                estudio.TipoEstudio === "LaboratorioIndividual";
-              const tituloResultados = esIndividual
-                ? "Resultado individual de Laboratorio"
-                : estudio.TipoEstudio === "Laboratorio"
-                  ? "Resultados de Laboratorio"
-                  : "Resultados de Enfermería";
-              contentHtml += `<p class="font-semibold mt-2">${tituloResultados}:</p>`;
-              contentHtml += `<ul class="list-disc list-inside ml-4">`;
-
-              for (const key in resultados) {
-                let value = resultados[key];
-                if (!value || String(value).trim() === "") {
-                  continue;
-                }
-
-                // Manejo de enlaces PDF dentro de los resultados detallados
-                if (
-                  (key === "Agudeza_Visual_PDF" ||
-                    key === "Espirometria_PDF") &&
-                  value !== "N/A"
-                ) {
-                  const label = key
-                    .replace(/_/g, " ")
-                    .replace("PDF", "")
-                    .trim();
-                  contentHtml += `<li><strong>${label}:</strong> <a href="${value}" target="_blank" class="text-blue-600 hover:underline"><i class="fas fa-file-pdf mr-1"></i>Ver Informe</a></li>`;
-                }
-
-                // Manejo especial para IMC (cálculo)
-                else if (key === "Peso") {
-                  const alturaCm = parseFloat(resultados.Altura);
-                  const pesoKg = parseFloat(value);
-
-                  if (!isNaN(alturaCm) && !isNaN(pesoKg) && alturaCm > 0) {
-                    const imc = (pesoKg / (alturaCm / 100) ** 2).toFixed(2);
-                    contentHtml += `<li><strong>IMC:</strong> ${imc}</li>`;
-                  }
-                  contentHtml += `<li><strong>Peso:</strong> ${value} kg</li>`;
-                }
-                // Ignorar el campo Altura para evitar duplicados en la lista cuando se calcula el IMC
-                else if (key === "Altura") {
-                  contentHtml += `<li><strong>Altura:</strong> ${value} cm</li>`;
-                } else {
-                  const label = key.replace(/_/g, " ");
-                  contentHtml += `<li><strong>${label}:</strong> ${value}</li>`;
-                }
-              }
-              contentHtml += `</ul>`;
-
-              // Maneja el LinkPDF del estudio, que ahora está en el objeto 'estudio'
-              if (estudio.LinkPDF && estudio.LinkPDF.trim() !== "") {
-                contentHtml += `<p class="mt-2"><a href="${estudio.LinkPDF}" target="_blank" class="bg-green-400 hover:bg-green-500 text-gray-900 font-bold py-1 px-2 rounded inline-block"><i class="fas fa-file-pdf mr-1"></i> Ver PDF</a></p>`;
-              }
-            } else if (estudio.LinkPDF) {
-              // Lógica para estudios con un solo PDF (ej. Mamografía)
-              contentHtml += `<p class="mt-2"><a href="${estudio.LinkPDF}" target="_blank" class="text-blue-600 hover:underline"><i class="fas fa-file-pdf mr-1"></i>Ver PDF</a></p>`;
-            } else {
-              // Lógica para el resto de los estudios (ej. Odontologia)
-              contentHtml += `<p><strong>Resultado:</strong> ${estudio.Resultado || "N/A"}</p>`;
-              if (estudio.Observaciones) {
-                contentHtml += `<p><strong>Observaciones:</strong> ${estudio.Observaciones}</p>`;
-              }
-            }
-
-            estudioCard.innerHTML = contentHtml;
-            estudiosModalContent.appendChild(estudioCard);
-          });
-        } else {
-          estudiosModalContent.innerHTML = `<p class="text-center text-gray-600">No se encontraron estudios de tipo "${studyType}" para este DNI.</p>`;
-        }
-        estudiosModalContent.style.maxHeight = "60vh";
-        estudiosModalContent.style.overflowY = "auto";
-      } else {
-        estudiosModalContent.innerHTML = `<p class="text-center text-gray-600">${data.message || "No se encontraron estudios para este DNI."}</p>`;
-      }
-    } catch (error) {
-      console.error("Error al obtener estudios para el modal:", error);
-      estudiosModalContent.innerHTML = `<p class="text-center text-red-600">Error al cargar los estudios. Intente nuevamente.</p>`;
-    }
-  }
-  // Eventos para cerrar el modal
-  closeModalBtn.addEventListener("click", () => {
-    estudiosModal.classList.add("hidden");
-  });
-
-  modalCloseButtonBottom.addEventListener("click", () => {
-    estudiosModal.classList.add("hidden");
-  });
-
-  // Cerrar modal al hacer clic fuera de él (opcional)
-  estudiosModal.addEventListener("click", (e) => {
-    if (e.target === estudiosModal) {
-      estudiosModal.classList.add("hidden");
-    }
-  });
-  function cerrarSesionGlobal() {
-    if (!confirm("¿Cerrar sesión?")) return;
-    localStorage.removeItem("dpToken");
-    localStorage.removeItem("dpProfesional");
-    window.location.href = "https://acceso.diapreventivoiapos.com";
+  } catch (e) {
+    console.error("Error calculando valoresEsperadosLab:", e.message);
+    // No bloqueamos la carga del paciente por un error acá.
   }
 
-  // Asegurarse de que la función mostrarEstudiosModal esté disponible globalmente (opcional si ya está ahí)
-  // window.mostrarEstudiosModal = mostrarEstudiosModal; // Descomentar si realmente necesitas que sea global para otras partes del código
+  res.json({
+    success: true,
+    iapos: datosIAPOS,
+    afiliado: afiliado || menor || null,
+    ultimoDP: ultimoDP || null,
+    practicasRealizadas: practicas || [],
+    alertas,
+    bloqueoCierreAnual,
+    valoresEsperadosLab,
+    excepcionesNombreObservacion: EXCEPCIONES_NOMBRE_OBSERVACION,
+  });
 });
+function mapearTipoEstudio(descripcion) {
+  if (!descripcion) return "Otro";
+  const d = descripcion.toLowerCase();
+  if (d.includes("mamog")) return "Mamografia";
+  if (d.includes("ecograf") && d.includes("mam")) return "Eco mamaria";
+  if (d.includes("ecograf")) return "Ecografia";
+  if (d.includes("densito")) return "Densitometria";
+  if (d.includes("colonos") || d.includes("vcc")) return "VCC";
+  if (d.includes("pap")) return "Papanicolau";
+  if (d.includes("espiro")) return "Espirometria";
+  if (d.includes("biopsia")) return "Biopsia";
+  if (
+    d.includes("glucemia") ||
+    d.includes("colesterol") ||
+    d.includes("hepatitis") ||
+    d.includes("vih") ||
+    d.includes("chagas") ||
+    d.includes("vdrl")
+  )
+    return "Laboratorio";
+  if (d.includes("odonto")) return "Odontologia";
+  if (d.includes("vision") || d.includes("visual")) return "Oftalmologia";
+  return "Otro";
+}
+
+function parsearResultadosLab(practica) {
+  return {
+    Glucemia: practica.resultado_texto || "N/A",
+    "Colesterol Total": practica.resultado_texto || "N/A",
+  };
+}
+
+// ── VERIFICAR AFILIADO IAPOS ──
+app.get("/verificar-afiliado/:dni", async (req, res) => {
+  const dni = req.params.dni;
+  const hoy = new Date().toISOString().split("T")[0];
+
+  const soapBody = `<?xml version="1.0" encoding="utf-8"?>
+    <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+        <soap:Body>
+            <BEWsValidaAfi.Execute xmlns="IAPOS_WS">
+                <Usuario>CONSULTAPDP</Usuario>
+                <Passwd>1Qaz</Passwd>
+                <Nafiliado>${dni}</Nafiliado>
+                <Badocnumdo>${dni}</Badocnumdo>
+                <Tidocodigo_de_documento>96</Tidocodigo_de_documento>
+                <Ogorcodigo>1</Ogorcodigo>
+                <Fechpresta>${hoy}</Fechpresta>
+            </BEWsValidaAfi.Execute>
+        </soap:Body>
+    </soap:Envelope>`;
+
+  try {
+    const iaposRes = await axios.post(
+      "https://aswe.santafe.gov.ar/iapos-sw-srvt/servlet/abewsvalidaafi",
+      soapBody,
+      {
+        headers: {
+          "Content-Type": "text/xml; charset=utf-8",
+          SOAPAction: "IAPOS_WSaction/ABEWSVALIDAAFI.Execute",
+        },
+        timeout: 10000,
+      },
+    );
+    const xml = iaposRes.data;
+    const getValor = (tag) => {
+      const match = xml.match(new RegExp(`<${tag}[^>]*>([^<]+)<\/${tag}>`));
+      return match ? match[1].trim() : null;
+    };
+    res.json({
+      esActivo: getValor("Estado") === "A",
+      nombre: getValor("Apenom"),
+      edad: getValor("Edad"),
+      sexo: getValor("Sexo"),
+      localidad: getValor("Localidad"),
+      fechaNac: getValor("Fechanac"),
+    });
+  } catch (e) {
+    console.error("Error IAPOS:", e.message);
+    res.json({ esActivo: false, nombre: null });
+  }
+});
+registrarEndpointObtenerEstudios(app, supabase);
+
+// ── Resultado de SOMF (fuente: Supabase, no Google Sheets) ──
+app.post("/obtener-estudio-somf", async (req, res) => {
+  const { dni } = req.body;
+  try {
+    const { data, error } = await supabase
+      .from("practicas_autorizadas")
+      .select(
+        "descripcion_practica, resultado_texto, enlace_pdf, fecha_carga, nombre_prestador",
+      )
+      .eq("dni", dni)
+      .ilike("descripcion_practica", "%somf%")
+      .eq("estado", "REALIZADA")
+      .order("fecha_carga", { ascending: false });
+    if (error) throw error;
+    res.json({ success: true, estudios: data || [] });
+  } catch (e) {
+    console.error("Error en /obtener-estudio-somf:", e.message);
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+async function iniciarApp() {
+  const maxIntentos = 5;
+  let retraso = 1000;
+  for (let intento = 1; intento <= maxIntentos; intento++) {
+    try {
+      console.log(
+        `⏳ Cargando Google Sheet (Intento ${intento}/${maxIntentos})...`,
+      );
+      await initializeGoogleSheet();
+      console.log("✅ Google Sheets conectado.");
+      break;
+    } catch (error) {
+      console.error(`⚠️ Intento ${intento} fallido:`, error.message);
+      if (intento === maxIntentos) {
+        console.error(
+          "⚠️ Google Sheets no disponible al arrancar — el servidor sigue funcionando sin Sheets.",
+        );
+      } else {
+        console.log(`🔄 Reintentando en ${retraso / 1000}s...`);
+        await new Promise((resolve) => setTimeout(resolve, retraso));
+        retraso *= 2;
+      }
+    }
+  }
+  app.listen(PORT, () => {
+    console.log(`✅ Servidor funcionando en http://localhost:${PORT}`);
+  });
+}
+
+iniciarApp();
