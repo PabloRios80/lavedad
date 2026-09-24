@@ -145,13 +145,23 @@ document.addEventListener("DOMContentLoaded", () => {
   // Precarga el formulario con los valores del último cierre activo, para
   // que corregir sea "editar lo que ya está", no empezar de cero.
   function prefillFormDesdeUltimoDP(ultimoDP) {
-    if (!ultimoDP) return;
+    if (!ultimoDP) {
+      console.warn("prefillFormDesdeUltimoDP: no hay ultimoDP para precargar.");
+      return;
+    }
+    let encontrados = 0;
     Object.entries(CAMPO_A_COLUMNA).forEach(([campo, columna]) => {
       const valor = ultimoDP[columna];
       if (valor === null || valor === undefined) return;
       const el = cierreForm.querySelector(`[name="${campo}"]`);
-      if (el) el.value = valor;
+      if (el) {
+        el.value = valor;
+        encontrados++;
+      } else {
+        console.warn(`prefillFormDesdeUltimoDP: no se encontró el campo "${campo}" en el DOM.`);
+      }
     });
+    console.log(`prefillFormDesdeUltimoDP: ${encontrados} campos precargados.`);
   }
 
   function mostrarCartelBloqueoAnual(bloqueo) {
@@ -197,6 +207,12 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         window._modoCorreccion = true;
         window._motivoCorreccion = motivo.trim();
+        // Se regenera el formulario acá mismo, justo antes de precargar
+        // (no alcanza con confiar en que ya esté armado desde el "Cargar
+        // Datos" inicial — si se lo vuelve a tocar después, esto no se
+        // rompe porque construye y llena en el mismo paso).
+        generateFormSteps();
+        console.log("Precargando corrección con:", window._datosPaciente?.ultimoDP);
         prefillFormDesdeUltimoDP(window._datosPaciente?.ultimoDP);
         const bloque = document.getElementById("bloqueEdicionCierre");
         if (bloque)

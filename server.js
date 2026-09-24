@@ -1205,11 +1205,9 @@ app.post("/api/cierre/corregir", async (req, res) => {
       fecha_correccion: new Date().toISOString(),
     };
 
-    const { data: nuevoRegistro, error: errInsert } = await supabase
+    const { error: errInsert } = await supabase
       .from("historial_dia_preventivo")
-      .insert(supabaseData)
-      .select("id")
-      .single();
+      .insert(supabaseData);
 
     if (errInsert) {
       console.error("Error al insertar corrección:", errInsert);
@@ -1236,12 +1234,11 @@ app.post("/api/cierre/corregir", async (req, res) => {
     }
 
     console.log(
-      `SERVER: Cierre corregido para DNI ${dni} por ${profesionalName} (original id ${idOriginal} → nuevo id ${nuevoRegistro?.id})`,
+      `SERVER: Cierre corregido para DNI ${dni} por ${profesionalName} (original id ${idOriginal})`,
     );
     return res.json({
       success: true,
       message: "Corrección guardada. La versión anterior queda conservada para auditoría.",
-      idNuevoRegistro: nuevoRegistro?.id,
     });
   } catch (error) {
     console.error("SERVER ERROR: Fallo al guardar la corrección del cierre:", error);
