@@ -140,6 +140,10 @@ document.addEventListener("DOMContentLoaded", () => {
     Observaciones_PSA: "obs_psa",
     Chagas: "chagas",
     Observaciones_Chagas: "obs_chagas",
+    Cuidados_adultos_mayores: "caidas_adultos_mayores",
+    Observaciones_Cuidados_adultos_mayores: "obs_caidas",
+    Acido_folico: "acido_folico",
+    Observaciones_Acido_folico: "obs_acido_folico",
   };
 
   // Precarga el formulario con los valores del último cierre activo, para

@@ -921,6 +921,10 @@ app.post("/api/cierre/guardar", async (req, res) => {
         obs_psa: formData["Observaciones_PSA"] || null,
         chagas: formData["Chagas"] || null,
         obs_chagas: formData["Observaciones_Chagas"] || null,
+        caidas_adultos_mayores: formData["Cuidados_adultos_mayores"] || null,
+        obs_caidas: formData["Observaciones_Cuidados_adultos_mayores"] || null,
+        acido_folico: formData["Acido_folico"] || null,
+        obs_acido_folico: formData["Observaciones_Acido_folico"] || null,
       };
 
       const { error: supabaseError } = await supabase
@@ -1197,6 +1201,10 @@ app.post("/api/cierre/corregir", async (req, res) => {
       obs_psa: formData["Observaciones_PSA"] || null,
       chagas: formData["Chagas"] || null,
       obs_chagas: formData["Observaciones_Chagas"] || null,
+      caidas_adultos_mayores: formData["Cuidados_adultos_mayores"] || null,
+      obs_caidas: formData["Observaciones_Cuidados_adultos_mayores"] || null,
+      acido_folico: formData["Acido_folico"] || null,
+      obs_acido_folico: formData["Observaciones_Acido_folico"] || null,
       // ── Versionado / auditoría ──
       estado_registro: "activo",
       id_registro_original: idOriginal,
