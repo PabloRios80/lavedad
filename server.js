@@ -1205,32 +1205,49 @@ app.post("/api/cierre/corregir", async (req, res) => {
       fecha_correccion: new Date().toISOString(),
     };
 
+    // Hay un índice único (dni, fechax) que solo aplica a filas "activo"
+    // — no puede haber dos cierres activos del mismo día para el mismo
+    // afiliado. Por eso el orden importa: primero hay que "liberar" la
+    // fecha marcando el original como corregido, y recién después crear
+    // la nueva fila activa. Si el insert fallara después de esto, se
+    // revierte el original a "activo" para no dejar al paciente sin
+    // ninguna versión vigente.
+    const { error: errMarcar, data: filasMarcadas } = await supabase
+      .from("historial_dia_preventivo")
+      .update({ estado_registro: "corregido" })
+      .eq("id", idOriginal)
+      .eq("estado_registro", "activo")
+      .select("id");
+
+    if (errMarcar || !filasMarcadas || filasMarcadas.length === 0) {
+      console.error("Error al marcar el original como corregido:", errMarcar);
+      return res.status(409).json({
+        success: false,
+        error:
+          "No se pudo iniciar la corrección (el registro original ya no está activo, puede que otro usuario ya lo haya corregido). Volvé a cargar los datos del paciente.",
+      });
+    }
+
     const { error: errInsert } = await supabase
       .from("historial_dia_preventivo")
       .insert(supabaseData);
 
     if (errInsert) {
       console.error("Error al insertar corrección:", errInsert);
+      // Compensar: si no se pudo crear la versión nueva, el original
+      // vuelve a quedar activo — nunca dejamos al paciente sin ninguna
+      // fila vigente.
+      await supabase
+        .from("historial_dia_preventivo")
+        .update({ estado_registro: "activo" })
+        .eq("id", idOriginal);
       return res.status(500).json({
         success: false,
         error: "No se pudo guardar la corrección.",
-        details: errInsert.message,
+        details: [errInsert.message, errInsert.details, errInsert.hint]
+          .filter(Boolean)
+          .join(" | "),
       });
-    }
-
-    // Recién si la nueva versión se guardó bien, se marca la vieja como
-    // superada — así nunca queda un estado intermedio sin ninguna fila
-    // "activo" para este cierre.
-    const { error: errMarcar } = await supabase
-      .from("historial_dia_preventivo")
-      .update({ estado_registro: "corregido" })
-      .eq("id", idOriginal);
-
-    if (errMarcar) {
-      console.error(
-        "ALERTA: se creó la corrección pero no se pudo marcar el original como corregido:",
-        errMarcar.message,
-      );
     }
 
     console.log(

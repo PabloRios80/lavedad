@@ -1541,7 +1541,7 @@ document.addEventListener("DOMContentLoaded", () => {
         alert(result.message);
         resetForm(); // Resetear el formulario y volver al estado inicial
       } else {
-        alert(`Error al guardar: ${result.error}`);
+        alert(`Error al guardar: ${result.error}${result.details ? "\n\nDetalle técnico: " + result.details : ""}`);
       }
     } catch (error) {
       console.error("Error al guardar el formulario de cierre:", error);
