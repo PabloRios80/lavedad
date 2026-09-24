@@ -1059,6 +1059,200 @@ app.post("/api/cierre/guardar", async (req, res) => {
     });
   }
 });
+// ── CORREGIR un cierre de Día Preventivo ya guardado ──
+// A diferencia de /api/cierre/guardar, esto NO es un cierre nuevo:
+// - No corre el candado de "un DP por año" (justamente estamos editando
+//   el que ya existe, no creando uno adicional).
+// - No vuelve a insertar en practicas_autorizadas (Consulta médica /
+//   Módulo DP 339159) — eso ya se facturó y pagó, y se queda como está,
+//   tal cual se decidió.
+// - Nunca borra ni pisa el registro original en historial_dia_preventivo:
+//   lo marca estado_registro='corregido' y crea uno nuevo activo, con
+//   motivo y quién corrigió. Los dos quedan disponibles para auditoría.
+app.post("/api/cierre/corregir", async (req, res) => {
+  const profesionalName = req.body["Profesional"] || "Desconocido";
+  const formData = req.body;
+  const dni = String(formData["DNI"] || "").trim();
+  const idOriginal = formData["id_registro_original"];
+  const motivoCorreccion = String(formData["motivo_correccion"] || "").trim();
+
+  if (!dni || !idOriginal) {
+    return res.status(400).json({
+      success: false,
+      error: "Faltan DNI o id_registro_original para corregir el cierre.",
+    });
+  }
+  if (!motivoCorreccion) {
+    return res.status(400).json({
+      success: false,
+      error: "El motivo de la corrección es obligatorio.",
+    });
+  }
+
+  try {
+    // Verificar que el registro original exista, sea de este DNI y esté
+    // activo (no se puede corregir algo que ya fue corregido antes por
+    // esta misma vía sin pasar por la nueva versión).
+    const { data: original, error: errOriginal } = await supabase
+      .from("historial_dia_preventivo")
+      .select("id, dni, estado_registro")
+      .eq("id", idOriginal)
+      .single();
+
+    if (errOriginal || !original) {
+      return res.status(404).json({
+        success: false,
+        error: "No se encontró el registro original a corregir.",
+      });
+    }
+    if (String(original.dni) !== dni) {
+      return res.status(400).json({
+        success: false,
+        error: "El registro original no corresponde a este DNI.",
+      });
+    }
+    if (original.estado_registro !== "activo") {
+      return res.status(409).json({
+        success: false,
+        error:
+          "Este registro ya fue corregido antes. Volvé a cargar los datos del paciente para ver la versión vigente.",
+      });
+    }
+
+    const supabaseData = {
+      dni: dni,
+      apellido_y_nombre:
+        `${formData["Apellido"] || ""} ${formData["Nombre"] || ""}`.trim(),
+      fechax: formData["Fecha_cierre_DP"] || new Date().toISOString().split("T")[0],
+      edad: formData["Edad"] || null,
+      sexo: formData["Sexo"] || null,
+      efector: formData["efector"] || null,
+      id_sede_dp: formData["id_sede_dp"] ? parseInt(formData["id_sede_dp"]) : null,
+      tipo: "Adultos",
+      profesional: profesionalName,
+      marca_temporal: new Date().toISOString(),
+      presion_arterial: formData["Presion_Arterial"] || null,
+      obs_presion_arterial: formData["Observaciones_Presion_Arterial"] || null,
+      imc: formData["IMC"] || null,
+      obs_imc: formData["Observaciones_IMC"] || null,
+      agudeza_visual: formData["Agudeza_visual"] || null,
+      obs_agudeza_visual: formData["Observaciones_Agudeza_visual"] || null,
+      control_odontologico_adultos: formData["Control_odontologico"] || null,
+      obs_control_odontologico: formData["Observaciones_Control_odontologico"] || null,
+      alimentacion_saludable: formData["Alimentacion_saludable"] || null,
+      obs_alimentacion: formData["Observaciones_Alimentacion_saludable"] || null,
+      actividad_fisica: formData["Actividad_fisica"] || null,
+      obs_actividad_fisica: formData["Observaciones_Actividad_fisica"] || null,
+      seguridad_vial: formData["Seguridad_vial"] || null,
+      obs_seguridad_vial: formData["Observaciones_Seguridad_vial"] || null,
+      abuso_alcohol: formData["Abuso_alcohol"] || null,
+      obs_abuso_alcohol: formData["Observaciones_Abuso_alcohol"] || null,
+      tabaco: formData["Tabaco"] || null,
+      obs_tabaco: formData["Observaciones_Tabaco"] || null,
+      violencia: formData["Violencia"] || null,
+      obs_violencia: formData["Observaciones_Violencia"] || null,
+      depresion: formData["Depresion"] || null,
+      obs_depresion: formData["Observaciones_Depresion"] || null,
+      its: formData["ITS"] || null,
+      obs_its: formData["Observaciones_ITS"] || null,
+      hepatitis_b: formData["Hepatitis_B"] || null,
+      obs_hepatitis_b: formData["Observaciones_Hepatitis_B"] || null,
+      hepatitis_c: formData["Hepatitis_C"] || null,
+      obs_hepatitis_c: formData["Observaciones_Hepatitis_C"] || null,
+      vih: formData["VIH"] || null,
+      obs_vih: formData["Observaciones_VIH"] || null,
+      dislipemias: formData["Dislipemias"] || null,
+      obs_dislipemias: formData["Observaciones_Dislipemias"] || null,
+      diabetes: formData["Diabetes"] || null,
+      obs_diabetes: formData["Observaciones_Diabetes"] || null,
+      cancer_cervico_hpv: formData["Cancer_cervico_uterino_HPV"] || null,
+      obs_hpv: formData["Observaciones_Cancer_cervico_uterino_HPV"] || null,
+      cancer_cervico_pap: formData["Cancer_cervico_uterino_PAP"] || null,
+      obs_pap: formData["Observaciones_PAP"] || null,
+      somf: formData["Cancer_colon_SOMF"] || null,
+      obs_somf: formData["Observaciones_Cancer_colon_SOMF"] || null,
+      cancer_colon_colonoscopia: formData["Cancer_colon_Colonoscopia"] || null,
+      obs_colonoscopia: formData["Observaciones_Colonoscopia"] || null,
+      cancer_mama_mamografia: formData["Cancer_mama_Mamografia"] || null,
+      obs_mamografia: formData["Observaciones_Mamografia"] || null,
+      cancer_mama_eco_mamaria: formData["Cancer_mama_Eco_mamaria"] || null,
+      obs_eco_mamaria: formData["Observaciones_Eco_mamaria"] || null,
+      erc: formData["ERC"] || null,
+      obs_erc: formData["Observaciones_ECG"] || null,
+      epoc: formData["EPOC"] || null,
+      obs_epoc: formData["Observaciones_EPOC"] || null,
+      aneurisma_aorta: formData["Aneurisma_aorta"] || null,
+      obs_aneurisma_aorta: formData["Observaciones_Aneurisma_aorta"] || null,
+      osteoporosis: formData["Osteoporosis"] || null,
+      obs_osteoporosis: formData["Observaciones_Osteoporosis"] || null,
+      estratificacion_riesgo_cv: formData["Estratificacion_riesgo_CV"] || null,
+      obs_riesgo_cv: formData["Observaciones_Riesgo_CV"] || null,
+      aspirina: formData["Aspirina"] || null,
+      obs_aspirina: formData["Observaciones_Aspirina"] || null,
+      inmunizaciones: formData["Inmunizaciones"] || null,
+      obs_inmunizaciones: formData["Observaciones_Inmunizaciones"] || null,
+      vdrl: formData["VDRL"] || null,
+      obs_vdrl: formData["Observaciones_VDRL"] || null,
+      prostata_psa: formData["Prostata_PSA"] || null,
+      obs_psa: formData["Observaciones_PSA"] || null,
+      chagas: formData["Chagas"] || null,
+      obs_chagas: formData["Observaciones_Chagas"] || null,
+      // ── Versionado / auditoría ──
+      estado_registro: "activo",
+      id_registro_original: idOriginal,
+      motivo_correccion: motivoCorreccion,
+      corregido_por: profesionalName,
+      fecha_correccion: new Date().toISOString(),
+    };
+
+    const { data: nuevoRegistro, error: errInsert } = await supabase
+      .from("historial_dia_preventivo")
+      .insert(supabaseData)
+      .select("id")
+      .single();
+
+    if (errInsert) {
+      console.error("Error al insertar corrección:", errInsert);
+      return res.status(500).json({
+        success: false,
+        error: "No se pudo guardar la corrección.",
+        details: errInsert.message,
+      });
+    }
+
+    // Recién si la nueva versión se guardó bien, se marca la vieja como
+    // superada — así nunca queda un estado intermedio sin ninguna fila
+    // "activo" para este cierre.
+    const { error: errMarcar } = await supabase
+      .from("historial_dia_preventivo")
+      .update({ estado_registro: "corregido" })
+      .eq("id", idOriginal);
+
+    if (errMarcar) {
+      console.error(
+        "ALERTA: se creó la corrección pero no se pudo marcar el original como corregido:",
+        errMarcar.message,
+      );
+    }
+
+    console.log(
+      `SERVER: Cierre corregido para DNI ${dni} por ${profesionalName} (original id ${idOriginal} → nuevo id ${nuevoRegistro?.id})`,
+    );
+    return res.json({
+      success: true,
+      message: "Corrección guardada. La versión anterior queda conservada para auditoría.",
+      idNuevoRegistro: nuevoRegistro?.id,
+    });
+  } catch (error) {
+    console.error("SERVER ERROR: Fallo al guardar la corrección del cierre:", error);
+    res.status(500).json({
+      success: false,
+      error: "Error interno del servidor al guardar la corrección.",
+      details: error.message,
+    });
+  }
+});
+
 app.post("/guardar-consulta", async (req, res) => {
   console.log("Datos recibidos del cliente:", req.body);
   const profesionalName = req.body["Profesional"] || "Desconocido";
@@ -1219,13 +1413,16 @@ app.post("/cargar-datos-paciente", async (req, res) => {
     menor = afiliadoMenor || null;
   }
 
-  // 3. Buscar último DP
+  // 3. Buscar último DP (solo la versión ACTIVA — si hubo una corrección,
+  // acá tiene que verse siempre la vigente, nunca la superada).
+  // Trae todos los campos clínicos (no solo los 6 de antes) porque ahora
+  // también se usa para precargar el formulario cuando el profesional
+  // corrige un cierre anterior.
   const { data: ultimoDP } = await supabase
     .from("historial_dia_preventivo")
-    .select(
-      "fechax, efector, cancer_cervico_hpv, somf, dislipemias, diabetes, presion_arterial",
-    )
+    .select("*")
     .eq("dni", dni)
+    .eq("estado_registro", "activo")
     .order("fechax", { ascending: false })
     .limit(1)
     .single();

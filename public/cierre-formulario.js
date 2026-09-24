@@ -69,10 +69,97 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  // Mapeo campo del formulario -> columna en historial_dia_preventivo.
+  // Espejo exacto del que arma el server en /api/cierre/guardar y
+  // /api/cierre/corregir — si se agrega un campo nuevo al formulario, hay
+  // que agregarlo también acá y en las dos listas del server.
+  const CAMPO_A_COLUMNA = {
+    Presion_Arterial: "presion_arterial",
+    Observaciones_Presion_Arterial: "obs_presion_arterial",
+    IMC: "imc",
+    Observaciones_IMC: "obs_imc",
+    Agudeza_visual: "agudeza_visual",
+    Observaciones_Agudeza_visual: "obs_agudeza_visual",
+    Control_odontologico: "control_odontologico_adultos",
+    Observaciones_Control_odontologico: "obs_control_odontologico",
+    Alimentacion_saludable: "alimentacion_saludable",
+    Observaciones_Alimentacion_saludable: "obs_alimentacion",
+    Actividad_fisica: "actividad_fisica",
+    Observaciones_Actividad_fisica: "obs_actividad_fisica",
+    Seguridad_vial: "seguridad_vial",
+    Observaciones_Seguridad_vial: "obs_seguridad_vial",
+    Abuso_alcohol: "abuso_alcohol",
+    Observaciones_Abuso_alcohol: "obs_abuso_alcohol",
+    Tabaco: "tabaco",
+    Observaciones_Tabaco: "obs_tabaco",
+    Violencia: "violencia",
+    Observaciones_Violencia: "obs_violencia",
+    Depresion: "depresion",
+    Observaciones_Depresion: "obs_depresion",
+    ITS: "its",
+    Observaciones_ITS: "obs_its",
+    Hepatitis_B: "hepatitis_b",
+    Observaciones_Hepatitis_B: "obs_hepatitis_b",
+    Hepatitis_C: "hepatitis_c",
+    Observaciones_Hepatitis_C: "obs_hepatitis_c",
+    VIH: "vih",
+    Observaciones_VIH: "obs_vih",
+    Dislipemias: "dislipemias",
+    Observaciones_Dislipemias: "obs_dislipemias",
+    Diabetes: "diabetes",
+    Observaciones_Diabetes: "obs_diabetes",
+    Cancer_cervico_uterino_HPV: "cancer_cervico_hpv",
+    Observaciones_Cancer_cervico_uterino_HPV: "obs_hpv",
+    Cancer_cervico_uterino_PAP: "cancer_cervico_pap",
+    Observaciones_PAP: "obs_pap",
+    Cancer_colon_SOMF: "somf",
+    Observaciones_Cancer_colon_SOMF: "obs_somf",
+    Cancer_colon_Colonoscopia: "cancer_colon_colonoscopia",
+    Observaciones_Colonoscopia: "obs_colonoscopia",
+    Cancer_mama_Mamografia: "cancer_mama_mamografia",
+    Observaciones_Mamografia: "obs_mamografia",
+    Cancer_mama_Eco_mamaria: "cancer_mama_eco_mamaria",
+    Observaciones_Eco_mamaria: "obs_eco_mamaria",
+    ERC: "erc",
+    Observaciones_ECG: "obs_erc",
+    EPOC: "epoc",
+    Observaciones_EPOC: "obs_epoc",
+    Aneurisma_aorta: "aneurisma_aorta",
+    Observaciones_Aneurisma_aorta: "obs_aneurisma_aorta",
+    Osteoporosis: "osteoporosis",
+    Observaciones_Osteoporosis: "obs_osteoporosis",
+    Estratificacion_riesgo_CV: "estratificacion_riesgo_cv",
+    Observaciones_Riesgo_CV: "obs_riesgo_cv",
+    Aspirina: "aspirina",
+    Observaciones_Aspirina: "obs_aspirina",
+    Inmunizaciones: "inmunizaciones",
+    Observaciones_Inmunizaciones: "obs_inmunizaciones",
+    VDRL: "vdrl",
+    Observaciones_VDRL: "obs_vdrl",
+    Prostata_PSA: "prostata_psa",
+    Observaciones_PSA: "obs_psa",
+    Chagas: "chagas",
+    Observaciones_Chagas: "obs_chagas",
+  };
+
+  // Precarga el formulario con los valores del último cierre activo, para
+  // que corregir sea "editar lo que ya está", no empezar de cero.
+  function prefillFormDesdeUltimoDP(ultimoDP) {
+    if (!ultimoDP) return;
+    Object.entries(CAMPO_A_COLUMNA).forEach(([campo, columna]) => {
+      const valor = ultimoDP[columna];
+      if (valor === null || valor === undefined) return;
+      const el = cierreForm.querySelector(`[name="${campo}"]`);
+      if (el) el.value = valor;
+    });
+  }
+
   function mostrarCartelBloqueoAnual(bloqueo) {
     let cartel = document.getElementById("cartelBloqueoAnual");
     if (!bloqueo) {
       if (cartel) cartel.remove();
+      window._modoCorreccion = false;
+      window._motivoCorreccion = "";
       return;
     }
     const fechaLegible = new Date(
@@ -80,8 +167,15 @@ document.addEventListener("DOMContentLoaded", () => {
     ).toLocaleDateString("es-AR");
     const html = `
       <div id="cartelBloqueoAnual" style="position: sticky; top: 0; z-index: 50; background: #dc2626; color: white; padding: 14px 20px; border-radius: 8px; margin-bottom: 16px; font-weight: bold; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">
-        ⛔ Este paciente ya tiene un Día Preventivo cerrado el ${fechaLegible}.
-        Todavía faltan ${bloqueo.diasRestantes} días para cumplir el año. Podés revisar el caso, pero NO se va a poder guardar un nuevo cierre.
+        <div>
+          ⛔ Este paciente ya tiene un Día Preventivo cerrado el ${fechaLegible}.
+          Todavía faltan ${bloqueo.diasRestantes} días para cumplir el año. Podés revisar el caso, pero NO se va a poder guardar un nuevo cierre — salvo que sea una corrección del que ya existe.
+        </div>
+        <div id="bloqueEdicionCierre" style="margin-top: 10px;">
+          <button type="button" id="btnEditarCierreAnterior" style="background:white; color:#dc2626; font-weight:bold; padding:6px 14px; border-radius:6px; border:none; cursor:pointer;">
+            ✏️ Editar cierre anterior (corregir un error de carga)
+          </button>
+        </div>
       </div>`;
     if (cartel) {
       cartel.outerHTML = html;
@@ -90,6 +184,24 @@ document.addEventListener("DOMContentLoaded", () => {
         .getElementById("main-content")
         .insertAdjacentHTML("afterbegin", html);
     }
+
+    document
+      .getElementById("btnEditarCierreAnterior")
+      ?.addEventListener("click", () => {
+        const motivo = prompt(
+          "Motivo de la corrección (obligatorio — quedará guardado junto con el registro original, que no se borra):",
+        );
+        if (!motivo || !motivo.trim()) {
+          alert("Necesitás indicar el motivo para poder corregir el cierre.");
+          return;
+        }
+        window._modoCorreccion = true;
+        window._motivoCorreccion = motivo.trim();
+        prefillFormDesdeUltimoDP(window._datosPaciente?.ultimoDP);
+        const bloque = document.getElementById("bloqueEdicionCierre");
+        if (bloque)
+          bloque.innerHTML = `✅ Modo corrección activo — el formulario se precargó con los datos del cierre del ${fechaLegible}. Corregí lo que esté mal y guardá normalmente.`;
+      });
   }
   const prevStepBtn = document.getElementById("prev-step-btn");
   const nextStepBtn = document.getElementById("next-step-btn");
@@ -1300,13 +1412,13 @@ document.addEventListener("DOMContentLoaded", () => {
     formData["Edad"] = pacienteEdadInput.value.trim();
     formData["Sexo"] = sexoSelect.value.trim();
 
-    if (window._cierreBloqueadoAnual) {
+    if (window._cierreBloqueadoAnual && !window._modoCorreccion) {
       const b = window._cierreBloqueadoAnual;
       const fechaLegible = new Date(
         b.fechaUltimoCierre + "T00:00:00",
       ).toLocaleDateString("es-AR");
       alert(
-        `⛔ No se puede guardar este cierre.\n\nEste paciente ya tiene un Día Preventivo cerrado el ${fechaLegible}. Todavía faltan ${b.diasRestantes} días para cumplir el año.`,
+        `⛔ No se puede guardar este cierre.\n\nEste paciente ya tiene un Día Preventivo cerrado el ${fechaLegible}. Todavía faltan ${b.diasRestantes} días para cumplir el año.\n\nSi lo que necesitás es corregir un dato mal cargado de ese cierre, usá el botón "Editar cierre anterior" en el cartel rojo.`,
       );
       resetForm();
       return;
@@ -1381,11 +1493,27 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     formData.discrepanciasConfirmadas = discrepanciasConfirmadas;
 
+    if (window._modoCorreccion) {
+      formData.id_registro_original = window._datosPaciente?.ultimoDP?.id;
+      formData.motivo_correccion = window._motivoCorreccion || "";
+      if (!formData.id_registro_original) {
+        alert(
+          "No se encontró el registro original a corregir. Volvé a cargar el DNI e intentá de nuevo.",
+        );
+        guardarCierreBtn.disabled = false;
+        guardarCierreBtn.textContent = "Guardar Cierre";
+        return;
+      }
+    }
+
     guardarCierreBtn.disabled = true;
     guardarCierreBtn.textContent = "Guardando...";
 
     try {
-      const response = await fetch("/api/cierre/guardar", {
+      const endpoint = window._modoCorreccion
+        ? "/api/cierre/corregir"
+        : "/api/cierre/guardar";
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
