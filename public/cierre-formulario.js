@@ -223,6 +223,58 @@ document.addEventListener("DOMContentLoaded", () => {
           bloque.innerHTML = `✅ Modo corrección activo — el formulario se precargó con los datos del cierre del ${fechaLegible}. Corregí lo que esté mal y guardá normalmente.`;
       });
   }
+  // ── CARTEL DE PRÁCTICAS OBLIGATORIAS FALTANTES ──
+  // control = { aplica, bloquea: [...], justifica: [...] } (viene del server).
+  // - bloquea: no se puede cerrar; debe comunicarse con coordinación central.
+  // - justifica (Chagas / Espirometría): deja cerrar, con observación obligatoria.
+  const OBS_JUSTIFICACION = {
+    Chagas: "Observaciones_Chagas",
+    "Espirometría": "Observaciones_EPOC",
+  };
+
+  function mostrarCartelFaltantes(control) {
+    document.getElementById("cartelFaltantes")?.remove();
+    if (!control || !control.aplica) return;
+    const bloquea = control.bloquea || [];
+    const justifica = control.justifica || [];
+    if (bloquea.length === 0 && justifica.length === 0) return;
+
+    const lista = (arr) =>
+      "<ul style='margin:8px 0 0 22px; list-style:disc; text-align:left;'>" +
+      arr.map((p) => `<li>${p}</li>`).join("") +
+      "</ul>";
+
+    const html =
+      bloquea.length > 0
+        ? `<div id="cartelFaltantes" style="background:#dc2626; color:white; padding:16px 20px; border-radius:8px; margin-bottom:16px; box-shadow:0 2px 8px rgba(0,0,0,0.2);">
+             <div style="font-weight:bold; font-size:16px;">⛔ No se puede cerrar el Día Preventivo de este paciente</div>
+             <div style="margin-top:6px;">Faltan cargar estas prácticas obligatorias para cerrar apropiadamente el formulario:</div>
+             ${lista(bloquea)}
+             ${justifica.length ? `<div style="margin-top:8px;">También deberá justificar: ${justifica.join(", ")}.</div>` : ""}
+             <div style="margin-top:10px; font-weight:bold;">Debe comunicarse con la coordinación central del programa.</div>
+           </div>`
+        : `<div id="cartelFaltantes" style="background:#fef3c7; color:#92400e; border:1px solid #f59e0b; padding:14px 20px; border-radius:8px; margin-bottom:16px;">
+             <div style="font-weight:bold;">⚠️ Prácticas sin resultado que debe justificar</div>
+             ${lista(justifica)}
+             <div style="margin-top:6px;">Puede cerrar el formulario, pero tiene que explicar en la observación de cada una por qué no se realizó.</div>
+           </div>`;
+
+    document.getElementById("main-content").insertAdjacentHTML("afterbegin", html);
+  }
+
+  // Marca como obligatorias las observaciones de las prácticas a justificar.
+  function exigirJustificaciones(control) {
+    (control?.justifica || []).forEach((p) => {
+      const campo = OBS_JUSTIFICACION[p];
+      const el = campo && cierreForm.querySelector(`[name="${campo}"]`);
+      if (el) {
+        el.required = true;
+        el.placeholder = `Obligatorio: motivo por el que no se realizó ${p}`;
+        el.classList.add("border-yellow-500");
+      }
+    });
+  }
+
   const prevStepBtn = document.getElementById("prev-step-btn");
   const nextStepBtn = document.getElementById("next-step-btn");
   const guardarCierreBtn = document.getElementById("guardar-cierre-btn");
@@ -1158,6 +1210,8 @@ document.addEventListener("DOMContentLoaded", () => {
     window._cierreBloqueadoAnual = null;
     window._valoresEsperadosLab = {};
     mostrarCartelBloqueoAnual(null);
+    window._controlCierre = null;
+    mostrarCartelFaltantes(null);
 
     // Mostrar formulario de cierre
     cierreForm.classList.remove("hidden");
@@ -1216,7 +1270,10 @@ document.addEventListener("DOMContentLoaded", () => {
       const response = await fetch("/cargar-datos-paciente", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dni }),
+        body: JSON.stringify({
+          dni,
+          id_sede_dp: window.dpProfesional?.id_sede_dp || null,
+        }),
       });
       console.log("Response status:", response.status);
       const data = await response.json();
@@ -1236,6 +1293,15 @@ document.addEventListener("DOMContentLoaded", () => {
         ? data.bloqueoCierreAnual
         : null;
       mostrarCartelBloqueoAnual(window._cierreBloqueadoAnual);
+
+      // ── PRÁCTICAS OBLIGATORIAS FALTANTES ──
+      // Si el paciente ya tiene un cierre este año (cartel rojo anual), no se
+      // está haciendo un cierre nuevo sino, a lo sumo, una corrección: ahí
+      // este control no corresponde.
+      window._controlCierre = window._cierreBloqueadoAnual
+        ? null
+        : data.controlCierre || null;
+      mostrarCartelFaltantes(window._controlCierre);
 
       // Valores esperados de laboratorio (para el cruce al momento de guardar)
       window._valoresEsperadosLab = data.valoresEsperadosLab || {};
@@ -1359,6 +1425,17 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    // Si faltan prácticas obligatorias, se muestran los datos del paciente y
+    // el cartel rojo, pero NO el formulario: no se puede cerrar.
+    if (window._controlCierre?.bloquea?.length > 0) {
+      patientInfoDisplay.classList.remove("hidden");
+      cierreForm.classList.add("hidden");
+      document
+        .getElementById("cartelFaltantes")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+
     // Mostrar campos fijos de paciente y el formulario de cierre
     patientInfoDisplay.classList.remove("hidden");
     cierreForm.classList.remove("hidden");
@@ -1373,6 +1450,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Generar y mostrar el primer paso del formulario dinámico
     generateFormSteps();
+    exigirJustificaciones(window._controlCierre);
   });
 
   // Event Listeners para los botones de navegación del formulario multi-paso
@@ -1441,6 +1519,17 @@ document.addEventListener("DOMContentLoaded", () => {
         `⛔ No se puede guardar este cierre.\n\nEste paciente ya tiene un Día Preventivo cerrado el ${fechaLegible}. Todavía faltan ${b.diasRestantes} días para cumplir el año.\n\nSi lo que necesitás es corregir un dato mal cargado de ese cierre, usá el botón "Editar cierre anterior" en el cartel rojo.`,
       );
       resetForm();
+      return;
+    }
+
+    // Red de seguridad: si faltan prácticas obligatorias no se envía
+    // (el server igual lo vuelve a controlar).
+    if (window._controlCierre?.bloquea?.length > 0 && !window._modoCorreccion) {
+      alert(
+        "⛔ No se puede cerrar el Día Preventivo: faltan prácticas obligatorias.\n\n- " +
+          window._controlCierre.bloquea.join("\n- ") +
+          "\n\nComuníquese con la coordinación central del programa.",
+      );
       return;
     }
 

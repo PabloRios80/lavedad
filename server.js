@@ -15,6 +15,69 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY,
 );
 
+// ====================================================================
+// CONTROL DE PRÁCTICAS OBLIGATORIAS ANTES DEL CIERRE DE DP
+// ====================================================================
+// Sedes donde no se puede cerrar un DP con prácticas obligatorias faltantes.
+// Por ahora solo ATEM (id_sede_dp = 2). Para sumar otra sede, agregar su id.
+const SEDES_CONTROL_FALTANTES = [2];
+
+// Campo de observación del formulario que justifica cada práctica de nivel
+// "justifica" (deja cerrar, pero con la observación completa).
+const OBS_JUSTIFICACION = {
+  Chagas: "Observaciones_Chagas",
+  "Espirometría": "Observaciones_EPOC",
+};
+
+function fechaLocalHoy() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Argentina/Buenos_Aires",
+  }).format(new Date());
+}
+
+// Sede real del cierre: la admisión del día en tablero_dia; si no hay,
+// la sede del profesional (mismo criterio que usa /api/cierre/guardar).
+async function sedeRealDelCierre(dni, idSedeProfesional) {
+  let idSede = idSedeProfesional ? parseInt(idSedeProfesional) : null;
+  try {
+    const { data: admisionHoy } = await supabase
+      .from("tablero_dia")
+      .select("id_sede_dp")
+      .eq("dni", dni)
+      .eq("fecha", fechaLocalHoy())
+      .not("id_sede_dp", "is", null)
+      .maybeSingle();
+    if (admisionHoy?.id_sede_dp) idSede = admisionHoy.id_sede_dp;
+  } catch (e) {
+    console.warn("sedeRealDelCierre: no se pudo leer tablero_dia:", e.message);
+  }
+  return idSede;
+}
+
+// Devuelve { aplica, bloquea: [...], justifica: [...] }.
+// La lógica (qué es obligatorio, vigencias, excepciones aprobadas en el CRM)
+// vive en la función faltantes_cierre_dp de Supabase.
+async function controlFaltantesCierre(dni, idSedeProfesional) {
+  const idSede = await sedeRealDelCierre(dni, idSedeProfesional);
+  if (!SEDES_CONTROL_FALTANTES.includes(idSede)) {
+    return { aplica: false, idSede, bloquea: [], justifica: [] };
+  }
+  const { data, error } = await supabase.rpc("faltantes_cierre_dp", {
+    p_dni: String(dni).trim(),
+    p_fecha: fechaLocalHoy(),
+  });
+  if (error) throw error;
+  const filas = data || [];
+  return {
+    aplica: true,
+    idSede,
+    bloquea: filas.filter((f) => f.nivel === "bloquea").map((f) => f.practica),
+    justifica: filas
+      .filter((f) => f.nivel === "justifica")
+      .map((f) => f.practica),
+  };
+}
+
 // Limitar el tamaño del heap de Node.js
 const heapSizeLimit = 8192 * 1024 * 1024; // 8GB en bytes
 if (process.memoryUsage().heapTotal > heapSizeLimit) {
@@ -749,6 +812,47 @@ app.post("/api/cierre/guardar", async (req, res) => {
     // solo lo registramos, para no frenar el trabajo por una falla técnica.
   }
 
+  // ── VALIDACIÓN SERVER-SIDE DE PRÁCTICAS OBLIGATORIAS (sedes con control) ──
+  // Se repite acá aunque el formulario ya lo haya avisado, para que no se
+  // pueda saltear desde el navegador. Va antes de escribir nada.
+  try {
+    const control = await controlFaltantesCierre(dni, formData["id_sede_dp"]);
+    if (control.aplica) {
+      if (control.bloquea.length > 0) {
+        console.warn(
+          `⛔ Cierre bloqueado DNI ${dni} (sede ${control.idSede}) — faltan: ${control.bloquea.join(", ")}`,
+        );
+        return res.status(409).json({
+          success: false,
+          error:
+            "No se puede cerrar el Día Preventivo: faltan prácticas obligatorias.\n\n" +
+            "Prácticas que faltan cargar:\n- " +
+            control.bloquea.join("\n- ") +
+            "\n\nComuníquese con la coordinación central del programa.",
+          faltantes: control.bloquea,
+        });
+      }
+      const sinJustificar = control.justifica.filter((p) => {
+        const campoObs = OBS_JUSTIFICACION[p];
+        return campoObs && !String(formData[campoObs] || "").trim();
+      });
+      if (sinJustificar.length > 0) {
+        return res.status(400).json({
+          success: false,
+          error:
+            "Para cerrar tenés que justificar en observaciones por qué no se realizó: " +
+            sinJustificar.join(", ") +
+            ".",
+          sinJustificar,
+        });
+      }
+    }
+  } catch (e) {
+    console.error("Error verificando prácticas obligatorias:", e.message);
+    // Igual que el bloqueo anual: una falla técnica no frena el cierre,
+    // queda registrada en los logs.
+  }
+
   try {
     await doc.loadInfo();
     const pacientesSheet = doc.sheetsByTitle["Hoja 1"];
@@ -1364,7 +1468,7 @@ app.post("/guardar-consulta", async (req, res) => {
 
 // Cargar datos del paciente desde IAPOS + Supabase
 app.post("/cargar-datos-paciente", async (req, res) => {
-  const { dni } = req.body;
+  const { dni, id_sede_dp } = req.body;
   if (!dni) return res.status(400).json({ error: "DNI requerido." });
 
   const hoy = new Date().toISOString().split("T")[0];
@@ -1980,6 +2084,14 @@ app.post("/cargar-datos-paciente", async (req, res) => {
     // No bloqueamos la carga del paciente por un error acá.
   }
 
+  // ── PRÁCTICAS OBLIGATORIAS FALTANTES (solo sedes con control) ──
+  let controlCierre = { aplica: false, bloquea: [], justifica: [] };
+  try {
+    controlCierre = await controlFaltantesCierre(String(dni).trim(), id_sede_dp);
+  } catch (e) {
+    console.error("Error calculando prácticas obligatorias faltantes:", e.message);
+  }
+
   res.json({
     success: true,
     iapos: datosIAPOS,
@@ -1990,6 +2102,7 @@ app.post("/cargar-datos-paciente", async (req, res) => {
     bloqueoCierreAnual,
     valoresEsperadosLab,
     excepcionesNombreObservacion: EXCEPCIONES_NOMBRE_OBSERVACION,
+    controlCierre,
   });
 });
 function mapearTipoEstudio(descripcion) {
