@@ -275,6 +275,41 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // ── DATOS DEL PACIENTE OBLIGATORIOS ──
+  // Están fuera del <form> (bloque "Datos del Paciente"), así que la
+  // validación paso a paso no los veía. Son obligatorios siempre, y más
+  // cuando el padrón no responde y el médico los carga a mano.
+  function validarDatosPaciente() {
+    const campos = [
+      [pacienteApellidoInput, "Apellido"],
+      [pacienteNombreInput, "Nombre"],
+      [pacienteEdadInput, "Edad"],
+      [sexoSelect, "Sexo"],
+    ];
+    const faltan = [];
+    campos.forEach(([el, nombre]) => {
+      const vacio = !el || !String(el.value || "").trim();
+      const edadInvalida =
+        nombre === "Edad" && !vacio &&
+        !(Number(el.value) >= 0 && Number(el.value) <= 120);
+      if (vacio || edadInvalida) {
+        faltan.push(edadInvalida ? "Edad (valor inválido)" : nombre);
+        el?.classList.add("border-red-500", "ring-red-500");
+      } else {
+        el.classList.remove("border-red-500", "ring-red-500");
+      }
+    });
+    if (faltan.length > 0) {
+      alert(
+        "Completá los datos del paciente antes de continuar:\n\n- " +
+          faltan.join("\n- "),
+      );
+      patientInfoDisplay.scrollIntoView({ behavior: "smooth", block: "center" });
+      return false;
+    }
+    return true;
+  }
+
   const prevStepBtn = document.getElementById("prev-step-btn");
   const nextStepBtn = document.getElementById("next-step-btn");
   const guardarCierreBtn = document.getElementById("guardar-cierre-btn");
@@ -1329,8 +1364,19 @@ document.addEventListener("DOMContentLoaded", () => {
         // sabemos si está activo o no. Se deja continuar con carga
         // manual, con aviso, para no frenar el trabajo por una falla
         // técnica ajena al paciente.
+        // Mientras tanto, se completan los datos con la hoja de vida
+        // (si el afiliado la tiene), así el médico no los tipea de cero.
+        const af = data.afiliado;
+        if (af) {
+          pacienteApellidoInput.value = af.apellido || "";
+          pacienteNombreInput.value = af.nombre || "";
+          pacienteEdadInput.value = af.edad ?? "";
+          const sx = String(af.sexo_biologico || af.sexo || "").toUpperCase();
+          if (sexoSelect && sx) sexoSelect.value = sx.startsWith("F") ? "F" : "M";
+        }
         alert(
-          "⚠️ No se pudo verificar el estado del afiliado en IAPOS (padrón no respondió). Verificá manualmente antes de continuar.",
+          "⚠️ No se pudo verificar el estado del afiliado en IAPOS (padrón no respondió). Verificá manualmente antes de continuar." +
+            (af ? "\n\nLos datos del paciente se completaron con su hoja de vida." : ""),
         );
       } else {
         // IAPOS respondió explícitamente que el afiliado NO está activo:
@@ -1428,7 +1474,14 @@ document.addEventListener("DOMContentLoaded", () => {
     // Si faltan prácticas obligatorias, se muestran los datos del paciente y
     // el cartel rojo, pero NO el formulario: no se puede cerrar.
     if (window._controlCierre?.bloquea?.length > 0) {
-      patientInfoDisplay.classList.remove("hidden");
+      // Los datos del paciente se muestran solo si hay algo para mostrar
+      // (si el padrón no respondió y no tiene hoja de vida, quedarían vacíos
+      // y parecería que el formulario se trabó).
+      if (pacienteApellidoInput.value.trim()) {
+        patientInfoDisplay.classList.remove("hidden");
+      } else {
+        patientInfoDisplay.classList.add("hidden");
+      }
       cierreForm.classList.add("hidden");
       document
         .getElementById("cartelFaltantes")
@@ -1455,6 +1508,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Event Listeners para los botones de navegación del formulario multi-paso
   nextStepBtn.addEventListener("click", () => {
+    // Los datos del paciente tienen que estar completos antes de avanzar
+    if (!validarDatosPaciente()) return;
+
     // Validar campos de la página actual antes de avanzar
     const currentStepFields = formSteps[currentStep].querySelectorAll(
       "input, select, textarea",
@@ -1490,6 +1546,8 @@ document.addEventListener("DOMContentLoaded", () => {
   // Event Listener para el botón "Guardar Cierre"
   guardarCierreBtn.addEventListener("click", async (e) => {
     e.preventDefault(); // Prevenir el envío tradicional del formulario
+
+    if (!validarDatosPaciente()) return;
 
     // Validar todos los campos del formulario (incluyendo el último paso)
     const allFormInputs = cierreForm.querySelectorAll(

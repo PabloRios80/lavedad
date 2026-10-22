@@ -780,6 +780,18 @@ app.post("/api/cierre/guardar", async (req, res) => {
     });
   }
 
+  // Datos del paciente obligatorios (el médico los carga a mano si el
+  // padrón no responde y no hay hoja de vida).
+  const faltanDatos = ["Apellido", "Nombre", "Edad", "Sexo"].filter(
+    (c) => !String(formData[c] || "").trim(),
+  );
+  if (faltanDatos.length > 0) {
+    return res.status(400).json({
+      success: false,
+      error: `Faltan datos del paciente: ${faltanDatos.join(", ")}.`,
+    });
+  }
+
   // ── VALIDACIÓN SERVER-SIDE DEL BLOQUEO ANUAL ──
   // No confiar solo en que el frontend respete el aviso: se verifica de
   // nuevo acá, independiente de lo que haya hecho el navegador.
