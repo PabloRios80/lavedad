@@ -39,9 +39,10 @@ const supabase = createClient(
 // ====================================================================
 // CONTROL DE PRÁCTICAS OBLIGATORIAS ANTES DEL CIERRE DE DP
 // ====================================================================
-// Sedes donde no se puede cerrar un DP con prácticas obligatorias faltantes.
-// Por ahora solo ATEM (id_sede_dp = 2). Para sumar otra sede, agregar su id.
-const SEDES_CONTROL_FALTANTES = [2];
+// Sedes donde se controla el cierre de DP (ciclo nuevo: hoja de vida,
+// plan del algoritmo y prácticas obligatorias con resultado vigente).
+// null = TODAS las sedes. Para limitarlo, poner los ids, ej. [2] = solo ATEM.
+const SEDES_CONTROL_FALTANTES = null;
 
 // Campo de observación del formulario que justifica cada práctica de nivel
 // "justifica" (deja cerrar, pero con la observación completa).
@@ -80,7 +81,7 @@ async function sedeRealDelCierre(dni, idSedeProfesional) {
 // vive en la función faltantes_cierre_dp de Supabase.
 async function controlFaltantesCierre(dni, idSedeProfesional) {
   const idSede = await sedeRealDelCierre(dni, idSedeProfesional);
-  if (!SEDES_CONTROL_FALTANTES.includes(idSede)) {
+  if (SEDES_CONTROL_FALTANTES && !SEDES_CONTROL_FALTANTES.includes(idSede)) {
     return { aplica: false, idSede, bloquea: [], justifica: [] };
   }
   const { data, error } = await supabase.rpc("faltantes_cierre_dp", {
