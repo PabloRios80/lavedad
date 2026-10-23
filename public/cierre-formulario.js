@@ -1,4 +1,4 @@
-console.log("%c🔵 cierre-formulario.js VERSION 2026-08-31-cruce-lab", "background: blue; color: white; font-size: 14px; padding: 4px;");
+console.log("%c🔵 cierre-formulario.js VERSION 2026-10-23-control-faltantes", "background: blue; color: white; font-size: 14px; padding: 4px;");
 document.addEventListener("DOMContentLoaded", () => {
   const unauthorizedMessage = document.getElementById("unauthorized-message");
   const mainContent = document.getElementById("main-content");
@@ -1474,15 +1474,26 @@ document.addEventListener("DOMContentLoaded", () => {
     // Si faltan prácticas obligatorias, se muestran los datos del paciente y
     // el cartel rojo, pero NO el formulario: no se puede cerrar.
     if (window._controlCierre?.bloquea?.length > 0) {
-      // Los datos del paciente se muestran solo si hay algo para mostrar
-      // (si el padrón no respondió y no tiene hoja de vida, quedarían vacíos
-      // y parecería que el formulario se trabó).
-      if (pacienteApellidoInput.value.trim()) {
-        patientInfoDisplay.classList.remove("hidden");
-      } else {
-        patientInfoDisplay.classList.add("hidden");
-      }
+      // Cierre bloqueado: no se muestran los campos del paciente (en gris y
+      // sin poder editarse parecía que el formulario estaba trabado). El
+      // nombre, si se conoce, va dentro del cartel rojo.
+      patientInfoDisplay.classList.add("hidden");
       cierreForm.classList.add("hidden");
+      const nombrePac = [pacienteApellidoInput.value, pacienteNombreInput.value]
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .join(", ");
+      const cartel = document.getElementById("cartelFaltantes");
+      if (cartel) {
+        cartel.insertAdjacentHTML(
+          "afterbegin",
+          `<div style="font-size:13px; opacity:.9; margin-bottom:6px;">Paciente: DNI ${dni}${nombrePac ? " — " + nombrePac : ""}</div>`,
+        );
+        cartel.insertAdjacentHTML(
+          "beforeend",
+          `<div style="margin-top:8px; font-size:13px; opacity:.9;">El formulario de cierre se habilita cuando estén cargados los resultados (o la coordinación apruebe la excepción en el CRM).</div>`,
+        );
+      }
       document
         .getElementById("cartelFaltantes")
         ?.scrollIntoView({ behavior: "smooth", block: "start" });

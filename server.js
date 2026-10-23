@@ -169,10 +169,19 @@ const SPREADSHEET_ID = "15YPfBG9PBfN3nBW5xXJYjIXEgYIS9z71pI0VpeCtAAU";
 const API_BASE_URL =
   process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
 
+// Sin caché: que cada sede reciba siempre la última versión del formulario
+// (antes un navegador o un proxy podía quedarse con una versión vieja).
+function sinCache(res) {
+  res.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+  res.set("Pragma", "no-cache");
+  res.set("Expires", "0");
+}
 app.get("/cierre-formulario.html", (req, res) => {
+  sinCache(res);
   res.sendFile(path.join(__dirname, "private", "cierre-formulario.html"));
 });
 app.get("/cierre-formulario.js", (req, res) => {
+  sinCache(res);
   res.sendFile(path.join(__dirname, "public", "cierre-formulario.js"));
 });
 app.get("/consultas.html", (req, res) => {
