@@ -7,6 +7,27 @@ const {
 
 const { createClient } = require("@supabase/supabase-js");
 const axios = require("axios");
+
+// ── PADRÓN IAPOS CON CORTE RÁPIDO ──
+// Con el padrón caído cada consulta esperaba 10 s o más (si la conexión
+// quedaba colgada). Ahora: tope duro de 5 s y, si falla, no se vuelve a
+// consultar durante 5 minutos (se sigue como "sin datos del padrón").
+let padronIaposEnPausaHasta = 0;
+async function padronPost(url, body, opciones = {}) {
+  if (Date.now() < padronIaposEnPausaHasta) {
+    throw new Error("Padrón IAPOS no disponible (reintento automático en unos minutos)");
+  }
+  const opts = { ...opciones, timeout: 4000 };
+  if (typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function") {
+    opts.signal = AbortSignal.timeout(5000);
+  }
+  try {
+    return await axios.post(url, body, opts);
+  } catch (e) {
+    padronIaposEnPausaHasta = Date.now() + 5 * 60 * 1000;
+    throw e;
+  }
+}
 const https = require("https");
 const agenteIapos = new https.Agent({ rejectUnauthorized: false });
 
@@ -1510,9 +1531,12 @@ app.post("/cargar-datos-paciente", async (req, res) => {
         </soap:Body>
     </soap:Envelope>`;
 
+  // El padrón de IAPOS se consulta EN PARALELO con las búsquedas en
+  // Supabase (antes iba primero y, con el padrón caído, todo esperaba).
+  const promesaIAPOS = (async () => {
   let datosIAPOS = null;
   try {
-    const iaposRes = await axios.post(
+    const iaposRes = await padronPost(
       "https://aswe.santafe.gov.ar/iapos-sw-srvt/servlet/abewsvalidaafi",
       soapBody,
       {
@@ -1541,52 +1565,58 @@ app.post("/cargar-datos-paciente", async (req, res) => {
   } catch (e) {
     console.error("Error IAPOS:", e.message);
   }
-  // 2. Buscar hoja de vida en Supabase
-  const { data: afiliado } = await supabase
-    .from("afiliados")
-    .select("*")
-    .eq("dni", dni)
-    .single();
+  return datosIAPOS;
+  })();
 
-  let menor = null;
-  if (!afiliado) {
-    const { data: afiliadoMenor } = await supabase
+  // 2-5. Búsquedas en Supabase, todas juntas en paralelo (mismas consultas
+  // que antes, solo que ya no van una detrás de otra).
+  const [
+    { data: afiliado },
+    { data: afiliadoMenor },
+    { data: ultimoDP },
+    { data: practicas },
+    { data: enfermeria },
+  ] = await Promise.all([
+    // 2. Hoja de vida (adulto)
+    supabase.from("afiliados").select("*").eq("dni", dni).single(),
+    // 2b. Hoja de vida (menor) — solo se usa si no hay de adulto
+    supabase
       .from("afiliados_menores")
       .select("*")
       .eq("dni", dni)
       .order("fecha_carga", { ascending: false })
       .limit(1)
-      .single();
-    menor = afiliadoMenor || null;
-  }
+      .single(),
 
-  // 3. Buscar último DP (solo la versión ACTIVA — si hubo una corrección,
-  // acá tiene que verse siempre la vigente, nunca la superada).
-  // Trae todos los campos clínicos (no solo los 6 de antes) porque ahora
-  // también se usa para precargar el formulario cuando el profesional
-  // corrige un cierre anterior.
-  const { data: ultimoDP } = await supabase
-    .from("historial_dia_preventivo")
-    .select("*")
-    .eq("dni", dni)
-    .eq("estado_registro", "activo")
-    .order("fechax", { ascending: false })
-    .limit(1)
-    .single();
-  // 4. Buscar prácticas realizadas
-  const { data: practicas } = await supabase
-    .from("practicas_autorizadas")
-    .select("*")
-    .eq("dni", dni)
-    .eq("estado", "REALIZADA");
-  // 5. Buscar datos de enfermería
-  const { data: enfermeria } = await supabase
-    .from("enfermeria_consultas")
-    .select("presion_arterial, peso_kg, altura_cm")
-    .eq("dni", dni)
-    .order("fecha_cierre_enf", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    // 3. Último DP (solo la versión ACTIVA — si hubo una corrección, acá
+    // tiene que verse siempre la vigente, nunca la superada). Trae todos
+    // los campos clínicos porque también se usa para precargar el
+    // formulario cuando el profesional corrige un cierre anterior.
+    supabase
+      .from("historial_dia_preventivo")
+      .select("*")
+      .eq("dni", dni)
+      .eq("estado_registro", "activo")
+      .order("fechax", { ascending: false })
+      .limit(1)
+      .single(),
+    // 4. Prácticas realizadas
+    supabase
+      .from("practicas_autorizadas")
+      .select("*")
+      .eq("dni", dni)
+      .eq("estado", "REALIZADA"),
+    // 5. Datos de enfermería
+    supabase
+      .from("enfermeria_consultas")
+      .select("presion_arterial, peso_kg, altura_cm")
+      .eq("dni", dni)
+      .order("fecha_cierre_enf", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+  const menor = !afiliado ? afiliadoMenor || null : null;
+  const datosIAPOS = await promesaIAPOS;
   // 6. Generar alertas clínicas con campo asociado
   const alertas = [];
 
@@ -2179,7 +2209,7 @@ app.get("/verificar-afiliado/:dni", async (req, res) => {
     </soap:Envelope>`;
 
   try {
-    const iaposRes = await axios.post(
+    const iaposRes = await padronPost(
       "https://aswe.santafe.gov.ar/iapos-sw-srvt/servlet/abewsvalidaafi",
       soapBody,
       {
