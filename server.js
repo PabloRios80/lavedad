@@ -7,6 +7,7 @@ const {
 
 const { createClient } = require("@supabase/supabase-js");
 const axios = require("axios");
+const { programarAvisoPortal, procesarPendientes } = require("./avisoPortal");
 
 // ── PADRÓN IAPOS CON CORTE RÁPIDO ──
 // Con el padrón caído cada consulta esperaba 10 s o más (si la conexión
@@ -1082,6 +1083,8 @@ app.post("/api/cierre/guardar", async (req, res) => {
         console.error("Error al guardar en Supabase:", supabaseError);
       } else {
         console.log("✅ Cierre guardado en Supabase para DNI:", dni);
+        programarAvisoPortal(supabase, { dni, nombre: formData["Nombre"] })
+  .catch((e) => console.error("Aviso portal:", e.message));
 
         // Registrar la consulta médica como acción facturable (módulo DP)
         try {
@@ -2288,6 +2291,10 @@ async function iniciarApp() {
   }
   app.listen(PORT, () => {
     console.log(`✅ Servidor funcionando en http://localhost:${PORT}`);
+    setInterval(
+  () => procesarPendientes(supabase).catch((e) => console.error("Barrido avisos:", e.message)),
+  10 * 60 * 1000,
+);
   });
 }
 
