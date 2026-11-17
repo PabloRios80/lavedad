@@ -18,6 +18,14 @@ const MAX_INTENTOS = 3;
 const MODO = () => (process.env.AVISO_PORTAL_MODO || "apagado").toLowerCase();
 const PORTAL_URL = () =>
   process.env.PORTAL_URL || "https://portal.diapreventivoiapos.com/";
+// Freno de pruebas: si AVISO_DNI_PERMITIDOS tiene DNIs, SOLO esos se procesan.
+// Los demás quedan intactos (estado "pendiente") y salen cuando se quite la variable.
+const PERMITIDOS = () =>
+  (process.env.AVISO_DNI_PERMITIDOS || "")
+    .split(",")
+    .map((s) => normDni(s))
+    .filter(Boolean);
+
 const EXCLUIDOS = () =>
   (process.env.AVISO_DNI_EXCLUIDOS || "12884070")
     .split(",")
@@ -259,6 +267,8 @@ async function procesarAviso(supabase, aviso, opts = {}) {
   if (modo === "apagado" || enProceso.has(aviso.id)) return;
   enProceso.add(aviso.id);
   try {
+    const permitidos = PERMITIDOS();
+    if (permitidos.length && !permitidos.includes(normDni(aviso.dni))) return; // modo prueba: no tocar
     if (EXCLUIDOS().includes(normDni(aviso.dni))) {
       return await marcar(supabase, aviso.id, { estado: "retenido", motivo_retencion: "DNI de prueba (excluido)" });
     }
