@@ -91,8 +91,20 @@ const PLACEHOLDER = /^(prueba|test|asdf+|xxx+|\.+|-+|ok ok|aaa+)$/;
 // Devuelve { ok, manual: [...], reevaluable: [...] }
 //  manual       -> requiere que una persona lo resuelva (no se reintenta solo)
 //  reevaluable  -> se vuelve a evaluar solo más tarde (ej. estudio pendiente)
-function evaluarCierre(f) {
+// Palabras clave para reconocer, en excepciones_practicas, la práctica de cada campo
+const CLAVES_EXCEPCION = {
+  cancer_cervico_hpv: ["hpv"], cancer_cervico_pap: ["papanicolau"], somf: ["somf", "sangre oculta"],
+  cancer_mama_mamografia: ["mamograf"], cancer_mama_eco_mamaria: ["mamaria"],
+  cancer_colon_colonoscopia: ["colonoscop", "vcc"], prostata_psa: ["psa", "prostatico"],
+  osteoporosis: ["densitometr"], aneurisma_aorta: ["abdominal"], erc: ["creatinina", "filtrado"],
+  vih: ["vih"], hepatitis_b: ["hepatitis b"], hepatitis_c: ["hepatitis c"], vdrl: ["vdrl"], chagas: ["chagas"],
+};
+
+function evaluarCierre(f, excepciones = []) {
   const manual = [];
+  const excep = excepciones.map((e) => norm(e));
+  const tieneExcepcion = (campo) =>
+    (CLAVES_EXCEPCION[campo] || []).some((k) => excep.some((e) => e.includes(k)));
   const reevaluable = [];
   const todos = [...SENSIBLES, ...HALLAZGOS];
 
@@ -122,7 +134,8 @@ function evaluarCierre(f) {
 
   // 4) Estudios pendientes -> se reevalúa solo.
   for (const [campo, , nombre] of todos) {
-    if (esPendiente(f[campo])) reevaluable.push(`${nombre} pendiente`);
+    // Pendiente con excepción aprobada por Coordinación = no se hizo a propósito: no retiene.
+    if (esPendiente(f[campo]) && !tieneExcepcion(campo)) reevaluable.push(`${nombre} pendiente`);
   }
 
   // 5) Incoherencias de sexo.
@@ -255,7 +268,10 @@ async function procesarAviso(supabase, aviso, opts = {}) {
       return await marcar(supabase, aviso.id, { estado: "retenido", motivo_retencion: "PENDIENTE: no se encontró el cierre en el historial" });
     }
 
-    const ev = evaluarCierre(fila);
+    const { data: exc } = await supabase
+      .from("excepciones_practicas").select("descripcion_practica")
+      .eq("dni", normDni(aviso.dni)).eq("estado", "aprobada");
+    const ev = evaluarCierre(fila, (exc || []).map((x) => x.descripcion_practica));
     if (!ev.ok) {
       const motivo = [...ev.manual, ...ev.reevaluable.map((m) => `PENDIENTE: ${m}`)].join(" | ");
       return await marcar(supabase, aviso.id, { estado: "retenido", motivo_retencion: motivo });
