@@ -356,15 +356,19 @@ async function programarAvisoPortal(supabase, { dni, nombre }) {
 async function procesarPendientes(supabase) {
   if (MODO() === "apagado") return { procesados: 0 };
   let n = 0;
-  const { data: reint } = await supabase
-    .from("avisos_portal").select("*").in("estado", ["pendiente", "error"]).lt("intentos", MAX_INTENTOS)
-    .order("actualizado_en", { ascending: true }).limit(25);
+  const permitidos = PERMITIDOS(); // modo prueba: el barrido solo mira estos DNIs
+  let qReint = supabase
+    .from("avisos_portal").select("*").in("estado", ["pendiente", "error"]).lt("intentos", MAX_INTENTOS);
+  if (permitidos.length) qReint = qReint.in("dni", permitidos);
+  const { data: reint } = await qReint.order("actualizado_en", { ascending: true }).limit(25);
   for (const a of reint || []) { await procesarAviso(supabase, a); n++; }
 
   const desde = new Date(Date.now() - 45 * 24 * 3600 * 1000).toISOString();
-  const { data: ret } = await supabase
+  let qRet = supabase
     .from("avisos_portal").select("*").eq("estado", "retenido").ilike("motivo_retencion", "%PENDIENTE:%")
-    .gte("creado_en", desde).order("actualizado_en", { ascending: true }).limit(25);
+    .gte("creado_en", desde);
+  if (permitidos.length) qRet = qRet.in("dni", permitidos);
+  const { data: ret } = await qRet.order("actualizado_en", { ascending: true }).limit(25);
   for (const a of ret || []) { await procesarAviso(supabase, a); n++; }
   return { procesados: n };
 }
