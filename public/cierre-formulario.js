@@ -32,7 +32,70 @@ document.addEventListener("DOMContentLoaded", () => {
   const formStepsContainer = document.getElementById("form-steps-container");
   const progressBar = document.getElementById("progress-bar");
 
+  // ── RESULTADO SIN ESTUDIO CARGADO ──
+  // Si el campo tiene estudio asociado y no hay nada cargado (botón "Ver
+  // Estudio" gris), la única opción sin justificar es "No se realiza"
+  // ("Pendiente" también, porque no es un resultado). Cualquier otro valor
+  // obliga a explicar en la observación del campo, y queda registrado como
+  // novedad para la coordinación.
+  const VALORES_SIN_ESTUDIO_PERMITIDOS = ["No se realiza", "No aplica", "Pendiente"];
+
+  function campoConfigDe(nombre) {
+    return fieldsConfig.find((f) => f.name === nombre);
+  }
+  // Opción neutra de cada campo (VDRL, PSA y Chagas usan "No aplica")
+  function opcionSinEstudio(cfg) {
+    return ["No se realiza", "No aplica"].find((o) => (cfg.options || []).includes(o)) || "";
+  }
+  // La observación de cada campo es el campo "Observaciones_..." que viene
+  // justo después en fieldsConfig (los nombres no siempre coinciden: ERC usa
+  // Observaciones_ECG, PAP usa Observaciones_PAP, etc.)
+  function nombreObsDe(nombre) {
+    const i = fieldsConfig.findIndex((f) => f.name === nombre);
+    const sig = fieldsConfig[i + 1];
+    return sig && sig.name.startsWith("Observaciones_") ? sig.name : `Observaciones_${nombre}`;
+  }
+  function resultadoSinEstudio(selectEl) {
+    const cfg = campoConfigDe(selectEl.name);
+    if (!cfg || !cfg.hasStudyButton) return false;
+    const valor = selectEl.value;
+    if (!valor || VALORES_SIN_ESTUDIO_PERMITIDOS.includes(valor)) return false;
+    // En una corrección, solo se controla lo que el médico cambia ahora
+    if (window._modoCorreccion && selectEl.dataset.valorOriginal === valor) return false;
+    return !resolverEstadoEstudio(cfg.name, cfg.studyType).tieneAlgo;
+  }
+
+  function verificarSinEstudioEnVivo(selectEl) {
+    if (!resultadoSinEstudio(selectEl)) {
+      selectEl.dataset.sinEstudioConfirmado = "";
+      return false;
+    }
+    const cfg = campoConfigDe(selectEl.name);
+    const neutra = opcionSinEstudio(cfg);
+    const confirma = confirm(
+      `⚠️ No hay ningún estudio cargado para "${cfg.label}".\n\n${neutra ? `Sin el informe, la opción que corresponde es "${neutra}".` : "Sin el informe no se puede poner un resultado."}\n\n¿Querés dejar "${selectEl.value}" igual? Vas a tener que explicar en "Obs." de este campo de dónde sale el resultado (por ejemplo: el paciente trajo el estudio en papel).`,
+    );
+    if (!confirma) {
+      selectEl.value = neutra;
+      selectEl.dataset.sinEstudioConfirmado = "";
+      return true;
+    }
+    selectEl.dataset.sinEstudioConfirmado = "true";
+    const inputObs = cierreForm.querySelector(`[name="${nombreObsDe(selectEl.name)}"]`);
+    if (inputObs) {
+      inputObs.classList.add("border-yellow-500", "ring-yellow-500");
+      setTimeout(() => {
+        inputObs.scrollIntoView({ behavior: "smooth", block: "center" });
+        inputObs.focus();
+      }, 200);
+    }
+    return true;
+  }
+
   function verificarDiscrepanciaEnVivo(selectEl) {
+    // Primero: ¿hay estudio para respaldar el resultado? Si no lo hay, ese
+    // aviso es el que corresponde (no tiene sentido comparar con el lab).
+    if (verificarSinEstudioEnVivo(selectEl)) return;
     const campo = selectEl.name;
     const esperados = window._valoresEsperadosLab || {};
     if (!esperados[campo]) return;
@@ -160,6 +223,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const el = cierreForm.querySelector(`[name="${campo}"]`);
       if (el) {
         el.value = valor;
+        el.dataset.valorOriginal = el.value;
         encontrados++;
       } else {
         console.warn(`prefillFormDesdeUltimoDP: no se encontró el campo "${campo}" en el DOM.`);
@@ -1669,6 +1733,48 @@ document.addEventListener("DOMContentLoaded", () => {
         observacion: observacionActual,
       });
     }
+    // ── RESULTADOS SIN ESTUDIO CARGADO (red de seguridad al guardar) ──
+    for (const selectEl of cierreForm.querySelectorAll("select")) {
+      if (!resultadoSinEstudio(selectEl)) continue;
+      const cfg = campoConfigDe(selectEl.name);
+      const nombreObs = nombreObsDe(selectEl.name);
+      const inputObs = cierreForm.querySelector(`[name="${nombreObs}"]`);
+
+      if (selectEl.dataset.sinEstudioConfirmado !== "true") {
+        const confirma = confirm(
+          `⚠️ En "${cfg.label}" pusiste "${selectEl.value}", pero no hay ningún estudio cargado.\n\n${opcionSinEstudio(cfg) ? `Sin el informe, la opción que corresponde es "${opcionSinEstudio(cfg)}".` : "Sin el informe no se puede poner un resultado."}\n\n¿Confirmás "${selectEl.value}"? (Cancelar = volver al formulario para corregirlo)`,
+        );
+        if (!confirma) {
+          selectEl.classList.add("border-red-500", "ring-red-500");
+          selectEl.scrollIntoView({ behavior: "smooth", block: "center" });
+          selectEl.focus();
+          return;
+        }
+        selectEl.dataset.sinEstudioConfirmado = "true";
+      }
+
+      const observacionActual = (formData[nombreObs] || "").trim();
+      if (!observacionActual) {
+        alert(
+          `En "${cfg.label}" pusiste "${selectEl.value}" sin estudio cargado.\n\nAntes de guardar, explicá en "Obs. ${cfg.label}" de dónde sale ese resultado.`,
+        );
+        if (inputObs) {
+          inputObs.classList.add("border-red-500", "ring-red-500");
+          inputObs.scrollIntoView({ behavior: "smooth", block: "center" });
+          inputObs.focus();
+        }
+        return;
+      }
+
+      // Queda registrado para la coordinación (tabla novedades_coordinacion)
+      discrepanciasConfirmadas.push({
+        campo: selectEl.name,
+        valorMedico: selectEl.value,
+        valorLab: "SIN ESTUDIO CARGADO",
+        observacion: observacionActual,
+      });
+    }
+
     formData.discrepanciasConfirmadas = discrepanciasConfirmadas;
 
     if (window._modoCorreccion) {
