@@ -32,13 +32,15 @@ document.addEventListener("DOMContentLoaded", () => {
   const formStepsContainer = document.getElementById("form-steps-container");
   const progressBar = document.getElementById("progress-bar");
 
-  // ── RESULTADO SIN ESTUDIO CARGADO ──
-  // Si el campo tiene estudio asociado y no hay nada cargado (botón "Ver
-  // Estudio" gris), la única opción sin justificar es "No se realiza"
-  // ("Pendiente" también, porque no es un resultado). Cualquier otro valor
-  // obliga a explicar en la observación del campo, y queda registrado como
-  // novedad para la coordinación.
-  const VALORES_SIN_ESTUDIO_PERMITIDOS = ["No se realiza", "No aplica", "Pendiente"];
+  // ── RESULTADO vs. ESTUDIO CARGADO ──
+  // Cada campo con botón "Ver Estudio" sabe si hay algo cargado (verde/gris).
+  // Dos incoherencias obligan a explicar en la observación del campo, y
+  // quedan registradas como novedad para la coordinación:
+  //  - "sinEstudio": no hay estudio (gris) y el médico pone un resultado.
+  //    Sin estudio solo vale "No se realiza" / "No aplica" / "Pendiente".
+  //  - "conEstudio": hay estudio (verde) y el médico pone "No se realiza",
+  //    "No aplica" o "Pendiente".
+  const VALORES_NEUTROS = ["No se realiza", "No aplica", "Pendiente"];
 
   function campoConfigDe(nombre) {
     return fieldsConfig.find((f) => f.name === nombre);
@@ -55,28 +57,40 @@ document.addEventListener("DOMContentLoaded", () => {
     const sig = fieldsConfig[i + 1];
     return sig && sig.name.startsWith("Observaciones_") ? sig.name : `Observaciones_${nombre}`;
   }
-  function resultadoSinEstudio(selectEl) {
+  // Devuelve "sinEstudio", "conEstudio" o null (todo coherente)
+  function incoherenciaConEstudio(selectEl) {
     const cfg = campoConfigDe(selectEl.name);
-    if (!cfg || !cfg.hasStudyButton) return false;
+    if (!cfg || !cfg.hasStudyButton) return null;
     const valor = selectEl.value;
-    if (!valor || VALORES_SIN_ESTUDIO_PERMITIDOS.includes(valor)) return false;
-    // En una corrección, solo se controla lo que el médico cambia ahora
-    if (window._modoCorreccion && selectEl.dataset.valorOriginal === valor) return false;
-    return !resolverEstadoEstudio(cfg.name, cfg.studyType).tieneAlgo;
+    if (!valor) return null;
+    const hayEstudio = resolverEstadoEstudio(cfg.name, cfg.studyType).tieneAlgo;
+    const esNeutro = VALORES_NEUTROS.includes(valor);
+    if (!hayEstudio && !esNeutro) return "sinEstudio";
+    if (hayEstudio && esNeutro) return "conEstudio";
+    return null;
+  }
+  function textoIncoherencia(tipo, cfg, valor) {
+    if (tipo === "sinEstudio") {
+      const neutra = opcionSinEstudio(cfg);
+      return `No hay ningún estudio cargado para "${cfg.label}" y pusiste "${valor}".\n\n${neutra ? `Sin el informe, la opción que corresponde es "${neutra}".` : "Sin el informe no se puede poner un resultado."}`;
+    }
+    return `Hay un estudio cargado para "${cfg.label}" (botón "Ver Estudio" en verde) y pusiste "${valor}".\n\nRevisá el estudio y poné el resultado que corresponde.`;
   }
 
   function verificarSinEstudioEnVivo(selectEl) {
-    if (!resultadoSinEstudio(selectEl)) {
+    const tipo = incoherenciaConEstudio(selectEl);
+    if (!tipo) {
       selectEl.dataset.sinEstudioConfirmado = "";
       return false;
     }
     const cfg = campoConfigDe(selectEl.name);
-    const neutra = opcionSinEstudio(cfg);
     const confirma = confirm(
-      `⚠️ No hay ningún estudio cargado para "${cfg.label}".\n\n${neutra ? `Sin el informe, la opción que corresponde es "${neutra}".` : "Sin el informe no se puede poner un resultado."}\n\n¿Querés dejar "${selectEl.value}" igual? Vas a tener que explicar en "Obs." de este campo de dónde sale el resultado (por ejemplo: el paciente trajo el estudio en papel).`,
+      `⚠️ ${textoIncoherencia(tipo, cfg, selectEl.value)}\n\n¿Querés dejar "${selectEl.value}" igual? Vas a tener que explicar el motivo en "Obs." de este campo.`,
     );
     if (!confirma) {
-      selectEl.value = neutra;
+      // Sin estudio: vuelve a la opción neutra. Con estudio: queda vacío
+      // para que elija el resultado mirando el estudio.
+      selectEl.value = tipo === "sinEstudio" ? opcionSinEstudio(cfg) : "";
       selectEl.dataset.sinEstudioConfirmado = "";
       return true;
     }
@@ -1733,16 +1747,18 @@ document.addEventListener("DOMContentLoaded", () => {
         observacion: observacionActual,
       });
     }
-    // ── RESULTADOS SIN ESTUDIO CARGADO (red de seguridad al guardar) ──
+    // ── RESULTADO vs. ESTUDIO CARGADO (red de seguridad al guardar) ──
+    // Se controlan TODOS los campos, también en una corrección.
     for (const selectEl of cierreForm.querySelectorAll("select")) {
-      if (!resultadoSinEstudio(selectEl)) continue;
+      const tipo = incoherenciaConEstudio(selectEl);
+      if (!tipo) continue;
       const cfg = campoConfigDe(selectEl.name);
       const nombreObs = nombreObsDe(selectEl.name);
       const inputObs = cierreForm.querySelector(`[name="${nombreObs}"]`);
 
       if (selectEl.dataset.sinEstudioConfirmado !== "true") {
         const confirma = confirm(
-          `⚠️ En "${cfg.label}" pusiste "${selectEl.value}", pero no hay ningún estudio cargado.\n\n${opcionSinEstudio(cfg) ? `Sin el informe, la opción que corresponde es "${opcionSinEstudio(cfg)}".` : "Sin el informe no se puede poner un resultado."}\n\n¿Confirmás "${selectEl.value}"? (Cancelar = volver al formulario para corregirlo)`,
+          `⚠️ ${textoIncoherencia(tipo, cfg, selectEl.value)}\n\n¿Confirmás "${selectEl.value}"? (Cancelar = volver al formulario para corregirlo)`,
         );
         if (!confirma) {
           selectEl.classList.add("border-red-500", "ring-red-500");
@@ -1756,7 +1772,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const observacionActual = (formData[nombreObs] || "").trim();
       if (!observacionActual) {
         alert(
-          `En "${cfg.label}" pusiste "${selectEl.value}" sin estudio cargado.\n\nAntes de guardar, explicá en "Obs. ${cfg.label}" de dónde sale ese resultado.`,
+          `En "${cfg.label}" pusiste "${selectEl.value}" ${tipo === "sinEstudio" ? "sin estudio cargado" : "aunque hay un estudio cargado"}.\n\nAntes de guardar, explicá el motivo en "Obs. ${cfg.label}".`,
         );
         if (inputObs) {
           inputObs.classList.add("border-red-500", "ring-red-500");
@@ -1770,7 +1786,7 @@ document.addEventListener("DOMContentLoaded", () => {
       discrepanciasConfirmadas.push({
         campo: selectEl.name,
         valorMedico: selectEl.value,
-        valorLab: "SIN ESTUDIO CARGADO",
+        valorLab: tipo === "sinEstudio" ? "SIN ESTUDIO CARGADO" : "HAY ESTUDIO CARGADO",
         observacion: observacionActual,
       });
     }
