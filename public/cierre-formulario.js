@@ -45,7 +45,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const { esperado, valorLabCrudo } = esperados[campo];
     const confirma = confirm(
-      `⚠️ El valor que elegiste en "${campo.replace(/_/g, " ")}" es "${valorMedico}", pero el laboratorio dice "${valorLabCrudo}" (esperado: "${esperado}").\n\n¿Confirmás que querés dejarlo así? Vas a tener que explicar el motivo en el campo de Observaciones correspondiente antes de poder guardar el cierre.`,
+      `⚠️ El valor que elegiste en "${campo.replace(/_/g, " ")}" es "${valorMedico}", pero la LECTURA AUTOMÁTICA del laboratorio dice "${valorLabCrudo}" (esperado: "${esperado}").\n\nEsa lectura la hace el sistema y puede tener errores. El informe oficial es el PDF firmado por el bioquímico responsable: verificalo en el PDF.\n\n¿Confirmás tu valor? Vas a tener que explicar el motivo en el campo de Observaciones correspondiente antes de poder guardar el cierre.`,
     );
 
     if (!confirma) {
@@ -1639,7 +1639,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (!yaConfirmadoEnVivo) {
         const confirma = confirm(
-          `⚠️ El valor que ingresaste en "${campo.replace(/_/g, " ")}" es "${valorMedico}", pero el laboratorio dice "${valorLabCrudo}" (esperado: "${esperado}").\n\n¿Confirmás que querés guardar este valor de todos modos?`,
+          `⚠️ El valor que ingresaste en "${campo.replace(/_/g, " ")}" es "${valorMedico}", pero la LECTURA AUTOMÁTICA del laboratorio dice "${valorLabCrudo}" (esperado: "${esperado}").\n\nEsa lectura puede tener errores. El informe oficial es el PDF firmado por el bioquímico responsable.\n\n¿Confirmás tu valor según el PDF?`,
         );
         if (!confirma) {
           guardarCierreBtn.disabled = false;
@@ -1909,6 +1909,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 : estudio.TipoEstudio === "Laboratorio"
                   ? "Resultados de Laboratorio"
                   : "Resultados de Enfermería";
+              if (estudio.TipoEstudio !== "Enfermeria" && estudio.ResultadosLaboratorio) {
+                contentHtml += `<div class="bg-orange-50 border-2 border-orange-400 rounded-lg p-2 mt-2 text-sm text-orange-900">
+                  <p class="font-bold">⚠️ Valores leídos automáticamente: pueden tener errores.</p>
+                  <p>El informe oficial es el <strong>PDF firmado por el bioquímico responsable</strong>. Verificá cada resultado en el PDF antes de cerrar.</p>
+                </div>`;
+              }
               contentHtml += `<p class="font-semibold mt-2">${tituloResultados}:</p>`;
               contentHtml += `<ul class="list-disc list-inside ml-4">`;
 

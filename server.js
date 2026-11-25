@@ -2070,12 +2070,21 @@ app.post("/cargar-datos-paciente", async (req, res) => {
         let esperado = null;
 
         if (cfg.tipo === "binario" || cfg.tipo === "binario_multiple") {
-          const hayPositivo = valoresLab.some((v) =>
-            ["POSITIVO", "REACTIVO"].includes(v.toString().toUpperCase()),
-          );
-          const todosNegativo = valoresLab.every((v) =>
-            ["NEGATIVO", "NO REACTIVO"].includes(v.toString().toUpperCase()),
-          );
+          // Clasifica el valor leído del informe. Reconoce la VDRL informada con
+          // diluciones ("R 32 DILS", "REACTIVO SUERO PURO") como reactiva, y NO
+          // compara cuando la lectura quedó marcada "VERIFICAR EN PDF".
+          const clasificar = (valor) => {
+            const u = valor.toString().trim().toUpperCase();
+            if (u.includes("VERIFICAR")) return "dudoso";
+            if (u === "NEGATIVO" || u === "NO REACTIVO" || u === "NR") return "neg";
+            if (u === "POSITIVO" || u === "REACTIVO") return "pos";
+            if (cfg.labCampos.includes("vdrl") && !u.includes("NO REACTIVO") &&
+                (/^R\s*\d/.test(u) || u.includes("DIL") || u.includes("REACTIVO"))) return "pos";
+            return "dudoso";
+          };
+          const clases = valoresLab.map(clasificar);
+          const hayPositivo = clases.includes("pos");
+          const todosNegativo = clases.every((c) => c === "neg");
           if (hayPositivo) esperado = cfg.positivo;
           else if (todosNegativo) esperado = cfg.negativo;
         } else if (cfg.tipo === "detectable_multiple") {
